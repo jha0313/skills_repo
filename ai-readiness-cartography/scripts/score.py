@@ -110,7 +110,12 @@ def walk_files(root: Path) -> list[Path]:
 
 
 def find_core_modules(repo: Path) -> list[Module]:
-    """Top-level + apps/* + packages/* + services/* code-bearing dirs."""
+    """Top-level + apps/* + packages/* + services/* code-bearing dirs.
+
+    Single-app expansion: if a single-app project uses the `src/features/`,
+    `src/modules/`, or `src/domains/` pattern (>=2 sub-dirs), each sub-dir
+    is also treated as a module so domain-level CLAUDE.md is counted.
+    """
     candidates: list[Path] = []
 
     # top-level dirs
@@ -131,8 +136,27 @@ def find_core_modules(repo: Path) -> list[Module]:
                 if d.is_dir() and d.name not in IGNORE_DIRS:
                     candidates.append(d)
 
+    # single-app domain pattern: src/(features|modules|domains)/*
+    for src_dir in (repo / "src",):
+        if not src_dir.is_dir():
+            continue
+        for pattern in ("features", "modules", "domains"):
+            domain_root = src_dir / pattern
+            if not domain_root.is_dir():
+                continue
+            sub_dirs = [
+                d for d in sorted(domain_root.iterdir())
+                if d.is_dir() and d.name not in IGNORE_DIRS and not d.name.startswith(".")
+            ]
+            if len(sub_dirs) >= 2:
+                candidates.extend(sub_dirs)
+
     modules: list[Module] = []
+    seen: set[Path] = set()
     for d in candidates:
+        if d in seen:
+            continue
+        seen.add(d)
         code_count = 0
         for r, dirs, files in os.walk(d):
             dirs[:] = [x for x in dirs if x not in IGNORE_DIRS and not x.startswith(".")]
