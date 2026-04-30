@@ -40,7 +40,7 @@ PRIMARY_CONTEXT = ("CLAUDE.md", "AGENTS.md")  # anything stronger than README
 # Heuristic regex
 RE_PATH_REF = re.compile(
     r"(?<![A-Za-z0-9_/])"
-    r"((?:\./|[A-Za-z0-9_]+/)[A-Za-z0-9_./-]+\.(?:py|ts|tsx|js|jsx|md|sql|json|yaml|yml|toml|html|css|sh|go|rs|java|kt|rb|php))"
+    r"((?:\./|[A-Za-z0-9_]+/)[A-Za-z0-9_./-]+\.(?:tsx|ts|jsx|js|py|md|sql|json|yaml|yml|toml|html|css|sh|go|rs|java|kt|rb|php))"
 )
 RE_BASH_FENCE = re.compile(r"```(?:bash|sh|shell|zsh|console)\s*\n([\s\S]*?)```", re.IGNORECASE)
 RE_NON_OBVIOUS = re.compile(r"\b(Why:|Note:|Gotcha|Warning|Don't|Caveat|Important:|반드시|주의)", re.IGNORECASE)
