@@ -1,0 +1,705 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>claude-md-management · Plugin Guide</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #fafafa;
+        --surface: #ffffff;
+        --border: #e5e7eb;
+        --border-strong: #d1d5db;
+        --text: #0f172a;
+        --text-2: #475569;
+        --text-3: #94a3b8;
+        --accent: #2563eb;
+        --accent-soft: #eff6ff;
+        --green: #16a34a;
+        --green-soft: #dcfce7;
+        --amber: #d97706;
+        --amber-soft: #fef3c7;
+        --red: #dc2626;
+        --red-soft: #fee2e2;
+        --grid: #f1f5f9;
+      }
+
+      * { box-sizing: border-box; }
+
+      html, body {
+        margin: 0; padding: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: "Inter", -apple-system, system-ui, "Segoe UI", sans-serif;
+        font-feature-settings: "cv11", "ss01";
+        -webkit-font-smoothing: antialiased;
+      }
+
+      .page { max-width: 1180px; margin: 0 auto; padding: 48px 40px 64px; }
+      code { font-family: "JetBrains Mono", monospace; }
+
+      /* ============ HEADER ============ */
+      .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        padding-bottom: 24px;
+        border-bottom: 1px solid var(--border);
+        margin-bottom: 36px;
+        gap: 24px;
+      }
+      .header .eyebrow {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px; font-weight: 500;
+        color: var(--text-3);
+        letter-spacing: 0.12em; text-transform: uppercase;
+        margin-bottom: 10px;
+      }
+      .header h1 { font-size: 32px; font-weight: 700; margin: 0; letter-spacing: -0.02em; }
+      .header .sub {
+        font-size: 15px; color: var(--text-2);
+        margin-top: 6px; line-height: 1.5; max-width: 680px;
+      }
+      .header-meta {
+        text-align: right;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px; color: var(--text-3);
+        line-height: 1.8; white-space: nowrap;
+      }
+      .header-meta strong { color: var(--text); font-weight: 500; }
+
+      /* ============ SECTION SCAFFOLD ============ */
+      section.block { margin-bottom: 40px; }
+      .block-title { display: flex; align-items: baseline; gap: 12px; margin-bottom: 16px; }
+      .block-title .n {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 12px; font-weight: 600;
+        color: var(--accent); background: var(--accent-soft);
+        border-radius: 4px; padding: 2px 8px;
+      }
+      .block-title h2 { font-size: 18px; font-weight: 700; margin: 0; letter-spacing: -0.01em; }
+      .block-title .hint { font-size: 13px; color: var(--text-3); margin-left: auto; }
+      .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+
+      /* ============ COMPARE TABLE ============ */
+      .compare {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .compare th, .compare td {
+        padding: 16px 20px;
+        text-align: left;
+        font-size: 14px;
+        border-bottom: 1px solid var(--border);
+        vertical-align: top;
+      }
+      .compare tr:last-child td { border-bottom: 0; }
+      .compare thead th {
+        font-size: 12px; font-weight: 600;
+        text-transform: uppercase; letter-spacing: 0.05em;
+        background: var(--grid); color: var(--text-2);
+      }
+      .compare thead th.skill { color: var(--accent); }
+      .compare thead th.cmd { color: var(--green); }
+      .compare tbody th {
+        font-weight: 600; color: var(--text-3);
+        font-size: 12px; width: 130px;
+        font-family: "JetBrains Mono", monospace;
+        background: #fcfcfd;
+      }
+      .compare td .v { font-weight: 600; color: var(--text); }
+      .compare td .s { font-size: 12.5px; color: var(--text-2); margin-top: 2px; }
+      .compare col.col-skill { background: var(--accent-soft); }
+      .compare col.col-cmd { background: var(--green-soft); }
+
+      /* ============ TOOL HERO ============ */
+      .tool {
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        overflow: hidden;
+        background: var(--surface);
+      }
+      .tool-head {
+        padding: 22px 26px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        border-bottom: 1px solid var(--border);
+      }
+      .tool-skill .tool-head { background: var(--accent-soft); }
+      .tool-cmd .tool-head { background: var(--green-soft); }
+      .tool-badge {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px; font-weight: 600;
+        padding: 4px 10px; border-radius: 999px;
+        white-space: nowrap;
+      }
+      .tool-skill .tool-badge { background: var(--accent); color: #fff; }
+      .tool-cmd .tool-badge { background: var(--green); color: #fff; }
+      .tool-head .name {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 19px; font-weight: 600;
+      }
+      .tool-skill .tool-head .name { color: var(--accent); }
+      .tool-cmd .tool-head .name { color: var(--green); }
+      .tool-head .role { font-size: 13px; color: var(--text-2); margin-top: 2px; }
+      .tool-head .right {
+        margin-left: auto;
+        text-align: right;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px; color: var(--text-3);
+        line-height: 1.7;
+      }
+      .tool-body { padding: 24px 26px 26px; }
+      .tool-body > p.lead {
+        font-size: 14px; color: var(--text-2);
+        line-height: 1.6; margin: 0 0 22px;
+      }
+      .tool-body > p.lead strong { color: var(--text); }
+
+      .writes-flag {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        font-size: 12px;
+        font-family: "JetBrains Mono", monospace;
+        color: var(--amber);
+        background: var(--amber-soft);
+        border-radius: 6px;
+        padding: 5px 11px;
+        margin-bottom: 20px;
+      }
+
+      /* phases / steps */
+      .phase-label {
+        font-size: 11px;
+        font-family: "JetBrains Mono", monospace;
+        font-weight: 600;
+        color: var(--text-3);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        margin: 0 0 12px;
+      }
+      .flow { display: grid; gap: 0; }
+      .flow-item {
+        display: grid;
+        grid-template-columns: 36px 1fr;
+        gap: 16px;
+        padding: 14px 0;
+        align-items: start;
+      }
+      .flow-item + .flow-item { border-top: 1px dashed var(--border); }
+      .flow-item .num {
+        width: 26px; height: 26px;
+        border-radius: 7px;
+        display: flex; align-items: center; justify-content: center;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 13px; font-weight: 600;
+      }
+      .tool-skill .flow-item .num { background: var(--accent-soft); color: var(--accent); }
+      .tool-cmd .flow-item .num { background: var(--green-soft); color: var(--green); }
+      .flow-item .t { font-size: 14px; font-weight: 600; margin-bottom: 3px; }
+      .flow-item .d { font-size: 13px; color: var(--text-2); line-height: 1.55; }
+      .flow-item .d code {
+        font-size: 11.5px; background: var(--grid);
+        padding: 1px 5px; border-radius: 3px;
+      }
+
+      /* invoke examples */
+      .invoke {
+        margin-top: 22px;
+        background: var(--text);
+        color: #e2e8f0;
+        border-radius: 8px;
+        padding: 16px 18px;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 12.5px;
+        line-height: 1.8;
+      }
+      .invoke .c { color: #64748b; }
+      .invoke .p { color: #93c5fd; }
+      .invoke .q { color: #86efac; }
+
+      /* ============ RUBRIC TABLE ============ */
+      .rubric-table {
+        width: 100%;
+        border-collapse: collapse;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .rubric-table th, .rubric-table td {
+        padding: 12px 18px;
+        font-size: 13.5px;
+        border-bottom: 1px solid var(--border);
+        text-align: left;
+      }
+      .rubric-table thead th {
+        font-size: 11px; font-weight: 600;
+        text-transform: uppercase; letter-spacing: 0.05em;
+        color: var(--text-3); background: var(--grid);
+      }
+      .rubric-table tbody tr:last-child td { border-bottom: 0; }
+      .rubric-table td.crit { font-weight: 600; }
+      .rubric-table td.wt {
+        font-family: "JetBrains Mono", monospace;
+        font-weight: 600; text-align: right; white-space: nowrap;
+      }
+      .rubric-table td .note { font-size: 12px; color: var(--text-2); margin-top: 2px; }
+      .rubric-table tfoot td {
+        font-family: "JetBrains Mono", monospace;
+        font-weight: 600; background: #fcfcfd;
+      }
+
+      .grade-chips {
+        display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px;
+      }
+      .grade-chip {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 12px; font-weight: 600;
+        padding: 5px 12px; border-radius: 999px;
+        border: 1px solid var(--border-strong);
+      }
+
+      /* ============ DECISION ============ */
+      .decide { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+      .decide-card { padding: 22px 24px; }
+      .decide-card .tag {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 12px; font-weight: 600;
+        display: inline-block; padding: 3px 10px; border-radius: 6px; margin-bottom: 12px;
+      }
+      .decide-card.skill .tag { background: var(--accent-soft); color: var(--accent); }
+      .decide-card.cmd .tag { background: var(--green-soft); color: var(--green); }
+      .decide-card h4 { font-size: 15px; margin: 0 0 10px; }
+      .decide-card ul { margin: 0; padding-left: 18px; }
+      .decide-card li { font-size: 13px; color: var(--text-2); line-height: 1.7; }
+
+      /* ============ TIPS ============ */
+      .tips { padding: 6px 0; }
+      .tip-row {
+        display: grid;
+        grid-template-columns: 200px 1fr;
+        gap: 18px;
+        padding: 14px 24px;
+        align-items: baseline;
+      }
+      .tip-row + .tip-row { border-top: 1px solid var(--border); }
+      .tip-row .k {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 12.5px; font-weight: 600; color: var(--accent);
+      }
+      .tip-row .d { font-size: 13px; color: var(--text-2); line-height: 1.55; }
+      .tip-row .d code {
+        font-size: 11.5px; background: var(--grid);
+        padding: 1px 5px; border-radius: 3px; color: var(--text);
+      }
+
+      /* ============ FILES ============ */
+      .files { padding: 6px 0; }
+      .file-row {
+        display: grid; grid-template-columns: 320px 1fr; gap: 18px;
+        padding: 12px 24px; align-items: baseline;
+      }
+      .file-row + .file-row { border-top: 1px solid var(--border); }
+      .file-row .path {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 12.5px; font-weight: 500;
+      }
+      .file-row .what { font-size: 13px; color: var(--text-2); line-height: 1.5; }
+
+      footer {
+        margin-top: 52px; padding-top: 20px;
+        border-top: 1px solid var(--border);
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px; color: var(--text-3); text-align: center;
+      }
+      footer a { color: var(--accent); text-decoration: none; }
+
+      @media (max-width: 920px) {
+        .page { padding: 32px 20px 48px; }
+        .header { flex-direction: column; align-items: flex-start; }
+        .header-meta { text-align: left; }
+        .decide { grid-template-columns: 1fr; }
+        .tip-row, .file-row { grid-template-columns: 1fr; gap: 6px; }
+        .compare thead { display: none; }
+        .tool-head { flex-wrap: wrap; }
+        .tool-head .right { margin-left: 0; text-align: left; width: 100%; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <!-- =========== HEADER =========== -->
+      <header class="header">
+        <div>
+          <div class="eyebrow">Official Plugin · claude-md-management</div>
+          <h1>CLAUDE.md Management</h1>
+          <div class="sub">
+            Anthropic's official plugin for maintaining and improving CLAUDE.md files —
+            audit quality, capture session learnings, and keep project memory current.
+            It ships <strong>two complementary tools</strong>: one skill and one slash command.
+          </div>
+        </div>
+        <div class="header-meta">
+          <div>Version <strong>1.0.0</strong></div>
+          <div>Author <strong>Anthropic</strong></div>
+          <div>by <strong>Isabella He</strong></div>
+        </div>
+      </header>
+
+      <!-- =========== OVERVIEW / COMPARE =========== -->
+      <section class="block">
+        <div class="block-title">
+          <span class="n">01</span>
+          <h2>Two tools, different purposes</h2>
+          <span class="hint">one aligns to the code, one records the session</span>
+        </div>
+        <table class="compare">
+          <colgroup>
+            <col />
+            <col class="col-skill" />
+            <col class="col-cmd" />
+          </colgroup>
+          <thead>
+            <tr>
+              <th></th>
+              <th class="skill">claude-md-improver (skill)</th>
+              <th class="cmd">/revise-claude-md (command)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th>Purpose</th>
+              <td><div class="v">Keep CLAUDE.md aligned with the codebase</div><div class="s">Audit &amp; improve against the current code state</div></td>
+              <td><div class="v">Capture session learnings</div><div class="s">Record context this conversation revealed</div></td>
+            </tr>
+            <tr>
+              <th>Triggered by</th>
+              <td><div class="v">Codebase changes</div></td>
+              <td><div class="v">End of session</div></td>
+            </tr>
+            <tr>
+              <th>Use when</th>
+              <td><div class="v">Periodic maintenance</div><div class="s">"audit my CLAUDE.md"</div></td>
+              <td><div class="v">A session revealed missing context</div><div class="s">You want to record what you just learned</div></td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- =========== TOOL 1: SKILL =========== -->
+      <section class="block">
+        <div class="block-title">
+          <span class="n">02</span>
+          <h2>Tool ①  claude-md-improver</h2>
+          <span class="hint">audit skill — quality report → approval → targeted updates</span>
+        </div>
+        <div class="tool tool-skill">
+          <div class="tool-head">
+            <span class="tool-badge">SKILL</span>
+            <div>
+              <div class="name">claude-md-improver</div>
+              <div class="role">Audit, evaluate, and improve CLAUDE.md across a codebase</div>
+            </div>
+            <div class="right">
+              <div>tools: Read · Glob</div>
+              <div>Grep · Bash · Edit</div>
+            </div>
+          </div>
+          <div class="tool-body">
+            <p class="lead">
+              Finds every CLAUDE.md in the repo, scores it against quality criteria, and
+              <strong>outputs a quality report first</strong> — then, with your approval,
+              makes minimal targeted edits. The goal: give Claude Code optimal project context.
+            </p>
+            <div class="writes-flag">⚠ This skill writes to CLAUDE.md files — but only after the report and your approval</div>
+
+            <div class="phase-label">5-phase workflow</div>
+            <div class="flow">
+              <div class="flow-item">
+                <div class="num">1</div>
+                <div>
+                  <div class="t">Discovery</div>
+                  <div class="d">Collect all <code>CLAUDE.md</code> · <code>.claude.local.md</code> · global / package-level files via <code>find</code>. Monorepos auto-discover parent directories.</div>
+                </div>
+              </div>
+              <div class="flow-item">
+                <div class="num">2</div>
+                <div>
+                  <div class="t">Quality Assessment</div>
+                  <div class="d">Evaluate each file against 6 criteria and cross-reference with the actual codebase (do commands run? do referenced files exist? is the architecture accurate?).</div>
+                </div>
+              </div>
+              <div class="flow-item">
+                <div class="num">3</div>
+                <div>
+                  <div class="t">Quality Report</div>
+                  <div class="d"><strong>Always before any edit</strong>, output the score report: summary + per-file criterion scores + issues + recommended additions.</div>
+                </div>
+              </div>
+              <div class="flow-item">
+                <div class="num">4</div>
+                <div>
+                  <div class="t">Targeted Updates</div>
+                  <div class="d">Only genuinely useful info (discovered commands · gotchas · package relationships · testing approaches). Skip what's obvious from code or generic. Present each change as a diff + "why this helps."</div>
+                </div>
+              </div>
+              <div class="flow-item">
+                <div class="num">5</div>
+                <div>
+                  <div class="t">Apply Updates</div>
+                  <div class="d">After approval, apply with <code>Edit</code>. Preserve the existing structure.</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="invoke">
+              <span class="c"># Triggered by natural language (skill)</span><br />
+              <span class="q">"audit my CLAUDE.md files"</span><br />
+              <span class="q">"check if my CLAUDE.md is up to date"</span><br />
+              <span class="q">"CLAUDE.md maintenance"</span> · <span class="q">"project memory optimization"</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =========== RUBRIC =========== -->
+      <section class="block">
+        <div class="block-title">
+          <span class="n">03</span>
+          <h2>Quality scoring rubric (100 pts)</h2>
+          <span class="hint">what claude-md-improver scores each file against</span>
+        </div>
+        <table class="rubric-table">
+          <thead>
+            <tr><th>Criterion</th><th>What it measures</th><th style="text-align:right">Points</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="crit">Commands / Workflows</td>
+              <td>Are build · test · lint · deploy commands and the dev workflow documented?</td>
+              <td class="wt">20</td>
+            </tr>
+            <tr>
+              <td class="crit">Architecture Clarity</td>
+              <td>Are key directories · module relationships · entry points · data flow clear?</td>
+              <td class="wt">20</td>
+            </tr>
+            <tr>
+              <td class="crit">Non-Obvious Patterns</td>
+              <td>Are gotchas · known issues · workarounds · "why we do it this way" captured?</td>
+              <td class="wt">15</td>
+            </tr>
+            <tr>
+              <td class="crit">Conciseness</td>
+              <td>No filler or obvious info — does every line add value?</td>
+              <td class="wt">15</td>
+            </tr>
+            <tr>
+              <td class="crit">Currency</td>
+              <td>Do commands work, and do file references · tech stack match the current state?</td>
+              <td class="wt">15</td>
+            </tr>
+            <tr>
+              <td class="crit">Actionability</td>
+              <td>Are instructions copy-pasteable, steps concrete, and paths real?</td>
+              <td class="wt">15</td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr><td>Total</td><td></td><td class="wt">100</td></tr>
+          </tfoot>
+        </table>
+        <div class="grade-chips">
+          <span class="grade-chip" style="color: var(--green); border-color: var(--green)">A · 90–100 comprehensive, current, actionable</span>
+          <span class="grade-chip" style="color: var(--green); border-color: var(--green)">B · 70–89 good coverage, minor gaps</span>
+          <span class="grade-chip" style="color: var(--amber); border-color: var(--amber)">C · 50–69 basic, missing key sections</span>
+          <span class="grade-chip" style="color: var(--amber); border-color: var(--amber)">D · 30–49 sparse or outdated</span>
+          <span class="grade-chip" style="color: var(--red); border-color: var(--red)">F · 0–29 missing or severely outdated</span>
+        </div>
+      </section>
+
+      <!-- =========== TOOL 2: COMMAND =========== -->
+      <section class="block">
+        <div class="block-title">
+          <span class="n">04</span>
+          <h2>Tool ②  /revise-claude-md</h2>
+          <span class="hint">end-of-session slash command — record learnings one line at a time</span>
+        </div>
+        <div class="tool tool-cmd">
+          <div class="tool-head">
+            <span class="tool-badge">COMMAND</span>
+            <div>
+              <div class="name">/revise-claude-md</div>
+              <div class="role">Fold this session's learnings into CLAUDE.md</div>
+            </div>
+            <div class="right">
+              <div>allowed-tools:</div>
+              <div>Read · Edit · Glob</div>
+            </div>
+          </div>
+          <div class="tool-body">
+            <p class="lead">
+              Reflects on the session to extract <strong>"what context would have helped future
+              Claude sessions work more effectively."</strong> Because CLAUDE.md is part of the
+              prompt, the key is to record <strong>one line per concept</strong> — brevity matters.
+            </p>
+
+            <div class="phase-label">5-step procedure</div>
+            <div class="flow">
+              <div class="flow-item">
+                <div class="num">1</div>
+                <div>
+                  <div class="t">Reflect</div>
+                  <div class="d">Identify what was missing: bash commands used/discovered, code-style patterns followed, testing approaches that worked, environment/config quirks, warnings &amp; gotchas hit.</div>
+                </div>
+              </div>
+              <div class="flow-item">
+                <div class="num">2</div>
+                <div>
+                  <div class="t">Find CLAUDE.md files</div>
+                  <div class="d">Decide where each addition belongs: <code>CLAUDE.md</code> (team-shared) vs <code>.claude.local.md</code> (personal · gitignored).</div>
+                </div>
+              </div>
+              <div class="flow-item">
+                <div class="num">3</div>
+                <div>
+                  <div class="t">Draft additions</div>
+                  <div class="d">Format: <code>&lt;command or pattern&gt; - &lt;brief description&gt;</code>. Avoid verbose explanations, obvious info, and one-off fixes unlikely to recur.</div>
+                </div>
+              </div>
+              <div class="flow-item">
+                <div class="num">4</div>
+                <div>
+                  <div class="t">Show proposed changes</div>
+                  <div class="d">Present each addition as <code>### Update</code> + a one-line <strong>Why</strong> + a diff block.</div>
+                </div>
+              </div>
+              <div class="flow-item">
+                <div class="num">5</div>
+                <div>
+                  <div class="t">Apply with approval</div>
+                  <div class="d">Ask whether to apply, and only edit the files the user approves.</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="invoke">
+              <span class="c"># Run as a slash command (at the end of a session)</span><br />
+              <span class="p">/revise-claude-md</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =========== WHICH TO USE =========== -->
+      <section class="block">
+        <div class="block-title">
+          <span class="n">05</span>
+          <h2>Which to use when</h2>
+        </div>
+        <div class="decide">
+          <div class="card decide-card skill">
+            <span class="tag">claude-md-improver</span>
+            <h4>When the code changed / periodically</h4>
+            <ul>
+              <li>After refactors or structural changes drift the docs from the code</li>
+              <li>When you want a score for "how's our CLAUDE.md doing?"</li>
+              <li>When you want to audit many CLAUDE.md files (monorepo) at once</li>
+              <li>To catch stale commands · broken paths · outdated architecture notes</li>
+            </ul>
+          </div>
+          <div class="card decide-card cmd">
+            <span class="tag">/revise-claude-md</span>
+            <h4>When a session ends / you just learned something</h4>
+            <ul>
+              <li>When the session surfaced new commands · gotchas · patterns</li>
+              <li>When something arises that "the next session should also know"</li>
+              <li>To quickly record context from what you just did, one line at a time</li>
+              <li>When you only need an incremental capture, not a full audit</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- =========== TIPS =========== -->
+      <section class="block">
+        <div class="block-title">
+          <span class="n">06</span>
+          <h2>Tips worth knowing</h2>
+          <span class="hint">things the skill surfaces alongside its recommendations</span>
+        </div>
+        <div class="card tips">
+          <div class="tip-row">
+            <div class="k"># shortcut</div>
+            <div class="d">During a session, press <code>#</code> to have Claude auto-incorporate learnings into CLAUDE.md.</div>
+          </div>
+          <div class="tip-row">
+            <div class="k">.claude.local.md</div>
+            <div class="d">Put personal settings not shared with the team here. Add it to <code>.gitignore</code>.</div>
+          </div>
+          <div class="tip-row">
+            <div class="k">~/.claude/CLAUDE.md</div>
+            <div class="d">Put user-wide defaults that apply across all projects.</div>
+          </div>
+          <div class="tip-row">
+            <div class="k">Keep it concise</div>
+            <div class="d">CLAUDE.md should be human-readable — dense is better than verbose.</div>
+          </div>
+          <div class="tip-row">
+            <div class="k">Copy-paste commands</div>
+            <div class="d">Every documented command should be copy-paste ready.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =========== FILES / INSTALL =========== -->
+      <section class="block">
+        <div class="block-title">
+          <span class="n">07</span>
+          <h2>Plugin layout</h2>
+        </div>
+        <div class="card files">
+          <div class="file-row">
+            <div class="path">.claude-plugin/plugin.json</div>
+            <div class="what">Plugin manifest (name · description · version 1.0.0 · author)</div>
+          </div>
+          <div class="file-row">
+            <div class="path">skills/claude-md-improver/SKILL.md</div>
+            <div class="what">The audit skill body — 5-phase workflow · trigger conditions</div>
+          </div>
+          <div class="file-row">
+            <div class="path">skills/claude-md-improver/references/</div>
+            <div class="what"><code>quality-criteria.md</code> (scoring rubric) · <code>templates.md</code> (templates by project type) · <code>update-guidelines.md</code></div>
+          </div>
+          <div class="file-row">
+            <div class="path">commands/revise-claude-md.md</div>
+            <div class="what">The slash command for capturing session learnings (5-step procedure)</div>
+          </div>
+          <div class="file-row">
+            <div class="path">README.md · LICENSE</div>
+            <div class="what">Two-tool comparison · usage examples · example screenshots</div>
+          </div>
+        </div>
+      </section>
+
+      <footer>
+        claude-md-management v1.0.0 · Anthropic Official Plugin ·
+        <a href="https://github.com/anthropics/claude-plugins-official/tree/main/plugins/claude-md-management">github.com/anthropics/claude-plugins-official</a>
+      </footer>
+    </div>
+  </body>
+</html>
