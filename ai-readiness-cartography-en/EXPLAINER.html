@@ -1,0 +1,945 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ai-readiness-cartography · Skill Guide</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #fafafa;
+        --surface: #ffffff;
+        --border: #e5e7eb;
+        --border-strong: #d1d5db;
+        --text: #0f172a;
+        --text-2: #475569;
+        --text-3: #94a3b8;
+        --accent: #2563eb;
+        --accent-soft: #eff6ff;
+        --green: #16a34a;
+        --green-soft: #dcfce7;
+        --amber: #d97706;
+        --amber-soft: #fef3c7;
+        --red: #dc2626;
+        --red-soft: #fee2e2;
+        --grid: #f1f5f9;
+      }
+
+      * { box-sizing: border-box; }
+
+      html, body {
+        margin: 0;
+        padding: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: "Inter", -apple-system, system-ui, "Segoe UI", sans-serif;
+        font-feature-settings: "cv11", "ss01";
+        -webkit-font-smoothing: antialiased;
+      }
+
+      .page {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 48px 40px 64px;
+      }
+
+      code, .mono {
+        font-family: "JetBrains Mono", monospace;
+      }
+
+      /* ============ HEADER ============ */
+      .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        padding-bottom: 24px;
+        border-bottom: 1px solid var(--border);
+        margin-bottom: 36px;
+        gap: 24px;
+      }
+
+      .header .eyebrow {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--text-3);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        margin-bottom: 10px;
+      }
+
+      .header h1 {
+        font-size: 32px;
+        font-weight: 700;
+        margin: 0;
+        letter-spacing: -0.02em;
+      }
+
+      .header .sub {
+        font-size: 15px;
+        color: var(--text-2);
+        margin-top: 6px;
+        line-height: 1.5;
+        max-width: 680px;
+      }
+
+      .header-meta {
+        text-align: right;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px;
+        color: var(--text-3);
+        line-height: 1.8;
+        white-space: nowrap;
+      }
+
+      .header-meta strong { color: var(--text); font-weight: 500; }
+
+      /* ============ SECTION SCAFFOLD ============ */
+      section.block { margin-bottom: 40px; }
+
+      .block-title {
+        display: flex;
+        align-items: baseline;
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+
+      .block-title .n {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--accent);
+        background: var(--accent-soft);
+        border-radius: 4px;
+        padding: 2px 8px;
+      }
+
+      .block-title h2 {
+        font-size: 18px;
+        font-weight: 700;
+        margin: 0;
+        letter-spacing: -0.01em;
+      }
+
+      .block-title .hint {
+        font-size: 13px;
+        color: var(--text-3);
+        margin-left: auto;
+      }
+
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+      }
+
+      /* ============ INTRO STRIP ============ */
+      .intro {
+        display: grid;
+        grid-template-columns: 360px 1fr;
+        gap: 24px;
+      }
+
+      .pitch { padding: 28px; }
+
+      .pitch .kicker {
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--text-3);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      .pitch .big {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+        margin: 12px 0 2px;
+      }
+
+      .pitch .big .num {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 56px;
+        font-weight: 700;
+        letter-spacing: -0.04em;
+        line-height: 1;
+      }
+
+      .pitch .big .unit {
+        font-size: 16px;
+        color: var(--text-3);
+        font-weight: 500;
+      }
+
+      .pitch p {
+        font-size: 13.5px;
+        color: var(--text-2);
+        line-height: 1.6;
+        margin: 14px 0 0;
+      }
+
+      .pitch hr {
+        border: 0;
+        border-top: 1px solid var(--border);
+        margin: 18px 0 14px;
+      }
+
+      .pitch .stat-row {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+      }
+
+      .pitch .stat .k {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px;
+        color: var(--text-3);
+        margin-bottom: 2px;
+      }
+
+      .pitch .stat .v { font-size: 17px; font-weight: 600; }
+
+      /* deliverables */
+      .deliverables {
+        padding: 22px 26px;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .deliverables h3 {
+        font-size: 13px;
+        font-weight: 600;
+        margin: 0 0 4px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-2);
+      }
+
+      .deliverables .lead {
+        font-size: 13px;
+        color: var(--text-3);
+        margin: 0 0 16px;
+      }
+
+      .deliv-item {
+        display: grid;
+        grid-template-columns: 30px 1fr;
+        gap: 14px;
+        padding: 14px 0;
+        align-items: start;
+      }
+
+      .deliv-item + .deliv-item { border-top: 1px dashed var(--border); }
+
+      .deliv-item .idx {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--accent);
+        background: var(--accent-soft);
+        border-radius: 6px;
+        width: 30px;
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .deliv-item .t { font-size: 14px; font-weight: 600; margin-bottom: 3px; }
+      .deliv-item .d { font-size: 13px; color: var(--text-2); line-height: 1.55; }
+
+      /* ============ TRIGGER CHIPS ============ */
+      .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+
+      .chip {
+        font-size: 13px;
+        color: var(--text);
+        background: var(--surface);
+        border: 1px solid var(--border-strong);
+        border-radius: 999px;
+        padding: 6px 14px;
+      }
+
+      .chip.soft {
+        color: var(--text-2);
+        border-style: dashed;
+        border-color: var(--border-strong);
+        background: var(--grid);
+      }
+
+      .trigger-note {
+        font-size: 13px;
+        color: var(--text-2);
+        line-height: 1.6;
+        margin-top: 16px;
+        padding: 14px 16px;
+        background: var(--accent-soft);
+        border-left: 3px solid var(--accent);
+        border-radius: 0 6px 6px 0;
+      }
+
+      /* ============ RUBRIC BARS ============ */
+      .rubric { padding: 20px 24px 22px; }
+
+      .rubric-row {
+        display: grid;
+        grid-template-columns: 28px 1fr 280px 64px;
+        gap: 14px;
+        align-items: center;
+        padding: 11px 0;
+      }
+
+      .rubric-row + .rubric-row { border-top: 1px dashed var(--border); }
+
+      .rubric-row .cat {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--accent);
+      }
+
+      .rubric-row .name { font-size: 14px; font-weight: 600; }
+
+      .rubric-row .desc {
+        font-size: 12px;
+        color: var(--text-3);
+        margin-top: 2px;
+        line-height: 1.45;
+      }
+
+      .rubric-row .bar {
+        height: 10px;
+        border-radius: 3px;
+        background: var(--grid);
+        overflow: hidden;
+      }
+
+      .rubric-row .bar > span {
+        display: block;
+        height: 100%;
+        border-radius: 3px;
+        background: var(--accent);
+      }
+
+      .rubric-row .pts {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 14px;
+        font-weight: 600;
+        text-align: right;
+      }
+
+      .rubric-row .pts small { color: var(--text-3); font-weight: 400; }
+
+      /* ============ GRADE SCALE ============ */
+      .grades {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 12px;
+      }
+
+      .grade {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 16px 16px 18px;
+        background: var(--surface);
+      }
+
+      .grade .band {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 12px;
+        font-weight: 600;
+        margin-bottom: 8px;
+      }
+
+      .grade .lvl { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
+      .grade .m { font-size: 12px; color: var(--text-2); line-height: 1.5; }
+
+      .grade .dot {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        margin-right: 6px;
+        vertical-align: middle;
+      }
+
+      /* ============ WORKFLOW STEPS ============ */
+      .steps {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 0;
+      }
+
+      .step {
+        position: relative;
+        padding: 22px 22px 24px;
+        border: 1px solid var(--border);
+        background: var(--surface);
+      }
+
+      .step:first-child { border-radius: 8px 0 0 8px; }
+      .step:last-child { border-radius: 0 8px 8px 0; }
+      .step + .step { border-left: 0; }
+
+      .step .s {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-3);
+        margin-bottom: 10px;
+      }
+
+      .step h4 { font-size: 14px; font-weight: 700; margin: 0 0 8px; }
+      .step p { font-size: 12.5px; color: var(--text-2); line-height: 1.55; margin: 0; }
+
+      .step .arrow {
+        position: absolute;
+        right: -9px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 18px;
+        height: 18px;
+        background: var(--bg);
+        border-radius: 999px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        color: var(--text-3);
+        z-index: 2;
+      }
+      .step:last-child .arrow { display: none; }
+
+      .cmd {
+        margin-top: 20px;
+        background: var(--text);
+        color: #e2e8f0;
+        border-radius: 8px;
+        padding: 16px 18px;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 12.5px;
+        line-height: 1.7;
+        overflow-x: auto;
+      }
+      .cmd .c { color: #64748b; }
+      .cmd .g { color: #86efac; }
+      .cmd .b { color: #93c5fd; }
+
+      /* ============ DETECT COLUMNS ============ */
+      .detect {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+      }
+
+      .panel-head {
+        padding: 14px 20px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .panel-head h3 {
+        font-size: 13px;
+        font-weight: 600;
+        margin: 0;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      .panel-auto .panel-head { background: var(--green-soft); }
+      .panel-auto .panel-head h3 { color: var(--green); }
+      .panel-manual .panel-head { background: var(--amber-soft); }
+      .panel-manual .panel-head h3 { color: var(--amber); }
+
+      .panel-list { list-style: none; margin: 0; padding: 0; }
+
+      .panel-list li {
+        padding: 13px 20px;
+        border-top: 1px solid var(--border);
+        font-size: 13px;
+        line-height: 1.55;
+        color: var(--text-2);
+      }
+      .panel-list li:first-child { border-top: 0; }
+
+      .panel-list .tag {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 10.5px;
+        font-weight: 600;
+        padding: 2px 6px;
+        border-radius: 3px;
+        margin-right: 8px;
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+
+      .e1-highlight {
+        margin-top: 16px;
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        padding: 16px 18px;
+        background: var(--red-soft);
+        border-radius: 8px;
+      }
+      .e1-highlight .badge {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--red);
+        background: #fff;
+        border: 1px solid var(--red);
+        border-radius: 4px;
+        padding: 3px 7px;
+        white-space: nowrap;
+      }
+      .e1-highlight .txt { font-size: 13px; color: #7f1d1d; line-height: 1.55; }
+      .e1-highlight .txt strong { color: var(--red); }
+
+      /* ============ STYLE RULES ============ */
+      .rules-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0;
+      }
+      .style-rule {
+        padding: 16px 20px;
+        border: 1px solid var(--border);
+        margin: -0.5px;
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        background: var(--surface);
+      }
+      .style-rule .mk { color: var(--accent); font-weight: 700; font-size: 15px; line-height: 1.3; }
+      .style-rule .x { color: var(--red); }
+      .style-rule .body { font-size: 13px; color: var(--text-2); line-height: 1.55; }
+      .style-rule .body strong { color: var(--text); }
+
+      /* ============ FILES ============ */
+      .files { padding: 6px 0; }
+      .file-row {
+        display: grid;
+        grid-template-columns: 280px 1fr;
+        gap: 18px;
+        padding: 14px 24px;
+        align-items: baseline;
+      }
+      .file-row + .file-row { border-top: 1px solid var(--border); }
+      .file-row .path {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--text);
+      }
+      .file-row .what { font-size: 13px; color: var(--text-2); line-height: 1.55; }
+
+      footer {
+        margin-top: 52px;
+        padding-top: 20px;
+        border-top: 1px solid var(--border);
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px;
+        color: var(--text-3);
+        text-align: center;
+      }
+
+      @media (max-width: 920px) {
+        .page { padding: 32px 20px 48px; }
+        .header { flex-direction: column; align-items: flex-start; }
+        .header-meta { text-align: left; }
+        .intro, .detect, .rules-grid { grid-template-columns: 1fr; }
+        .grades { grid-template-columns: 1fr 1fr; }
+        .steps { grid-template-columns: 1fr; }
+        .step, .step:first-child, .step:last-child { border-radius: 8px; }
+        .step + .step { border-left: 1px solid var(--border); border-top: 0; }
+        .step .arrow { display: none; }
+        .rubric-row { grid-template-columns: 22px 1fr 90px 50px; }
+        .rubric-row .desc { display: none; }
+        .file-row { grid-template-columns: 1fr; gap: 6px; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <!-- =========== HEADER =========== -->
+      <header class="header">
+        <div>
+          <div class="eyebrow">Skill Guide · ai-readiness-cartography-en</div>
+          <h1>AI-Readiness Cartography</h1>
+          <div class="sub">
+            A skill that scores any repository against the
+            <strong>AI-Ready Codebase v2 rubric</strong> and visualizes the result
+            as a professional technical dashboard. It answers one question with a number:
+            "How friendly is this codebase to coding agents / LLM workflows?"
+          </div>
+        </div>
+        <div class="header-meta">
+          <div>Rubric <strong>v2 · 100pt</strong></div>
+          <div>Categories <strong>7 (A–G)</strong></div>
+          <div>Scorer <strong>Python · stdlib</strong></div>
+        </div>
+      </header>
+
+      <!-- =========== INTRO / DELIVERABLES =========== -->
+      <section class="block">
+        <div class="intro">
+          <div class="card pitch">
+            <div class="kicker">In one line</div>
+            <div class="big">
+              <span class="num">100</span><span class="unit">points</span>
+            </div>
+            <p>
+              Scores a repo across 7 categories — Navigation · Context Quality ·
+              Tribal Knowledge · Dependency Mapping · Verification Gates · Freshness ·
+              Agent Outcomes. The bundled Python scorer auto-detects coverage,
+              hallucinated paths, drift, and god files.
+            </p>
+            <hr />
+            <div class="stat-row">
+              <div class="stat">
+                <div class="k">categories</div>
+                <div class="v">7</div>
+              </div>
+              <div class="stat">
+                <div class="k">deliverables</div>
+                <div class="v">3</div>
+              </div>
+              <div class="stat">
+                <div class="k">deps</div>
+                <div class="v">0</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card deliverables">
+            <h3>Deliverables — always all three at once</h3>
+            <p class="lead">It never produces just one. Score → visualize → prioritize, in a single pass.</p>
+            <div class="deliv-item">
+              <div class="idx">1</div>
+              <div>
+                <div class="t">JSON scorecard</div>
+                <div class="d">
+                  Raw data with categories A–G, evidence, sub_scores, findings,
+                  ROI actions, and large files. Consumable by other tools.
+                  (<code>ai-readiness-score.json</code>)
+                </div>
+              </div>
+            </div>
+            <div class="deliv-item">
+              <div class="idx">2</div>
+              <div>
+                <div class="t">Single HTML dashboard</div>
+                <div class="d">
+                  A decision-making instrument panel for humans: score hero ·
+                  7-category bar chart · structural map (SVG) · Wins / ROI panel.
+                  (<code>ai-readiness-map.html</code>)
+                </div>
+              </div>
+            </div>
+            <div class="deliv-item">
+              <div class="idx">3</div>
+              <div>
+                <div class="t">ROI-ranked action list</div>
+                <div class="d">
+                  Next steps sorted by <code>impact_score / effort_hours</code>.
+                  Each item carries a category tag, effort (S/M/L), and a quantified impact.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =========== TRIGGERS =========== -->
+      <section class="block">
+        <div class="block-title">
+          <span class="n">A</span>
+          <h2>When it triggers</h2>
+          <span class="hint">Fires on "agent-readiness assessment" intent, even without the keyword</span>
+        </div>
+        <div class="chips">
+          <span class="chip">AI-readiness map</span>
+          <span class="chip">AI-ready visualization</span>
+          <span class="chip">repo cartography</span>
+          <span class="chip">codebase audit visualization</span>
+          <span class="chip">ai-readiness-cartography</span>
+          <span class="chip soft">"is this repo AI-friendly?"</span>
+          <span class="chip soft">"can a coding agent handle this code?"</span>
+          <span class="chip soft">"map the repo against the rubric"</span>
+          <span class="chip soft">"audit our codebase for agent readiness"</span>
+        </div>
+        <div class="trigger-note">
+          Even without an exact keyword, it triggers whenever a user points at a repo
+          and asks whether it is <strong>ready for coding agents / LLM workflows</strong>.
+          The output is always a clean technical dashboard — never a fantasy map
+          (no compass roses, parchment, or similar ornaments).
+        </div>
+      </section>
+
+      <!-- =========== RUBRIC =========== -->
+      <section class="block">
+        <div class="block-title">
+          <span class="n">B</span>
+          <h2>v2 rubric — 7 categories</h2>
+          <span class="hint">bar length = point weight (relative to the 20-pt max)</span>
+        </div>
+        <div class="card rubric">
+          <div class="rubric-row">
+            <div class="cat">A</div>
+            <div>
+              <div class="name">AI Navigation &amp; Coverage</div>
+              <div class="desc">Can the AI quickly find the codebase / modules / workflows — context coverage ratio</div>
+            </div>
+            <div class="bar"><span style="width: 75%"></span></div>
+            <div class="pts">15<small>/15</small></div>
+          </div>
+          <div class="rubric-row">
+            <div class="cat">B</div>
+            <div>
+              <div class="name">Context Document Quality</div>
+              <div class="desc">"Compass, not encyclopedia" — conciseness · quick commands · key files · hidden rules · cross-refs (B1–B5)</div>
+            </div>
+            <div class="bar"><span style="width: 100%"></span></div>
+            <div class="pts">20<small>/20</small></div>
+          </div>
+          <div class="rubric-row">
+            <div class="cat">C</div>
+            <div>
+              <div class="name">Tribal Knowledge Externalization</div>
+              <div class="desc">Are hidden rules / failure patterns structured — Meta's Five-Question Framework + MEMORY/ADR</div>
+            </div>
+            <div class="bar"><span style="width: 100%"></span></div>
+            <div class="pts">20<small>/20</small></div>
+          </div>
+          <div class="rubric-row">
+            <div class="cat">D</div>
+            <div>
+              <div class="name">Cross-Module Dependency Mapping</div>
+              <div class="desc">Can the AI trace a change's blast radius — ARCHITECTURE.md · mermaid · deps sections</div>
+            </div>
+            <div class="bar"><span style="width: 75%"></span></div>
+            <div class="pts">15<small>/15</small></div>
+          </div>
+          <div class="rubric-row">
+            <div class="cat">E</div>
+            <div>
+              <div class="name">Verification &amp; Quality Gates</div>
+              <div class="desc">A system to verify AI-generated context / code — E1 hallucinated-path check is the heart</div>
+            </div>
+            <div class="bar"><span style="width: 75%"></span></div>
+            <div class="pts">15<small>/15</small></div>
+          </div>
+          <div class="rubric-row">
+            <div class="cat">F</div>
+            <div>
+              <div class="name">Freshness &amp; Self-Maintenance</div>
+              <div class="desc">Is context auto-maintained so it doesn't go stale — mtime drift · CI / hook validation</div>
+            </div>
+            <div class="bar"><span style="width: 50%"></span></div>
+            <div class="pts">10<small>/10</small></div>
+          </div>
+          <div class="rubric-row">
+            <div class="cat">G</div>
+            <div>
+              <div class="name">Agent Performance Outcomes</div>
+              <div class="desc">Is real AI task success / efficiency measured — evals/ · benchmarks · telemetry</div>
+            </div>
+            <div class="bar"><span style="width: 25%"></span></div>
+            <div class="pts">5<small>/5</small></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =========== GRADES =========== -->
+      <section class="block">
+        <div class="block-title">
+          <span class="n">C</span>
+          <h2>Final grade</h2>
+          <span class="hint">total → 5-tier badge (green / amber / red)</span>
+        </div>
+        <div class="grades">
+          <div class="grade">
+            <div class="band" style="color: var(--green)">90–100</div>
+            <div class="lvl"><span class="dot" style="background: var(--green)"></span>AI-Native</div>
+            <div class="m">Agent autonomously handles most recurring work + the context layer self-maintains</div>
+          </div>
+          <div class="grade">
+            <div class="band" style="color: var(--green)">75–89</div>
+            <div class="lvl"><span class="dot" style="background: var(--green)"></span>AI-Ready</div>
+            <div class="m">AI navigates, edits, and verifies reliably for most work</div>
+          </div>
+          <div class="grade">
+            <div class="band" style="color: var(--amber)">60–74</div>
+            <div class="lvl"><span class="dot" style="background: var(--amber)"></span>AI-Assisted</div>
+            <div class="m">Useful, but complex / domain tasks need human context</div>
+          </div>
+          <div class="grade">
+            <div class="band" style="color: var(--amber)">40–59</div>
+            <div class="lvl"><span class="dot" style="background: var(--amber)"></span>AI-Fragile</div>
+            <div class="m">Simple tasks work, but high error risk from hidden rules / dependencies</div>
+          </div>
+          <div class="grade">
+            <div class="band" style="color: var(--red)">&lt; 40</div>
+            <div class="lvl"><span class="dot" style="background: var(--red)"></span>AI-Hostile</div>
+            <div class="m">Heavy reliance on tribal knowledge; AI works from guesses</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =========== WORKFLOW =========== -->
+      <section class="block">
+        <div class="block-title">
+          <span class="n">D</span>
+          <h2>How it works</h2>
+          <span class="hint">auto-score → fill template → open → summarize</span>
+        </div>
+        <div class="steps">
+          <div class="step">
+            <div class="s">STEP 1</div>
+            <h4>Auto-score in Python</h4>
+            <p><code>scripts/score.py</code> scans the repo with stdlib only and emits per-category scores, findings, and ROI actions as JSON.</p>
+            <div class="arrow">→</div>
+          </div>
+          <div class="step">
+            <div class="s">STEP 2</div>
+            <h4>Fill the HTML template</h4>
+            <p>Copy <code>assets/template.html</code> and slot in the JSON values. <strong>Never write from scratch</strong> — the design would drift every time.</p>
+            <div class="arrow">→</div>
+          </div>
+          <div class="step">
+            <div class="s">STEP 3</div>
+            <h4>Open in the browser</h4>
+            <p><code>open</code> on macOS, <code>xdg-open</code> on Linux. If the user says "don't open it," just report the path.</p>
+            <div class="arrow">→</div>
+          </div>
+          <div class="step">
+            <div class="s">STEP 4</div>
+            <h4>Summary report</h4>
+            <p>Total / grade · the 1–2 weakest categories · top 3 ROI actions · the generated file paths — in one paragraph.</p>
+          </div>
+        </div>
+        <div class="cmd">
+          <span class="c"># Step 1 — auto-score (no dependencies, Python 3.10+)</span><br />
+          python3 ~/.claude/skills/ai-readiness-cartography-en/scripts/score.py <span class="b">&lt;repo-path&gt;</span> \<br />
+          &nbsp;&nbsp;<span class="g">--json</span> &lt;output&gt;/ai-readiness-score.json<br />
+          <br />
+          <span class="c"># Save-location priority: docs/ → .claude/ → repo root (explicit path wins)</span>
+        </div>
+      </section>
+
+      <!-- =========== AUTO vs MANUAL =========== -->
+      <section class="block">
+        <div class="block-title">
+          <span class="n">E</span>
+          <h2>What the scorer catches vs. what humans supplement</h2>
+          <span class="hint">run the script first → supplement on top</span>
+        </div>
+        <div class="detect">
+          <section class="card panel-auto">
+            <div class="panel-head"><h3>Auto — caught by the script</h3></div>
+            <ul class="panel-list">
+              <li><span class="tag">A</span>Context coverage ratio of core modules (CLAUDE.md / AGENTS.md)</li>
+              <li><span class="tag">B1·B5</span>Conciseness · cross-references (relative links)</li>
+              <li><span class="tag">C Q1–Q5</span>Five-Question heuristic + MEMORY/ADR presence</li>
+              <li><span class="tag">D</span>ARCHITECTURE.md · mermaid · workspace-file detection</li>
+              <li><span class="tag">E1</span>Hallucinated-path verification — every path candidate checked for existence</li>
+              <li><span class="tag">F</span>Context drift (mtime) + CI / hook validation</li>
+              <li><span class="tag">G</span>evals/ · benchmarks/ directories + telemetry hints</li>
+            </ul>
+          </section>
+          <section class="card panel-manual">
+            <div class="panel-head"><h3>Manual — supplemented in depth</h3></div>
+            <ul class="panel-list">
+              <li><span class="tag">B2–B4</span>The real depth of quick commands · key files · hidden patterns</li>
+              <li><span class="tag">C</span>The actual depth of tribal knowledge (heuristic-pass ≠ truly there)</li>
+              <li><span class="tag">E2</span>The quality of the independent critic review</li>
+              <li><span class="tag">E4</span>The quality of prompt / workflow tests</li>
+              <li style="color: var(--text-3)">After receiving the JSON, the LLM supplements manual items or reflects them in the charts.</li>
+            </ul>
+          </section>
+        </div>
+        <div class="e1-highlight">
+          <div class="badge">E1 · top priority</div>
+          <div class="txt">
+            <strong>Zero hallucinated paths</strong> is the Meta standard. If a context
+            file points at a path that doesn't exist, even one is an immediate fix action.
+            Unverified context is <strong>more dangerous</strong> than no context at all.
+          </div>
+        </div>
+      </section>
+
+      <!-- =========== STYLE RULES =========== -->
+      <section class="block">
+        <div class="block-title">
+          <span class="n">F</span>
+          <h2>Style rules (non-negotiable)</h2>
+          <span class="hint">deviate and it stops being this skill</span>
+        </div>
+        <div class="rules-grid">
+          <div class="style-rule">
+            <div class="mk">Aa</div>
+            <div class="body"><strong>Fonts.</strong> Inter for body, JetBrains Mono for numbers/code. No other fonts.</div>
+          </div>
+          <div class="style-rule">
+            <div class="mk">◧</div>
+            <div class="body"><strong>Colors.</strong> Locked to the template's CSS-variable palette. blue/green/amber/red accents.</div>
+          </div>
+          <div class="style-rule">
+            <div class="mk">▢</div>
+            <div class="body"><strong>Background.</strong> <code>#fafafa</code> light. Do not build a dark mode.</div>
+          </div>
+          <div class="style-rule">
+            <div class="mk x">✕</div>
+            <div class="body"><strong>No ornaments.</strong> compass roses · parchment · cursive · emoji · stamps — none.</div>
+          </div>
+          <div class="style-rule">
+            <div class="mk x">✕</div>
+            <div class="body"><strong>No chart libraries.</strong> Every visualization is inline SVG + CSS.</div>
+          </div>
+          <div class="style-rule">
+            <div class="mk x">✕</div>
+            <div class="body"><strong>No fantasy regression.</strong> The name is cartography, but don't lean on map metaphors.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =========== FILES =========== -->
+      <section class="block">
+        <div class="block-title">
+          <span class="n">G</span>
+          <h2>Skill files</h2>
+        </div>
+        <div class="card files">
+          <div class="file-row">
+            <div class="path">SKILL.md</div>
+            <div class="what">Entry-point doc: trigger conditions · deliverables · workflow · style rules</div>
+          </div>
+          <div class="file-row">
+            <div class="path">references/scoring-rubric.md</div>
+            <div class="what">Single source of truth for the 7-category v2 criteria (with Auto / Heuristic / Manual tags)</div>
+          </div>
+          <div class="file-row">
+            <div class="path">scripts/score.py</div>
+            <div class="what">Auto-scoring + ROI action generation (Python 3.10+, stdlib only). Emits JSON · markdown</div>
+          </div>
+          <div class="file-row">
+            <div class="path">assets/template.html</div>
+            <div class="what">The source dashboard to copy and fill. Never author from scratch — copy → edit</div>
+          </div>
+        </div>
+      </section>
+
+      <footer>
+        ai-readiness-cartography-en · Skill Explainer · v2 rubric (7 categories / 100 pts)
+      </footer>
+    </div>
+  </body>
+</html>

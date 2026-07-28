@@ -1,0 +1,1364 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GrowthNote · AI-Readiness Map</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #fafafa;
+        --surface: #ffffff;
+        --border: #e5e7eb;
+        --border-strong: #d1d5db;
+        --text: #0f172a;
+        --text-2: #475569;
+        --text-3: #94a3b8;
+        --accent: #2563eb;
+        --accent-soft: #eff6ff;
+        --green: #16a34a;
+        --green-soft: #dcfce7;
+        --amber: #d97706;
+        --amber-soft: #fef3c7;
+        --red: #dc2626;
+        --red-soft: #fee2e2;
+        --grid: #f1f5f9;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family:
+          "Inter",
+          -apple-system,
+          system-ui,
+          "Segoe UI",
+          sans-serif;
+        font-feature-settings: "cv11", "ss01";
+        -webkit-font-smoothing: antialiased;
+      }
+
+      .page {
+        max-width: 1280px;
+        margin: 0 auto;
+        padding: 48px 40px 64px;
+      }
+
+      /* ============ HEADER ============ */
+      .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        padding-bottom: 24px;
+        border-bottom: 1px solid var(--border);
+        margin-bottom: 32px;
+      }
+
+      .header .eyebrow {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--text-3);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        margin-bottom: 8px;
+      }
+
+      .header h1 {
+        font-size: 30px;
+        font-weight: 700;
+        margin: 0;
+        letter-spacing: -0.02em;
+      }
+
+      .header .sub {
+        font-size: 14px;
+        color: var(--text-2);
+        margin-top: 4px;
+      }
+
+      .header-meta {
+        text-align: right;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px;
+        color: var(--text-3);
+        line-height: 1.7;
+      }
+
+      .header-meta strong {
+        color: var(--text);
+        font-weight: 500;
+      }
+
+      /* ============ SCORE STRIP ============ */
+      .score-strip {
+        display: grid;
+        grid-template-columns: 320px 1fr;
+        gap: 24px;
+        margin-bottom: 32px;
+      }
+
+      .score-hero {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 28px 28px 24px;
+      }
+
+      .score-hero .label {
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--text-3);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      .score-hero .value {
+        display: flex;
+        align-items: baseline;
+        gap: 6px;
+        margin-top: 8px;
+      }
+
+      .score-hero .num {
+        font-size: 64px;
+        font-weight: 700;
+        letter-spacing: -0.04em;
+        line-height: 1;
+        color: var(--text);
+      }
+
+      .score-hero .denom {
+        font-size: 20px;
+        color: var(--text-3);
+        font-weight: 500;
+      }
+
+      .score-hero .grade-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 14px;
+      }
+
+      .grade-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 10px;
+        border-radius: 999px;
+        background: var(--green-soft);
+        color: var(--green);
+        font-size: 12px;
+        font-weight: 600;
+        font-family: "JetBrains Mono", monospace;
+      }
+
+      .grade-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 999px;
+        background: var(--green);
+      }
+
+      .score-hero .desc {
+        font-size: 13px;
+        color: var(--text-2);
+        line-height: 1.5;
+        margin-top: 10px;
+      }
+
+      .score-hero hr {
+        border: 0;
+        border-top: 1px solid var(--border);
+        margin: 18px 0 14px;
+      }
+
+      .mini-stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+      }
+
+      .mini-stat .k {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px;
+        color: var(--text-3);
+        margin-bottom: 2px;
+      }
+
+      .mini-stat .v {
+        font-size: 18px;
+        font-weight: 600;
+        color: var(--text);
+      }
+
+      /* ============ 10 RULES BAR CHART ============ */
+      .rules {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 20px 24px 24px;
+      }
+
+      .rules .rules-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 16px;
+      }
+
+      .rules h2 {
+        font-size: 14px;
+        font-weight: 600;
+        margin: 0;
+      }
+
+      .legend-inline {
+        display: flex;
+        gap: 14px;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px;
+        color: var(--text-2);
+      }
+
+      .legend-inline span {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+      }
+
+      .legend-inline i {
+        width: 8px;
+        height: 8px;
+        border-radius: 2px;
+      }
+
+      .rule-row {
+        display: grid;
+        grid-template-columns: 28px 1fr 220px 56px;
+        gap: 12px;
+        align-items: center;
+        padding: 7px 0;
+        font-size: 13px;
+      }
+
+      .rule-row + .rule-row {
+        border-top: 1px dashed var(--border);
+      }
+
+      .rule-row .idx {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px;
+        color: var(--text-3);
+        font-weight: 500;
+      }
+
+      .rule-row .title {
+        color: var(--text);
+        font-weight: 500;
+      }
+
+      .rule-row .sub {
+        font-size: 11.5px;
+        color: var(--text-3);
+        margin-top: 1px;
+      }
+
+      .rule-row .bar {
+        height: 8px;
+        border-radius: 3px;
+        background: var(--grid);
+        overflow: hidden;
+      }
+
+      .rule-row .bar > span {
+        display: block;
+        height: 100%;
+        border-radius: 3px;
+      }
+
+      .bar-good > span {
+        background: var(--green);
+      }
+      .bar-warn > span {
+        background: var(--amber);
+      }
+      .bar-bad > span {
+        background: var(--red);
+      }
+
+      .rule-row .num {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 13px;
+        font-weight: 600;
+        text-align: right;
+        color: var(--text);
+      }
+
+      /* ============ MAP ============ */
+      .map-section {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        margin-bottom: 32px;
+        overflow: hidden;
+      }
+
+      .map-head {
+        padding: 18px 24px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .map-head h2 {
+        font-size: 14px;
+        font-weight: 600;
+        margin: 0;
+      }
+
+      .map-head .sub {
+        font-size: 12px;
+        color: var(--text-2);
+        margin-top: 2px;
+      }
+
+      .map-legend {
+        display: flex;
+        gap: 18px;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px;
+        color: var(--text-2);
+        align-items: center;
+      }
+
+      .map-legend > span {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .legend-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+      }
+
+      .legend-square {
+        width: 10px;
+        height: 10px;
+        border-radius: 2px;
+      }
+
+      .legend-line {
+        width: 24px;
+        height: 0;
+        border-top: 1.5px solid;
+      }
+
+      .map-body {
+        padding: 28px 24px 32px;
+      }
+
+      .map-body svg {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+
+      /* ============ FINDINGS ============ */
+      .findings {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+      }
+
+      .panel {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+
+      .panel-head {
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .panel-head h3 {
+        font-size: 13px;
+        font-weight: 600;
+        margin: 0;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+
+      .panel-head .count {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px;
+        color: var(--text-3);
+        margin-left: auto;
+      }
+
+      .panel-strength .panel-head {
+        background: var(--green-soft);
+      }
+      .panel-strength .panel-head h3 {
+        color: var(--green);
+      }
+
+      .panel-risk .panel-head {
+        background: var(--red-soft);
+      }
+      .panel-risk .panel-head h3 {
+        color: var(--red);
+      }
+
+      .panel-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+
+      .panel-list li {
+        padding: 14px 20px;
+        border-top: 1px solid var(--border);
+        font-size: 13px;
+        line-height: 1.55;
+      }
+
+      .panel-list li:first-child {
+        border-top: 0;
+      }
+
+      .panel-list .head {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 500;
+        color: var(--text);
+      }
+
+      .panel-list .tag {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 10.5px;
+        padding: 2px 7px;
+        border-radius: 3px;
+        font-weight: 500;
+        letter-spacing: 0.02em;
+      }
+
+      .tag-rule {
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+
+      .panel-list .note {
+        margin-top: 4px;
+        color: var(--text-2);
+        font-size: 12.5px;
+      }
+
+      .panel-list code {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11.5px;
+        background: var(--grid);
+        padding: 1px 5px;
+        border-radius: 3px;
+        color: var(--text);
+      }
+
+      footer {
+        margin-top: 48px;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px;
+        color: var(--text-3);
+        text-align: center;
+      }
+
+      /* ============ SVG ============ */
+      .grid-bg {
+        stroke: var(--grid);
+        stroke-width: 1;
+      }
+
+      .node-card {
+        fill: var(--surface);
+        stroke: var(--border-strong);
+        stroke-width: 1.2;
+      }
+
+      .node-card.accent {
+        stroke: var(--accent);
+      }
+
+      .node-title {
+        font-family: "Inter", sans-serif;
+        font-size: 12px;
+        font-weight: 600;
+        fill: var(--text);
+      }
+
+      .node-meta {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 10px;
+        fill: var(--text-3);
+      }
+
+      .node-kpi {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px;
+        font-weight: 600;
+      }
+
+      .edge {
+        fill: none;
+        stroke: var(--border-strong);
+        stroke-width: 1.3;
+      }
+
+      .edge-dash {
+        stroke-dasharray: 4 3;
+      }
+
+      .edge-warn {
+        stroke: var(--amber);
+      }
+
+      .edge-type {
+        stroke: var(--accent);
+        stroke-width: 1.5;
+      }
+
+      .claude-dot {
+        fill: var(--accent);
+      }
+      .claude-ring {
+        fill: var(--accent-soft);
+      }
+
+      .test-dot {
+        fill: var(--green);
+      }
+
+      .hot {
+        fill: var(--red-soft);
+        stroke: var(--red);
+        stroke-width: 1;
+      }
+
+      .warm {
+        fill: var(--amber-soft);
+        stroke: var(--amber);
+        stroke-width: 1;
+      }
+
+      @media (max-width: 960px) {
+        .score-strip,
+        .findings {
+          grid-template-columns: 1fr;
+        }
+        .rule-row {
+          grid-template-columns: 24px 1fr 140px 40px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <!-- =========== HEADER =========== -->
+      <header class="header">
+        <div>
+          <div class="eyebrow">Repository Audit · AI-Readiness · v2 Rubric</div>
+          <h1>GrowthNote — AI-Readiness Map</h1>
+          <div class="sub">
+            7-category scoring · structural map · ROI-ranked actions
+          </div>
+        </div>
+        <div class="header-meta">
+          <div>Scored <strong>2026-04-28</strong></div>
+          <div>Branch <strong>feat/1-blog</strong></div>
+          <div>Modules <strong>4</strong> · Context files <strong>8</strong></div>
+        </div>
+      </header>
+
+      <!-- =========== SCORE STRIP =========== -->
+      <section class="score-strip">
+        <div class="score-hero">
+          <div class="label">AI-Readiness Index</div>
+          <div class="value">
+            <span class="num">32</span><span class="denom">/ 100</span>
+          </div>
+          <div class="grade-row">
+            <span class="grade-badge" style="background: var(--red-soft); color: var(--red)">
+              <span class="grade-dot" style="background: var(--red)"></span> AI-Hostile · agent-hostile
+            </span>
+          </div>
+          <div class="desc">
+            7 categories · weighted (A 15 · B 20 · C 20 · D 15 · E 15
+            · F 10 · G 5). The weakest areas are <strong>C Tribal
+            Knowledge Externalization (2/20)</strong> and <strong>D
+            Dependency Mapping (2/15)</strong>.
+            <strong>27 paths that don't exist in the context files</strong>
+            are the core reason the E1 verification item collapses.
+          </div>
+          <hr />
+          <div class="mini-stats">
+            <div class="mini-stat">
+              <div class="k">Modules with context</div>
+              <div class="v">3 / 4</div>
+            </div>
+            <div class="mini-stat">
+              <div class="k">Broken paths</div>
+              <div class="v" style="color: var(--red)">27</div>
+            </div>
+            <div class="mini-stat">
+              <div class="k">Files over 300 lines</div>
+              <div class="v">20</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Categories bar chart -->
+        <div class="rules">
+          <div class="rules-head">
+            <div>
+              <h2>7 categories — score by category</h2>
+            </div>
+            <div class="legend-inline">
+              <span><i style="background: var(--green)"></i> ≥75%</span>
+              <span><i style="background: var(--amber)"></i> 50–74%</span>
+              <span><i style="background: var(--red)"></i> &lt;50%</span>
+            </div>
+          </div>
+
+          <div class="rule-row">
+            <div class="idx">A</div>
+            <div>
+              <div class="title">AI Navigation & Coverage</div>
+              <div class="sub">
+                3 of 4 core modules have context · <code>scripts/</code> uncovered
+              </div>
+            </div>
+            <div class="bar bar-warn">
+              <span style="width: 73%"></span>
+            </div>
+            <div class="num">11/15</div>
+          </div>
+
+          <div class="rule-row">
+            <div class="idx">B</div>
+            <div>
+              <div class="title">Context Document Quality</div>
+              <div class="sub">
+                1 over length · sparse command blocks · few caution markers
+              </div>
+            </div>
+            <div class="bar bar-bad">
+              <span style="width: 30%"></span>
+            </div>
+            <div class="num">6/20</div>
+          </div>
+
+          <div class="rule-row">
+            <div class="idx">C</div>
+            <div>
+              <div class="title">Tribal Knowledge Externalization</div>
+              <div class="sub">
+                no MEMORY.md / ADR · Five-Question pass 1/5
+              </div>
+            </div>
+            <div class="bar bar-bad">
+              <span style="width: 10%"></span>
+            </div>
+            <div class="num">2/20</div>
+          </div>
+
+          <div class="rule-row">
+            <div class="idx">D</div>
+            <div>
+              <div class="title">Cross-Module Dependency Mapping</div>
+              <div class="sub">
+                ARCHITECTURE.md · mermaid · deps section all missing
+              </div>
+            </div>
+            <div class="bar bar-bad">
+              <span style="width: 13%"></span>
+            </div>
+            <div class="num">2/15</div>
+          </div>
+
+          <div class="rule-row">
+            <div class="idx">E</div>
+            <div>
+              <div class="title">Verification & Quality Gates</div>
+              <div class="sub">
+                <strong style="color: var(--red)">⚠ 27/31 refs broken</strong> · no CODEOWNERS · no evals
+              </div>
+            </div>
+            <div class="bar bar-bad">
+              <span style="width: 33%"></span>
+            </div>
+            <div class="num">5/15</div>
+          </div>
+
+          <div class="rule-row">
+            <div class="idx">F</div>
+            <div>
+              <div class="title">Freshness & Self-Maintenance</div>
+              <div class="sub">
+                drift 0% · husky pre-push present · no CI validation step
+              </div>
+            </div>
+            <div class="bar bar-good">
+              <span style="width: 80%"></span>
+            </div>
+            <div class="num">8/10</div>
+          </div>
+
+          <div class="rule-row">
+            <div class="idx">G</div>
+            <div>
+              <div class="title">Agent Performance Outcomes</div>
+              <div class="sub">
+                no evals/ · no benchmarks/ · zero measurement infra
+              </div>
+            </div>
+            <div class="bar bar-bad">
+              <span style="width: 0%"></span>
+            </div>
+            <div class="num">0/5</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =========== MAP =========== -->
+      <section class="map-section">
+        <div class="map-head">
+          <div>
+            <h2>Structural Map</h2>
+            <div class="sub">
+              Nodes = directories · edges = dependencies · in-card figures
+              are AI-readiness indicators for that area
+            </div>
+          </div>
+          <div class="map-legend">
+            <span
+              ><span
+                class="legend-dot"
+                style="background: var(--accent)"
+              ></span>
+              has CLAUDE.md</span
+            >
+            <span
+              ><span
+                class="legend-dot"
+                style="background: var(--green)"
+              ></span>
+              tests</span
+            >
+            <span
+              ><span
+                class="legend-square"
+                style="background: var(--red-soft); border: 1px solid var(--red)"
+              ></span>
+              over 400 lines
+            </span>
+            <span>
+              <span
+                class="legend-line"
+                style="border-color: var(--accent)"
+              ></span>
+              type link
+            </span>
+            <span>
+              <span
+                class="legend-line"
+                style="border-color: var(--border-strong); border-style: dashed"
+              ></span>
+              dependency
+            </span>
+          </div>
+        </div>
+
+        <div class="map-body">
+          <svg viewBox="0 0 1180 640" xmlns="http://www.w3.org/2000/svg">
+            <!-- subtle grid -->
+            <g class="grid-bg">
+              <path d="M0,80 H1180" />
+              <path d="M0,160 H1180" />
+              <path d="M0,240 H1180" />
+              <path d="M0,320 H1180" />
+              <path d="M0,400 H1180" />
+              <path d="M0,480 H1180" />
+              <path d="M0,560 H1180" />
+              <path d="M100,0 V640" />
+              <path d="M300,0 V640" />
+              <path d="M500,0 V640" />
+              <path d="M700,0 V640" />
+              <path d="M900,0 V640" />
+              <path d="M1100,0 V640" />
+            </g>
+
+            <!-- Column headers -->
+            <text
+              x="200"
+              y="32"
+              text-anchor="middle"
+              class="node-meta"
+              style="font-size: 11px; fill: var(--text-2); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;"
+            >
+              Frontend · apps/web
+            </text>
+            <text
+              x="590"
+              y="32"
+              text-anchor="middle"
+              class="node-meta"
+              style="font-size: 11px; fill: var(--text-2); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;"
+            >
+              Backend · apps/api
+            </text>
+            <text
+              x="980"
+              y="32"
+              text-anchor="middle"
+              class="node-meta"
+              style="font-size: 11px; fill: var(--text-2); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;"
+            >
+              Data · supabase
+            </text>
+
+            <!-- ============ ROOT CLAUDE.md (top center) ============ -->
+            <g transform="translate(440,60)">
+              <rect
+                class="node-card accent"
+                width="300"
+                height="70"
+                rx="8"
+              />
+              <circle cx="22" cy="22" r="14" class="claude-ring" />
+              <circle cx="22" cy="22" r="6" class="claude-dot" />
+              <text x="44" y="26" class="node-title">
+                CLAUDE.md (root)
+              </text>
+              <text x="44" y="42" class="node-meta">
+                Project overview · architecture · API endpoint map
+              </text>
+              <text x="44" y="58" class="node-meta" style="fill: var(--text-2)">
+                60 lines
+              </text>
+              <text
+                x="284"
+                y="26"
+                text-anchor="end"
+                class="node-kpi"
+                style="fill: var(--accent)"
+              >
+                root
+              </text>
+            </g>
+
+            <!-- ============ apps/web column ============ -->
+            <!-- web CLAUDE.md -->
+            <g transform="translate(60,180)">
+              <rect class="node-card accent" width="280" height="64" rx="8" />
+              <circle cx="22" cy="22" r="12" class="claude-ring" />
+              <circle cx="22" cy="22" r="5" class="claude-dot" />
+              <text x="42" y="26" class="node-title">apps/web/CLAUDE.md</text>
+              <text x="42" y="42" class="node-meta">
+                Directory conventions · naming · TanStack Query patterns
+              </text>
+              <text x="264" y="26" text-anchor="end" class="node-kpi">
+                360 ln
+              </text>
+            </g>
+
+            <!-- src/app -->
+            <g transform="translate(60,268)">
+              <rect class="node-card" width="280" height="110" rx="8" />
+              <text x="16" y="24" class="node-title">apps/web/src/app</text>
+              <text x="16" y="40" class="node-meta">
+                Next.js App Router · (app) (auth) (blog)
+              </text>
+
+              <!-- file row: manual -->
+              <g transform="translate(16,52)">
+                <rect class="hot" width="248" height="18" rx="3" />
+                <text x="8" y="13" class="node-meta" style="fill: var(--red); font-weight:600">
+                  manual/page.tsx
+                </text>
+                <text x="240" y="13" text-anchor="end" class="node-meta" style="fill: var(--red); font-weight:600">
+                  557
+                </text>
+              </g>
+
+              <!-- file row: upload -->
+              <g transform="translate(16,74)">
+                <rect class="hot" width="248" height="18" rx="3" />
+                <text x="8" y="13" class="node-meta" style="fill: var(--red); font-weight:600">
+                  upload/page.tsx
+                </text>
+                <text x="240" y="13" text-anchor="end" class="node-meta" style="fill: var(--red); font-weight:600">
+                  502
+                </text>
+              </g>
+            </g>
+
+            <!-- src/components -->
+            <g transform="translate(60,402)">
+              <rect class="node-card" width="280" height="130" rx="8" />
+              <text x="16" y="24" class="node-title">apps/web/src/components</text>
+              <text x="16" y="40" class="node-meta">
+                dashboard · blog · product · upload · layout
+              </text>
+
+              <!-- BlueCard -->
+              <g transform="translate(16,52)">
+                <rect class="hot" width="248" height="18" rx="3" />
+                <text x="8" y="13" class="node-meta" style="fill: var(--red); font-weight:600">
+                  dashboard/BlueCard.tsx
+                </text>
+                <text x="240" y="13" text-anchor="end" class="node-meta" style="fill: var(--red); font-weight:600">
+                  449
+                </text>
+              </g>
+
+              <!-- NotionRenderer -->
+              <g transform="translate(16,74)">
+                <rect class="warm" width="248" height="18" rx="3" />
+                <text x="8" y="13" class="node-meta" style="fill: var(--amber); font-weight:600">
+                  blog/NotionRenderer.tsx
+                </text>
+                <text x="240" y="13" text-anchor="end" class="node-meta" style="fill: var(--amber); font-weight:600">
+                  366
+                </text>
+              </g>
+
+              <!-- RedCard -->
+              <g transform="translate(16,96)">
+                <rect class="warm" width="248" height="18" rx="3" />
+                <text x="8" y="13" class="node-meta" style="fill: var(--amber); font-weight:600">
+                  dashboard/RedCard.tsx
+                </text>
+                <text x="240" y="13" text-anchor="end" class="node-meta" style="fill: var(--amber); font-weight:600">
+                  323
+                </text>
+              </g>
+            </g>
+
+            <!-- src/lib + tests (colocated) -->
+            <g transform="translate(60,556)">
+              <rect class="node-card" width="280" height="64" rx="8" />
+              <circle cx="22" cy="22" r="10" fill="var(--green-soft)" />
+              <circle cx="22" cy="22" r="5" class="test-dot" />
+              <text x="42" y="26" class="node-title">
+                apps/web/src/lib &amp; __tests__
+              </text>
+              <text x="42" y="42" class="node-meta">
+                Colocated tests ✓ · format · backend · notion · blog
+              </text>
+              <text x="264" y="26" text-anchor="end" class="node-kpi" style="fill: var(--green)">
+                5 suites
+              </text>
+            </g>
+
+            <!-- ============ apps/api column ============ -->
+            <!-- api CLAUDE.md -->
+            <g transform="translate(450,180)">
+              <rect class="node-card accent" width="280" height="64" rx="8" />
+              <circle cx="22" cy="22" r="12" class="claude-ring" />
+              <circle cx="22" cy="22" r="5" class="claude-dot" />
+              <text x="42" y="26" class="node-title">apps/api/CLAUDE.md</text>
+              <text x="42" y="42" class="node-meta">
+                Parser layout · Red/Blue Box · Template Method
+              </text>
+              <text x="264" y="26" text-anchor="end" class="node-kpi">
+                89 ln
+              </text>
+            </g>
+
+            <!-- app/routers -->
+            <g transform="translate(450,268)">
+              <rect class="node-card" width="280" height="110" rx="8" />
+              <text x="16" y="24" class="node-title">apps/api/app/routers</text>
+              <text x="16" y="40" class="node-meta">
+                upload · dashboard · costs · prices · admin
+              </text>
+
+              <!-- upload.py -->
+              <g transform="translate(16,52)">
+                <rect class="hot" width="248" height="18" rx="3" />
+                <text x="8" y="13" class="node-meta" style="fill: var(--red); font-weight:600">
+                  upload.py
+                </text>
+                <text x="240" y="13" text-anchor="end" class="node-meta" style="fill: var(--red); font-weight:600">
+                  539
+                </text>
+              </g>
+
+              <!-- dashboard.py -->
+              <g transform="translate(16,74)">
+                <rect fill="var(--grid)" width="248" height="18" rx="3" />
+                <text x="8" y="13" class="node-meta" style="fill: var(--text-2)">
+                  dashboard.py
+                </text>
+                <text x="240" y="13" text-anchor="end" class="node-meta" style="fill: var(--text-2)">
+                  269
+                </text>
+              </g>
+            </g>
+
+            <!-- app/services -->
+            <g transform="translate(450,402)">
+              <rect class="node-card" width="280" height="130" rx="8" />
+              <text x="16" y="24" class="node-title">apps/api/app/services</text>
+              <text x="16" y="40" class="node-meta">
+                aggregation · blue_box · file_processor · auth
+              </text>
+
+              <!-- aggregation.py -->
+              <g transform="translate(16,52)">
+                <rect class="hot" width="248" height="18" rx="3" />
+                <text x="8" y="13" class="node-meta" style="fill: var(--red); font-weight:600">
+                  aggregation.py
+                </text>
+                <text x="240" y="13" text-anchor="end" class="node-meta" style="fill: var(--red); font-weight:600">
+                  446
+                </text>
+              </g>
+              <!-- file_processor.py -->
+              <g transform="translate(16,74)">
+                <rect class="warm" width="248" height="18" rx="3" />
+                <text x="8" y="13" class="node-meta" style="fill: var(--amber); font-weight:600">
+                  file_processor.py
+                </text>
+                <text x="240" y="13" text-anchor="end" class="node-meta" style="fill: var(--amber); font-weight:600">
+                  345
+                </text>
+              </g>
+              <!-- blue_box.py -->
+              <g transform="translate(16,96)">
+                <rect fill="var(--grid)" width="248" height="18" rx="3" />
+                <text x="8" y="13" class="node-meta" style="fill: var(--text-2)">
+                  blue_box.py · pure fn
+                </text>
+                <text x="240" y="13" text-anchor="end" class="node-meta" style="fill: var(--text-2)">
+                  210
+                </text>
+              </g>
+            </g>
+
+            <!-- api/tests separate -->
+            <g transform="translate(450,556)">
+              <rect
+                class="node-card"
+                width="280"
+                height="64"
+                rx="8"
+                stroke-dasharray="4 3"
+              />
+              <circle cx="22" cy="22" r="10" fill="var(--green-soft)" />
+              <circle cx="22" cy="22" r="5" class="test-dot" />
+              <text x="42" y="26" class="node-title">
+                apps/api/tests &nbsp;<tspan style="fill: var(--amber); font-weight: 500;">(separate tree)</tspan>
+              </text>
+              <text x="42" y="42" class="node-meta">
+                17 test files · parsers · router · aggregation
+              </text>
+              <text x="264" y="26" text-anchor="end" class="node-kpi" style="fill: var(--green)">
+                17 suites
+              </text>
+            </g>
+
+            <!-- ============ supabase column ============ -->
+            <!-- supabase CLAUDE.md -->
+            <g transform="translate(840,180)">
+              <rect class="node-card accent" width="280" height="64" rx="8" />
+              <circle cx="22" cy="22" r="12" class="claude-ring" />
+              <circle cx="22" cy="22" r="5" class="claude-dot" />
+              <text x="42" y="26" class="node-title">supabase/CLAUDE.md</text>
+              <text x="42" y="42" class="node-meta">
+                Schema rules · RLS · staleness triggers
+              </text>
+              <text x="264" y="26" text-anchor="end" class="node-kpi">
+                50 ln
+              </text>
+            </g>
+
+            <!-- schema.sql -->
+            <g transform="translate(840,268)">
+              <rect class="node-card" width="280" height="110" rx="8" />
+              <text x="16" y="24" class="node-title">supabase/schema.sql</text>
+              <text x="16" y="40" class="node-meta">
+                canonical DDL · BIGINT KRW · RLS policies
+              </text>
+              <g transform="translate(16,52)">
+                <rect fill="var(--grid)" width="248" height="18" rx="3" />
+                <text x="8" y="13" class="node-meta" style="fill: var(--text-2)">
+                  8 tables · single RLS pattern
+                </text>
+              </g>
+              <g transform="translate(16,74)">
+                <rect fill="var(--grid)" width="248" height="18" rx="3" />
+                <text x="8" y="13" class="node-meta" style="fill: var(--text-2)">
+                  staleness triggers · ON DELETE CASCADE
+                </text>
+              </g>
+            </g>
+
+            <!-- docs/ -->
+            <g transform="translate(840,402)">
+              <rect class="node-card" width="280" height="110" rx="8" />
+              <text x="16" y="24" class="node-title">docs/ · MEMORY.md</text>
+              <text x="16" y="40" class="node-meta">
+                Design docs · calculation logic · decision "Why:"
+              </text>
+              <g transform="translate(16,52)">
+                <rect fill="var(--accent-soft)" width="248" height="18" rx="3" />
+                <text x="8" y="13" class="node-meta" style="fill: var(--accent); font-weight:600">
+                  dashboard-calculation-logic
+                </text>
+              </g>
+              <g transform="translate(16,74)">
+                <rect fill="var(--accent-soft)" width="248" height="18" rx="3" />
+                <text x="8" y="13" class="node-meta" style="fill: var(--accent); font-weight:600">
+                  blue-box-logic · parser-system
+                </text>
+              </g>
+            </g>
+
+            <!-- =================== EDGES =================== -->
+            <!-- Root CLAUDE.md → each sub CLAUDE.md -->
+            <path
+              class="edge edge-dash"
+              d="M500,130 C 500,160 200,160 200,180"
+            />
+            <path
+              class="edge edge-dash"
+              d="M590,130 C 590,160 590,160 590,180"
+            />
+            <path
+              class="edge edge-dash"
+              d="M680,130 C 680,160 980,160 980,180"
+            />
+
+            <!-- Type sync edge: web/src/app ↔ api/routers (thicker) -->
+            <path
+              class="edge edge-type"
+              d="M340,300 C 400,300 400,300 450,300"
+            />
+            <text
+              x="395"
+              y="293"
+              text-anchor="middle"
+              class="node-meta"
+              style="fill: var(--accent); font-weight: 600"
+            >
+              HTTP · JWT auth
+            </text>
+
+            <!-- Type sync warning: web/lib/types ↔ api/models/schemas -->
+            <path
+              class="edge edge-warn edge-dash"
+              d="M340,588 C 400,540 400,500 450,460"
+            />
+            <text
+              x="395"
+              y="528"
+              text-anchor="middle"
+              class="node-meta"
+              style="fill: var(--amber); font-weight: 600"
+            >
+              types ↔ schemas (manual)
+            </text>
+
+            <!-- api/services → supabase schema -->
+            <path
+              class="edge edge-dash"
+              d="M730,460 C 790,460 790,320 840,320"
+            />
+            <text
+              x="790"
+              y="395"
+              text-anchor="middle"
+              class="node-meta"
+              style="fill: var(--text-2)"
+            >
+              DB I/O
+            </text>
+
+            <!-- docs ← CLAUDE.md root -->
+            <path
+              class="edge edge-dash"
+              d="M740,95 C 900,95 980,95 980,402"
+            />
+          </svg>
+        </div>
+      </section>
+
+      <!-- =========== FINDINGS =========== -->
+      <div class="findings">
+        <section class="panel panel-strength">
+          <div class="panel-head">
+            <h3>Wins</h3>
+            <span class="count">Keep these</span>
+          </div>
+          <ul class="panel-list">
+            <li>
+              <div class="head">
+                <span class="tag tag-rule">Cat A</span>
+                root + 3-module CLAUDE.md system
+              </div>
+              <div class="note">
+                root → web → api → supabase. The agent drills down from
+                top to bottom, loading only as much context as needed.
+              </div>
+            </li>
+            <li>
+              <div class="head">
+                <span class="tag tag-rule">Cat F</span>
+                Context drift 0% · husky pre-push active
+              </div>
+              <div class="note">
+                CLAUDE.md mtimes are fresher than the latest code changes.
+                A pre-push hook runs the build gate.
+              </div>
+            </li>
+            <li>
+              <div class="head">
+                <span class="tag tag-rule">Cat E3</span>
+                Build/test infra complete
+              </div>
+              <div class="note">
+                <code>turbo.json</code> + each app's <code>package.json</code>
+                / <code>pyproject.toml</code>. The agent can immediately run
+                verification commands after a change.
+              </div>
+            </li>
+            <li>
+              <div class="head">
+                <span class="tag tag-rule">Cat A</span>
+                Monorepo 3-zone boundaries
+              </div>
+              <div class="note">
+                apps/web · apps/api · supabase are cleanly separated, so
+                parallel agent runs don't conflict.
+              </div>
+            </li>
+          </ul>
+        </section>
+
+        <section class="panel panel-risk">
+          <div class="panel-head">
+            <h3>Top ROI Actions</h3>
+            <span class="count">Priority-sorted</span>
+          </div>
+          <ul class="panel-list">
+            <li>
+              <div class="head">
+                <span class="tag tag-rule" style="background: var(--red-soft); color: var(--red)">Cat E1 · S</span>
+                Fix 27 / 31 hallucinated paths immediately
+              </div>
+              <div class="note">
+                <strong>Effort 0.5 hr · Impact 10/10.</strong>
+                Correct the broken paths in <code>AGENTS.md</code> and each
+                CLAUDE.md (e.g. <code>src/middleware.ts</code> → actually
+                <code>apps/web/src/middleware.ts</code>). Immediately blocks
+                the agent from following fake paths.
+              </div>
+            </li>
+            <li>
+              <div class="head">
+                <span class="tag tag-rule">Cat A · S</span>
+                Add a CLAUDE.md to the <code>scripts/</code> module
+              </div>
+              <div class="note">
+                <strong>Effort 0.5 hr · Impact 9/10.</strong>
+                Navigation coverage 3/4 → 4/4. The agent can replicate
+                patterns when writing new scripts.
+              </div>
+            </li>
+            <li>
+              <div class="head">
+                <span class="tag tag-rule">Cat F · S</span>
+                Add path validation to CI / pre-push hook
+              </div>
+              <div class="note">
+                <strong>Effort 1.0 hr · Impact 8/10.</strong>
+                Stale references are auto-blocked at merge time. Improves F
+                and prevents E1 regressions at once.
+              </div>
+            </li>
+            <li>
+              <div class="head">
+                <span class="tag tag-rule">Cat C · M</span>
+                Externalize tribal knowledge via MEMORY.md / docs/adr/
+              </div>
+              <div class="note">
+                <strong>Effort 3.0 hr · Impact 8/10.</strong>
+                Move decision rationale (Red/Blue Box differences · VAT
+                handling · staleness strategy) into an external store.
+                Fewer errors on new agent runs.
+              </div>
+            </li>
+            <li>
+              <div class="head">
+                <span class="tag tag-rule">Cat D · M</span>
+                ARCHITECTURE.md + mermaid dependency diagram
+              </div>
+              <div class="note">
+                <strong>Effort 2.5 hr · Impact 7/10.</strong>
+                Visualize cross-module ripple. Halve change-impact analysis
+                time.
+              </div>
+            </li>
+            <li>
+              <div class="head">
+                <span class="tag tag-rule">Cat B · M</span>
+                Compress <code>apps/web/CLAUDE.md</code> (360 → ~80 lines)
+              </div>
+              <div class="note">
+                <strong>Effort 2.0 hr · Impact 7/10.</strong>
+                "compass, not encyclopedia" principle. Faster agent context
+                load + better visibility of key info.
+              </div>
+            </li>
+            <li>
+              <div class="head">
+                <span class="tag tag-rule">Cat G · L</span>
+                <code>evals/</code> directory + representative task pass-rate
+              </div>
+              <div class="note">
+                <strong>Effort 6.0 hr · Impact 6/10.</strong>
+                Quantify the improvement ROI itself. Enables AI regression
+                measurement.
+              </div>
+            </li>
+          </ul>
+        </section>
+      </div>
+
+      <footer>
+        GrowthNote · AI-Readiness Audit · v2 rubric (7 categories / 100 pts) · scored 2026-04-28
+      </footer>
+    </div>
+  </body>
+</html>
