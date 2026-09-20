@@ -90,7 +90,7 @@ Default run location: `~/skill-eval/<skill-name>/<run-id>/`.
 
 - `manifest.json`, `analysis.json`, `criteria.yaml`, `CRITERIA_REVIEW.md`, captured native CLI help.
 - `cases/TC-001/`: prompt, complete transcript, native trace, output-only response, actual tool calls, metadata, artifacts, normalized execution and adapter logs.
-- `judges/`: independent raw judge inputs/results and validated checkpoints.
+- `judges/`: independent raw judge inputs/results (every attempt retained; an invalid round is retried once in `…-retry-N`) and per-round validated checkpoints.
 - `evaluations/TC-001.md` and `.json`: exact evidence citations, matched rubric levels and deterministic check results.
 - `summary.json`, `REPORT.md`, optional `REPORT.html`: totals, breakdowns, failures, recommendations and evidence links.
 

@@ -205,6 +205,75 @@ class EvaluatorTests(unittest.TestCase):
                 with self.assertRaises(core.EvalError):
                     core.validate_judgment(cite(path, quote), case, False, self.root)
 
+    def test_judge_packet_excludes_uncitable_transcript(self):
+        d = self.root / "cases/TC-001"
+        (d / "conversation.txt").write_text("USER PROMPT\nraw trace\n")
+        core.write_json(d / "artifacts.json", {"files": []})
+        packet = evaluate.evidence_packet(self.root, self.case)
+        self.assertEqual(
+            set(packet),
+            {
+                "cases/TC-001/response.txt",
+                "cases/TC-001/tool_calls.json",
+                "cases/TC-001/metadata.json",
+                "cases/TC-001/artifacts.json",
+            },
+        )
+
+    def test_judge_rounds_checkpoint_valid_rounds_and_retry_once(self):
+        options = {
+            "judge_rounds": 3,
+            "concurrency": 1,
+            "mode": "basic",
+            "binary": False,
+        }
+        batch = [self.case]
+        calls = []
+
+        def flaky(run, cases, manifest, idx, rn):
+            calls.append(rn)
+            if rn == 2 and calls.count(2) == 1:
+                raise core.EvalError("Evidence quote is not present at cited lines")
+            return {"TC-001": self.judgment()}, {"cost_usd": 1.0}
+
+        rounds, costs = evaluate.judge_rounds(
+            self.root, batch, {}, 0, options, judge=flaky
+        )
+        self.assertEqual((len(rounds), calls.count(2)), (3, 2))
+        self.assertIn(
+            "retried_after",
+            core.read_data(self.root / "judges/batch-000-round-2/validated.json"),
+        )
+        # Raw attempts never overwrite each other.
+        (self.root / "judges/batch-000-round-2").mkdir(exist_ok=True)
+        self.assertEqual(
+            evaluate.judge_attempt_dir(self.root, 0, 2).name,
+            "batch-000-round-2-retry-1",
+        )
+        # A round invalid twice is an infrastructure error; valid rounds stay checkpointed.
+        root2 = self.root / "run2"
+        (root2 / "cases/TC-001").mkdir(parents=True)
+        (root2 / "cases/TC-001/response.txt").write_text("Welcome to Observatory.\n")
+
+        def broken(run, cases, manifest, idx, rn):
+            if rn == 1:
+                raise core.EvalError("bad citation")
+            return {"TC-001": self.judgment()}, {"cost_usd": 1.0}
+
+        with self.assertRaises(core.EvalError):
+            evaluate.judge_rounds(root2, batch, {}, 0, options, judge=broken)
+        self.assertTrue((root2 / "judges/batch-000-round-3/validated.json").exists())
+        self.assertFalse((root2 / "judges/batch-000-round-1/validated.json").exists())
+        # Resume reuses the two checkpoints and re-judges only the missing round.
+        again = []
+
+        def fixed(run, cases, manifest, idx, rn):
+            again.append(rn)
+            return {"TC-001": self.judgment()}, {"cost_usd": 1.0}
+
+        rounds, _ = evaluate.judge_rounds(root2, batch, {}, 0, options, judge=fixed)
+        self.assertEqual((len(rounds), again), (3, [1]))
+
     def test_binary_thresholds_weighted_and_labels(self):
         case = core.read_data(FIXTURES / "basic-binary.yaml")["test_cases"][0]
         j = self.judgment(True)

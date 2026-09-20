@@ -498,7 +498,9 @@ def native_execute(analysis, case, case_dir, options):
         if arm.get("error") or final.get("is_error")
         else "completed",
         "timed_out": result["timed_out"]
-        or "timeout" in str(arm.get("error", "")).lower(),
+        or any(
+            w in str(arm.get("error", "")).lower() for w in ("timeout", "timed out")
+        ),
         "usage": {
             k: usage.get(k)
             for k in (

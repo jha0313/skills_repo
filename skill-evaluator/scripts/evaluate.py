@@ -308,8 +308,9 @@ def persist_execution(run, case, result):
 
 def evidence_packet(run, case):
     d = run / "cases" / case["id"]
+    # Only citable files travel to judges. The raw transcript (conversation.txt) stays
+    # on disk for audit; sending it dominated judge cost without being usable evidence.
     files = [
-        d / "conversation.txt",
         d / "response.txt",
         d / "tool_calls.json",
         d / "metadata.json",
@@ -331,6 +332,82 @@ def evidence_packet(run, case):
     return packet
 
 
+def judge_attempt_dir(run, batch, round_no):
+    """First unused directory for this round so every raw judge attempt is retained."""
+    base = run / "judges" / f"batch-{batch:03d}-round-{round_no}"
+    if not base.exists():
+        return base
+    n = 1
+    while (base.with_name(f"{base.name}-retry-{n}")).exists():
+        n += 1
+    return base.with_name(f"{base.name}-retry-{n}")
+
+
+def judge_rounds(run, batch, manifest, idx, options, judge=None):
+    """Independent judge rounds for one batch: reuse validated checkpoints, checkpoint
+    every valid round as soon as it validates, and retry an invalid round once in a
+    fresh session. The invalid attempt's raw output is kept in its own directory."""
+    judge = judge or judge_batch
+    ids = [c["id"] for c in batch]
+
+    def checkpoint(rn):
+        return run / "judges" / f"batch-{idx:03d}-round-{rn}" / "validated.json"
+
+    rounds, costs, pending = [], [], []
+    for rn in range(1, options["judge_rounds"] + 1):
+        if checkpoint(rn).exists():
+            old = read_data(checkpoint(rn))
+            if old["case_ids"] == ids:
+                for c in batch:
+                    validate_judgment(
+                        old["judgments"][c["id"]],
+                        {**c, "_mode": options["mode"]},
+                        options["binary"],
+                        run,
+                    )
+                rounds.append(old["judgments"])
+                costs.append(old["usage"])
+                continue
+        pending.append(rn)
+
+    def keep(rn, judgments, usage, retried_after=None):
+        rounds.append(judgments)
+        costs.append(usage)
+        write_json(
+            checkpoint(rn),
+            {
+                "case_ids": ids,
+                "judgments": judgments,
+                "usage": usage,
+                **({"retried_after": retried_after} if retried_after else {}),
+            },
+        )
+
+    failures = {}
+    with concurrent.futures.ThreadPoolExecutor(
+        max_workers=min(options["concurrency"], options["judge_rounds"])
+    ) as pool:
+        futures = {
+            rn: pool.submit(judge, run, batch, manifest, idx, rn) for rn in pending
+        }
+        for rn, f in futures.items():
+            try:
+                judgments, usage = f.result()
+            except EvalError as exc:
+                failures[rn] = str(exc)
+                continue
+            keep(rn, judgments, usage)
+    for rn, reason in failures.items():
+        try:
+            judgments, usage = judge(run, batch, manifest, idx, rn)
+        except EvalError as exc:
+            raise EvalError(
+                f"round {rn} invalid twice: first {reason}; retry {exc}"
+            ) from exc
+        keep(rn, judgments, usage, retried_after=reason)
+    return rounds, costs
+
+
 def judge_batch(run, cases, manifest, batch, round_no):
     options = manifest["options"]
     binary = options["binary"]
@@ -349,12 +426,11 @@ Citations may reference ONLY THIS CASE's files: response.txt (eval_target respon
 tool_calls.json entries carry native attribution: actor (parent = the evaluated session itself, worker = a delegated subagent, unknown = attribution unavailable), parent_tool_use_id, lineage_verified and trace_line. Any judgment about who performed work (delegation, no direct implementation by the coordinator, independent verification by a different worker) must cite those entries; the assistant's own narrative about which tools it used is a claim, not attribution evidence. Entries with actor unknown or lineage_verified false are unattributed and never establish role separation. Metadata is for efficiency/infrastructure; cannot establish output correctness. Missing behavior: cite the actual response that demonstrates the omission; never fabricate absence text. Use case-specific semantic rubric and the shared dimensions below. A skill with no business metrics can show plausible applicability; do not invent observed time saved or revenue. A simple case need not use subagents.
 {rubric}
 DATA:\n{json.dumps(packet, ensure_ascii=False)}"""
+    out_dir = judge_attempt_dir(run, batch, round_no)
     result, usage = agent_json(
-        judge_prompt,
-        run / "judges" / f"batch-{batch:03d}-round-{round_no}",
-        options["judge_model"],
-        options["judge_timeout"],
+        judge_prompt, out_dir, options["judge_model"], options["judge_timeout"]
     )
+    usage = {**usage, "judge_dir": str(out_dir.relative_to(run))}
     outputs = result.get("judgments", [])
     if len(outputs) != len(cases):
         raise EvalError("Independent judge omitted/added cases")
@@ -499,54 +575,8 @@ def execute(run, manifest, criteria, analysis):
         batches = [to_grade[i : i + 4] for i in range(0, len(to_grade), 4)]
         # Each round is a separate clean model process. Batch size bounded to four complete cases.
         for idx, batch in enumerate(batches):
-            rounds = []
-            costs = []
             try:
-                with concurrent.futures.ThreadPoolExecutor(
-                    max_workers=min(options["concurrency"], options["judge_rounds"])
-                ) as pool:
-                    futures = []
-                    for rn in range(1, options["judge_rounds"] + 1):
-                        checkpoint = (
-                            run
-                            / "judges"
-                            / f"batch-{idx:03d}-round-{rn}"
-                            / "validated.json"
-                        )
-                        if checkpoint.exists():
-                            old = read_data(checkpoint)
-                            if old["case_ids"] == [c["id"] for c in batch]:
-                                for c in batch:
-                                    validate_judgment(
-                                        old["judgments"][c["id"]],
-                                        {**c, "_mode": options["mode"]},
-                                        options["binary"],
-                                        run,
-                                    )
-                                rounds.append(old["judgments"])
-                                costs.append(old["usage"])
-                                continue
-                        futures.append(
-                            (
-                                rn,
-                                pool.submit(judge_batch, run, batch, manifest, idx, rn),
-                            )
-                        )
-                    for rn, f in futures:
-                        judgments, usage = f.result()
-                        rounds.append(judgments)
-                        costs.append(usage)
-                        write_json(
-                            run
-                            / "judges"
-                            / f"batch-{idx:03d}-round-{rn}"
-                            / "validated.json",
-                            {
-                                "case_ids": [c["id"] for c in batch],
-                                "judgments": judgments,
-                                "usage": usage,
-                            },
-                        )
+                rounds, costs = judge_rounds(run, batch, manifest, idx, options)
                 for c in batch:
                     execution = read_data(run / "cases" / c["id"] / "execution.json")
                     graded = grade_case(
