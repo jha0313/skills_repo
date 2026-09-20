@@ -1,0 +1,33 @@
+{
+  "schema_version": "skill-evaluator-regressions/1",
+  "runner": "uv run --with PyYAML==6.0.3 python -m unittest discover -s skill-evaluator/tests -v",
+  "timeout_seconds": 30,
+  "timeout_reason": "Deterministic fixtures only; no nested live evaluation. Live smoke uses per-case 120s and judge300s bounds.",
+  "tests": [
+    {
+      "id": "binary_flag",
+      "expected": "--binary selects binary labels and no letter grade",
+      "unittest": "test_evaluator.EvaluatorTests.test_binary_and_default_flags"
+    },
+    {
+      "id": "dimension_verdicts",
+      "expected": "Dimension verdicts PASS/FAIL and composite dimension pass rate",
+      "unittest": "test_evaluator.EvaluatorTests.test_binary_thresholds_weighted_and_labels"
+    },
+    {
+      "id": "weighted_binary",
+      "expected": "Semantic checks use weighted 0/1 rubric",
+      "unittest": "test_evaluator.EvaluatorTests.test_binary_thresholds_weighted_and_labels"
+    },
+    {
+      "id": "binary_report",
+      "expected": "Binary reports show verdicts and pass rates",
+      "unittest": "test_evaluator.EvaluatorTests.test_binary_report_uses_pass_rates_and_verdicts"
+    },
+    {
+      "id": "likert_default",
+      "expected": "Omitting --binary retains Likert scoring",
+      "unittest": "test_evaluator.EvaluatorTests.test_likert_thresholds"
+    }
+  ]
+}

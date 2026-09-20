@@ -1,0 +1,183 @@
+{
+  "default_working_directory": ".",
+  "analysis": {
+    "purpose": "Validate a harmless read-only greeting convention through real Claude routing and independent grading.",
+    "target_users": [
+      "new contributors"
+    ],
+    "triggers": [
+      "Observatory team greeting"
+    ],
+    "arguments": "optional recipient name",
+    "capabilities": [
+      "canonical greeting",
+      "bounded unknowns"
+    ],
+    "workflow_phases": [
+      "load convention",
+      "answer"
+    ],
+    "allowed_tools": [
+      "Read",
+      "Skill"
+    ],
+    "actual_tool_usage": [
+      "Skill"
+    ],
+    "external_systems": [],
+    "requirements": [],
+    "expected_outputs": [
+      "concise greeting"
+    ],
+    "type": "knowledge",
+    "mutates": false,
+    "mutation_evidence": "Skill explicitly says read-only and never send/edit.",
+    "edge_cases": [
+      "unknown department",
+      "missing name"
+    ],
+    "failure_modes": [
+      "invented names",
+      "wrong greeting",
+      "false positive routing"
+    ]
+  },
+  "test_cases": [
+    {
+      "id": "TC-001",
+      "name": "invocation 1",
+      "category": "invocation",
+      "project": "observatory-greeting",
+      "target_skills": [
+        "observatory-greeting/SKILL.md"
+      ],
+      "prompt": "How does the Observatory team greet new contributors?",
+      "description": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
+      "expected_behavior": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
+      "eval_target": "all",
+      "expect_invocation": true,
+      "timeout_seconds": 120,
+      "max_turns": 8,
+      "quality_criteria": {
+        "required_present": [
+          "Welcome to Observatory."
+        ],
+        "required_absent": [],
+        "semantic_checks": [
+          {
+            "question": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
+            "weight": 3,
+            "critical": true,
+            "rubric": {
+              "0": "Fails the observable expectation or fabricates facts/actions.",
+              "1": "Meets the observable expectation accurately."
+            }
+          }
+        ],
+        "artifact_checks": []
+      }
+    },
+    {
+      "id": "TC-002",
+      "name": "efficiency 2",
+      "category": "efficiency",
+      "project": "observatory-greeting",
+      "target_skills": [
+        "observatory-greeting/SKILL.md"
+      ],
+      "prompt": "Using observatory-greeting, state the contributor greeting in one sentence.",
+      "description": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
+      "expected_behavior": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
+      "eval_target": "all",
+      "expect_invocation": true,
+      "timeout_seconds": 120,
+      "max_turns": 8,
+      "quality_criteria": {
+        "required_present": [
+          "Welcome to Observatory."
+        ],
+        "required_absent": [],
+        "semantic_checks": [
+          {
+            "question": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
+            "weight": 3,
+            "critical": true,
+            "rubric": {
+              "0": "Fails the observable expectation or fabricates facts/actions.",
+              "1": "Meets the observable expectation accurately."
+            }
+          }
+        ],
+        "artifact_checks": []
+      }
+    },
+    {
+      "id": "TC-003",
+      "name": "best_practices 3",
+      "category": "best_practices",
+      "project": "observatory-greeting",
+      "target_skills": [
+        "observatory-greeting/SKILL.md"
+      ],
+      "prompt": "Using observatory-greeting, what conventions should I follow when greeting a new contributor without a name?",
+      "description": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
+      "expected_behavior": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
+      "eval_target": "all",
+      "expect_invocation": true,
+      "timeout_seconds": 120,
+      "max_turns": 8,
+      "quality_criteria": {
+        "required_present": [
+          "Welcome to Observatory."
+        ],
+        "required_absent": [],
+        "semantic_checks": [
+          {
+            "question": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
+            "weight": 3,
+            "critical": true,
+            "rubric": {
+              "0": "Fails the observable expectation or fabricates facts/actions.",
+              "1": "Meets the observable expectation accurately."
+            }
+          }
+        ],
+        "artifact_checks": []
+      }
+    },
+    {
+      "id": "TC-004",
+      "name": "business_impact 4",
+      "category": "business_impact",
+      "project": "observatory-greeting",
+      "target_skills": [
+        "observatory-greeting/SKILL.md"
+      ],
+      "prompt": "Using observatory-greeting, give the reusable welcome sentence and briefly explain how it helps maintain consistent wording. Do not claim measured savings.",
+      "description": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
+      "expected_behavior": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
+      "eval_target": "all",
+      "expect_invocation": true,
+      "timeout_seconds": 120,
+      "max_turns": 8,
+      "quality_criteria": {
+        "required_present": [
+          "Welcome to Observatory."
+        ],
+        "required_absent": [],
+        "semantic_checks": [
+          {
+            "question": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
+            "weight": 3,
+            "critical": true,
+            "rubric": {
+              "0": "Fails the observable expectation or fabricates facts/actions.",
+              "1": "Meets the observable expectation accurately."
+            }
+          }
+        ],
+        "artifact_checks": []
+      }
+    }
+  ]
+}

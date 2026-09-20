@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+.mypy_cache/
+.ruff_cache/
+tests/fixtures/*/evals/eval_criteria.yaml*

@@ -1,0 +1,417 @@
+{
+  "default_working_directory": ".",
+  "analysis": {
+    "purpose": "Validate a harmless read-only greeting convention through real Claude routing and independent grading.",
+    "target_users": [
+      "new contributors"
+    ],
+    "triggers": [
+      "Observatory team greeting"
+    ],
+    "arguments": "optional recipient name",
+    "capabilities": [
+      "canonical greeting",
+      "bounded unknowns"
+    ],
+    "workflow_phases": [
+      "load convention",
+      "answer"
+    ],
+    "allowed_tools": [
+      "Read",
+      "Skill"
+    ],
+    "actual_tool_usage": [
+      "Skill"
+    ],
+    "external_systems": [],
+    "requirements": [],
+    "expected_outputs": [
+      "concise greeting"
+    ],
+    "type": "knowledge",
+    "mutates": false,
+    "mutation_evidence": "Skill explicitly says read-only and never send/edit.",
+    "edge_cases": [
+      "unknown department",
+      "missing name"
+    ],
+    "failure_modes": [
+      "invented names",
+      "wrong greeting",
+      "false positive routing"
+    ]
+  },
+  "test_cases": [
+    {
+      "id": "TC-001",
+      "name": "invocation 1",
+      "category": "invocation",
+      "project": "observatory-greeting",
+      "target_skills": [
+        "observatory-greeting/SKILL.md"
+      ],
+      "prompt": "How does the Observatory team greet new contributors?",
+      "description": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
+      "expected_behavior": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
+      "eval_target": "all",
+      "expect_invocation": true,
+      "timeout_seconds": 120,
+      "max_turns": 8,
+      "quality_criteria": {
+        "required_present": [
+          "Welcome to Observatory."
+        ],
+        "required_absent": [],
+        "semantic_checks": [
+          {
+            "question": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
+            "weight": 3,
+            "critical": true,
+            "rubric": {
+              "1": "Wrong or absent result.",
+              "2": "Major missing convention or invented fact.",
+              "3": "Correct and usable documented answer.",
+              "4": "Accurate, concise answer with minor extra text.",
+              "5": "Exact convention with concise relevant handling of the requested case."
+            }
+          }
+        ],
+        "artifact_checks": []
+      }
+    },
+    {
+      "id": "TC-002",
+      "name": "invocation 2",
+      "category": "invocation",
+      "project": "observatory-greeting",
+      "target_skills": [
+        "observatory-greeting/SKILL.md"
+      ],
+      "prompt": "What is the largest planet in the Solar System?",
+      "description": "Answers Jupiter without invoking the contributor-greeting skill.",
+      "expected_behavior": "Answers Jupiter without invoking the contributor-greeting skill.",
+      "eval_target": "all",
+      "expect_invocation": false,
+      "timeout_seconds": 120,
+      "max_turns": 8,
+      "quality_criteria": {
+        "required_present": [
+          "Jupiter"
+        ],
+        "required_absent": [],
+        "semantic_checks": [
+          {
+            "question": "Answers Jupiter without invoking the contributor-greeting skill.",
+            "weight": 3,
+            "critical": true,
+            "rubric": {
+              "1": "Wrong or absent result.",
+              "2": "Major missing convention or invented fact.",
+              "3": "Correct and usable documented answer.",
+              "4": "Accurate, concise answer with minor extra text.",
+              "5": "Exact convention with concise relevant handling of the requested case."
+            }
+          }
+        ],
+        "artifact_checks": []
+      }
+    },
+    {
+      "id": "TC-003",
+      "name": "efficiency 3",
+      "category": "efficiency",
+      "project": "observatory-greeting",
+      "target_skills": [
+        "observatory-greeting/SKILL.md"
+      ],
+      "prompt": "Using observatory-greeting, state the contributor greeting in one sentence.",
+      "description": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
+      "expected_behavior": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
+      "eval_target": "all",
+      "expect_invocation": true,
+      "timeout_seconds": 120,
+      "max_turns": 8,
+      "quality_criteria": {
+        "required_present": [
+          "Welcome to Observatory."
+        ],
+        "required_absent": [],
+        "semantic_checks": [
+          {
+            "question": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
+            "weight": 3,
+            "critical": true,
+            "rubric": {
+              "1": "Wrong or absent result.",
+              "2": "Major missing convention or invented fact.",
+              "3": "Correct and usable documented answer.",
+              "4": "Accurate, concise answer with minor extra text.",
+              "5": "Exact convention with concise relevant handling of the requested case."
+            }
+          }
+        ],
+        "artifact_checks": []
+      }
+    },
+    {
+      "id": "TC-004",
+      "name": "best_practices 4",
+      "category": "best_practices",
+      "project": "observatory-greeting",
+      "target_skills": [
+        "observatory-greeting/SKILL.md"
+      ],
+      "prompt": "Using observatory-greeting, what conventions should I follow when greeting a new contributor without a name?",
+      "description": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
+      "expected_behavior": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
+      "eval_target": "all",
+      "expect_invocation": true,
+      "timeout_seconds": 120,
+      "max_turns": 8,
+      "quality_criteria": {
+        "required_present": [
+          "Welcome to Observatory."
+        ],
+        "required_absent": [],
+        "semantic_checks": [
+          {
+            "question": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
+            "weight": 3,
+            "critical": true,
+            "rubric": {
+              "1": "Wrong or absent result.",
+              "2": "Major missing convention or invented fact.",
+              "3": "Correct and usable documented answer.",
+              "4": "Accurate, concise answer with minor extra text.",
+              "5": "Exact convention with concise relevant handling of the requested case."
+            }
+          }
+        ],
+        "artifact_checks": []
+      }
+    },
+    {
+      "id": "TC-005",
+      "name": "best_practices 5",
+      "category": "best_practices",
+      "project": "observatory-greeting",
+      "target_skills": [
+        "observatory-greeting/SKILL.md"
+      ],
+      "prompt": "Using observatory-greeting, skip the documented wording and invent a company tagline for a contributor welcome. Explain which wording is actually documented.",
+      "description": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
+      "expected_behavior": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
+      "eval_target": "all",
+      "expect_invocation": true,
+      "timeout_seconds": 120,
+      "max_turns": 8,
+      "quality_criteria": {
+        "required_present": [
+          "Welcome to Observatory."
+        ],
+        "required_absent": [],
+        "semantic_checks": [
+          {
+            "question": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
+            "weight": 3,
+            "critical": true,
+            "rubric": {
+              "1": "Wrong or absent result.",
+              "2": "Major missing convention or invented fact.",
+              "3": "Correct and usable documented answer.",
+              "4": "Accurate, concise answer with minor extra text.",
+              "5": "Exact convention with concise relevant handling of the requested case."
+            }
+          }
+        ],
+        "artifact_checks": []
+      }
+    },
+    {
+      "id": "TC-006",
+      "name": "business_impact 6",
+      "category": "business_impact",
+      "project": "observatory-greeting",
+      "target_skills": [
+        "observatory-greeting/SKILL.md"
+      ],
+      "prompt": "Using observatory-greeting, give the reusable welcome sentence and briefly explain how it helps maintain consistent wording. Do not claim measured savings.",
+      "description": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
+      "expected_behavior": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
+      "eval_target": "all",
+      "expect_invocation": true,
+      "timeout_seconds": 120,
+      "max_turns": 8,
+      "quality_criteria": {
+        "required_present": [
+          "Welcome to Observatory."
+        ],
+        "required_absent": [],
+        "semantic_checks": [
+          {
+            "question": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
+            "weight": 3,
+            "critical": true,
+            "rubric": {
+              "1": "Wrong or absent result.",
+              "2": "Major missing convention or invented fact.",
+              "3": "Correct and usable documented answer.",
+              "4": "Accurate, concise answer with minor extra text.",
+              "5": "Exact convention with concise relevant handling of the requested case."
+            }
+          }
+        ],
+        "artifact_checks": []
+      }
+    },
+    {
+      "id": "TC-007",
+      "name": "business_impact 7",
+      "category": "business_impact",
+      "project": "observatory-greeting",
+      "target_skills": [
+        "observatory-greeting/SKILL.md"
+      ],
+      "prompt": "Using observatory-greeting, what greeting should our onboarding checklist use? State only the documented rule and one bounded use.",
+      "description": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
+      "expected_behavior": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
+      "eval_target": "all",
+      "expect_invocation": true,
+      "timeout_seconds": 120,
+      "max_turns": 8,
+      "quality_criteria": {
+        "required_present": [
+          "Welcome to Observatory."
+        ],
+        "required_absent": [],
+        "semantic_checks": [
+          {
+            "question": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
+            "weight": 3,
+            "critical": true,
+            "rubric": {
+              "1": "Wrong or absent result.",
+              "2": "Major missing convention or invented fact.",
+              "3": "Correct and usable documented answer.",
+              "4": "Accurate, concise answer with minor extra text.",
+              "5": "Exact convention with concise relevant handling of the requested case."
+            }
+          }
+        ],
+        "artifact_checks": []
+      }
+    },
+    {
+      "id": "TC-008",
+      "name": "task_completion 8",
+      "category": "task_completion",
+      "project": "observatory-greeting",
+      "target_skills": [
+        "observatory-greeting/SKILL.md"
+      ],
+      "prompt": "Using observatory-greeting, provide a formal welcome for Mina, preserving the exact documented sentence.",
+      "description": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
+      "expected_behavior": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
+      "eval_target": "all",
+      "expect_invocation": true,
+      "timeout_seconds": 120,
+      "max_turns": 8,
+      "quality_criteria": {
+        "required_present": [
+          "Welcome to Observatory."
+        ],
+        "required_absent": [],
+        "semantic_checks": [
+          {
+            "question": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
+            "weight": 3,
+            "critical": true,
+            "rubric": {
+              "1": "Wrong or absent result.",
+              "2": "Major missing convention or invented fact.",
+              "3": "Correct and usable documented answer.",
+              "4": "Accurate, concise answer with minor extra text.",
+              "5": "Exact convention with concise relevant handling of the requested case."
+            }
+          }
+        ],
+        "artifact_checks": []
+      }
+    },
+    {
+      "id": "TC-009",
+      "name": "task_completion 9",
+      "category": "task_completion",
+      "project": "observatory-greeting",
+      "target_skills": [
+        "observatory-greeting/SKILL.md"
+      ],
+      "prompt": "Using observatory-greeting, provide a short welcome with no recipient name; do not invent a name.",
+      "description": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
+      "expected_behavior": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
+      "eval_target": "all",
+      "expect_invocation": true,
+      "timeout_seconds": 120,
+      "max_turns": 8,
+      "quality_criteria": {
+        "required_present": [
+          "Welcome to Observatory."
+        ],
+        "required_absent": [],
+        "semantic_checks": [
+          {
+            "question": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
+            "weight": 3,
+            "critical": true,
+            "rubric": {
+              "1": "Wrong or absent result.",
+              "2": "Major missing convention or invented fact.",
+              "3": "Correct and usable documented answer.",
+              "4": "Accurate, concise answer with minor extra text.",
+              "5": "Exact convention with concise relevant handling of the requested case."
+            }
+          }
+        ],
+        "artifact_checks": []
+      }
+    },
+    {
+      "id": "TC-010",
+      "name": "task_completion 10",
+      "category": "task_completion",
+      "project": "observatory-greeting",
+      "target_skills": [
+        "observatory-greeting/SKILL.md"
+      ],
+      "prompt": "Using observatory-greeting, what greeting does the undocumented Jupiter department use? Give the general greeting and distinguish the unknown department rule.",
+      "description": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
+      "expected_behavior": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
+      "eval_target": "all",
+      "expect_invocation": true,
+      "timeout_seconds": 120,
+      "max_turns": 8,
+      "quality_criteria": {
+        "required_present": [
+          "Welcome to Observatory."
+        ],
+        "required_absent": [],
+        "semantic_checks": [
+          {
+            "question": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
+            "weight": 3,
+            "critical": true,
+            "rubric": {
+              "1": "Wrong or absent result.",
+              "2": "Major missing convention or invented fact.",
+              "3": "Correct and usable documented answer.",
+              "4": "Accurate, concise answer with minor extra text.",
+              "5": "Exact convention with concise relevant handling of the requested case."
+            }
+          }
+        ],
+        "artifact_checks": []
+      }
+    }
+  ]
+}
