@@ -317,11 +317,14 @@ def _score_item(item, binary, run_dir, case, derived=False):
         raise EvalError("Every score needs evidence")
     prefix = f"cases/{case['id']}/"
     target = case["eval_target"]
-    allowed = {"metadata.json"}
+    # Harness-written records are always citable: metadata (usage/timing/subagent stats),
+    # the structured tool-call record, and the artifact capture manifest (paths, existence,
+    # sha256). Every efficiency/best-practice/safety dimension needs them regardless of
+    # the case's content target. Target-produced content (response.txt, artifacts/*)
+    # stays gated by eval_target.
+    allowed = {"metadata.json", "tool_calls.json", "artifacts.json"}
     if target in ("response", "all"):
         allowed.add("response.txt")
-    if target in ("tool_usage", "all") or case["category"] == "invocation":
-        allowed.add("tool_calls.json")
     for citation in item["evidence"]:
         path = citation.get("path", "")
         rel = path[len(prefix) :] if path.startswith(prefix) else ""

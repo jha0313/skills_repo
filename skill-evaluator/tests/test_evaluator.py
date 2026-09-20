@@ -163,6 +163,48 @@ class EvaluatorTests(unittest.TestCase):
                 bad, {**self.case, "_mode": "basic"}, False, self.root
             )
 
+    def test_citation_allowlist_matches_judge_contract(self):
+        # Harness records (tool_calls.json, metadata.json, artifacts.json) are always
+        # citable; target content (response.txt, artifacts/*) stays gated by eval_target.
+        d = self.root / "cases/TC-001"
+        core.write_json(
+            d / "artifacts.json", {"files": [{"path": "notes.txt", "sha256": "ab"}]}
+        )
+        (d / "artifacts").mkdir()
+        (d / "artifacts/notes.txt").write_text("alpha: first\n")
+
+        def cite(path, quote):
+            # Every scored item cites the same file so only the allowlist is under test.
+            j = self.judgment()
+            ev = [{"path": path, "line_start": 1, "line_end": 1, "quote": quote}]
+            for group in (
+                "dimensions",
+                "best_practice_subcriteria",
+                "business_impact_subcriteria",
+            ):
+                for item in j[group].values():
+                    item["evidence"] = copy.deepcopy(ev)
+            for item in j["semantic_checks"]:
+                item["evidence"] = copy.deepcopy(ev)
+            return j
+
+        for target, path, quote, ok in (
+            ("response", "cases/TC-001/tool_calls.json", "[", True),
+            ("response", "cases/TC-001/metadata.json", "{", True),
+            ("response", "cases/TC-001/artifacts.json", "{", True),
+            ("response", "cases/TC-001/artifacts/notes.txt", "alpha", False),
+            ("all", "cases/TC-001/artifacts/notes.txt", "alpha", True),
+            ("tool_usage", "cases/TC-001/response.txt", "Welcome", False),
+            ("tool_usage", "cases/TC-001/artifacts.json", "{", True),
+        ):
+            case = {**copy.deepcopy(self.case), "eval_target": target, "_mode": "basic"}
+            case["category"] = "efficiency"
+            if ok:
+                core.validate_judgment(cite(path, quote), case, False, self.root)
+            else:
+                with self.assertRaises(core.EvalError):
+                    core.validate_judgment(cite(path, quote), case, False, self.root)
+
     def test_binary_thresholds_weighted_and_labels(self):
         case = core.read_data(FIXTURES / "basic-binary.yaml")["test_cases"][0]
         j = self.judgment(True)
