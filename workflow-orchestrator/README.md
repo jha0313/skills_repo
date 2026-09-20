@@ -1,4 +1,4 @@
-# firstmate-lite
+# workflow-orchestrator
 
 A small standalone skill for **orchestrator-only** agentic work. One coordinator talks to the user; workers investigate, plan, implement, verify, review and perform authorized delivery. The coordinator manages dependencies and evidence instead of taking over the implementation.
 
@@ -19,13 +19,13 @@ Install this entire folder through your host's normal skill mechanism. Claude Co
 Example requests:
 
 ```text
-Use firstmate-lite to orchestrate this feature. Delegate all project work.
+Use workflow-orchestrator to orchestrate this feature. Delegate all project work.
 Start by understanding the repo, review a plan, implement in isolated workers,
 then show separate GATE and VERIFY evidence. Local changes only for now.
 ```
 
 ```text
-Use firstmate-lite for a read-only Lighthouse baseline across this site's pages.
+Use workflow-orchestrator for a read-only Lighthouse baseline across this site's pages.
 Have a worker inventory routes and access constraints, a measurement worker
 capture repeatable runs, and a reviewer inspect the evidence. Do not change code.
 Report the measured opportunities before proposing implementation.
@@ -40,11 +40,15 @@ The complete workflow and compact worker brief are in [SKILL.md](SKILL.md). This
 
 ## Verified smoke scope
 
+The original 2026-09-19 probes below ran under the previous package name `firstmate-lite`; their retained execution records are unchanged.
+
 On 2026-09-19, a real Claude Code session loaded this skill and delegated a four-line read-only fixture investigation to one native Explore worker. The parent used only Skill and Agent calls; only the worker read the project file. The final answer reported the correct line count and labels with quoted line evidence, and the fixture remained unchanged. Frontmatter validation also passed.
 
 A second real session fixed a three-line Python whitespace-normalization function through one implementation worker, then used a different review/verification worker. The parent again used only Skill and Agent calls. The provided two-test suite failed before the change, passed after it, and passed the independent re-run (**GATE**). The independent reviewer separately ran eight direct edge cases including tabs, newlines, empty input and mixed case (**VERIFY**). Only the worker edited the one source line; the provided test file kept its original hash. No commit, merge, deployment or external publication occurred in the fixture.
 
 These bounded probes verify natural loading, delegation, the no-parent-edit boundary, a small local mutation, independent review and separate GATE/VERIFY reporting. They do not establish full production integration, browser verification, parallel-worktree reconciliation, deployment or interruption-recovery guarantees.
+
+After the rename to `workflow-orchestrator`, both bounded probes were repeated through the real Skill tool under the new name. The coordinator again used only Skill and Agent calls. The read-only fixture was unchanged; the mutation fixture passed the original two tests with their original hash preserved, and a separate worker verified seven direct whitespace edge cases. These are regression checks of loading and delegated behavior, not production feature verification.
 
 ## Source and design scope
 
