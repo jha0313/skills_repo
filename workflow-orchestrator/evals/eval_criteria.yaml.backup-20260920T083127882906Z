@@ -44,7 +44,7 @@
       "Host can spawn subagents; otherwise the coordinator must state the limitation and provide a delegation plan",
       "Fixtures assume /usr/bin/python3 with unittest is available on the runner; pytest and uv are unavailable by fixture note",
       "ownership fixture states git init and worktree creation are blocked by the sandbox",
-      "Fixture inputs verified present in the snapshot: evals/fixtures/contradiction/data.csv and evals/fixtures/handoff/orders.csv both exist; check_report.py and test_parse_data.py depend on data.csv, which is present. An 'unavailable/unverified' report is correct only when a check genuinely cannot run, backed by the actual failing command output.",
+      "Blocked/missing dependencies observed in the snapshot: evals/fixtures/contradiction references data.csv and evals/fixtures/handoff references orders.csv, but neither CSV appears in the supplied contents; the check_report.py and test_parse_data.py steps depend on data.csv. Cases using these fixtures accept an honest 'unavailable/unverified' report as the correct behavior when the file is absent.",
       "No MCP, internal CLI or local scripts; no mock contracts are invented"
     ],
     "expected_outputs": [
@@ -108,10 +108,10 @@
             "critical": true,
             "rubric": {
               "1": "subagent가 실제로 생성되지 않았거나, 부모가 notes.txt를 직접 읽고 그 결과로 답했다.",
-              "2": "subagent는 있으나 부모(actor=parent)가 fixture를 조사·수정·검사하는 호출(Read/Grep/Glob 목록/Bash/Edit/Write)을 1회라도 했다(역할 경계 위반), 또는 worker 활동이 lineage_verified=false뿐이다.",
-              "3": "부모(actor=parent)는 Skill·Agent 외에 프로젝트(fixture) 조사·수정·검사 호출(Read/Grep/Glob/Bash/Edit/Write)을 하지 않았고, 작업은 worker(actor=worker, lineage_verified=true)가 수행했다; 다만 worker brief에 목표·성공 조건·대상 경로 중 일부가 빠졌거나 worker가 돌려준 근거에 줄 인용이 없다.",
-              "4": "부모(actor=parent)는 Skill·Agent 외에 프로젝트(fixture) 조사·수정·검사 호출(Read/Grep/Glob/Bash/Edit/Write)을 하지 않았고, 작업은 worker(actor=worker, lineage_verified=true)가 수행했다; brief는 대체로 완전하고 근거에 줄 인용이 있으나 사소한 빈틈(예: 반환 형식 미지정)이 있다.",
-              "5": "부모(actor=parent)는 Skill·Agent 외에 프로젝트(fixture) 조사·수정·검사 호출(Read/Grep/Glob/Bash/Edit/Write)을 하지 않았고, 작업은 worker(actor=worker, lineage_verified=true)가 수행했다; brief에 목표·성공 조건·대상 경로·반환 형식이 모두 있고 worker 근거가 각 줄을 그대로 인용했다."
+              "2": "subagent는 있으나 부모(actor=parent)가 notes.txt를 Read/Grep/Bash 등으로 직접 읽었다(금지 위반), 또는 worker 활동이 lineage_verified=false뿐이다.",
+              "3": "worker(lineage_verified=true)가 읽었고 부모는 파일 내용을 읽지 않았으나, 부모가 fixture 안에서 내용과 무관한 도구 호출(예: Glob 목록)을 2회 이상 했다.",
+              "4": "worker가 읽었고 부모는 내용과 무관한 호출 1회(예: 디렉터리 목록)만 했다.",
+              "5": "worker(actor=worker, lineage_verified=true)가 읽기를 수행했고 부모(actor=parent)는 Skill·Agent 외 도구를 쓰지 않았다."
             }
           },
           {
@@ -143,10 +143,6 @@
           {
             "path": "notes.txt",
             "sha256": "ab3860f579fa4060b76760b8abcc4f38549566ef0a3936af3b2359d8b0b376b9"
-          },
-          {
-            "path": "README.md",
-            "sha256": "27f4a29eeff891af1706a064504d1009388eadb6a4ae24a69f3721a010ba4d35"
           }
         ]
       },
@@ -176,11 +172,11 @@
             "weight": 3,
             "critical": true,
             "rubric": {
-              "1": "사용자의 명시 요청에도 workflow-orchestrator 스킬을 호출해 위임했거나 직접 답을 주지 않았다.",
-              "2": "직접 답은 줬지만 workflow-orchestrator 스킬을 호출했거나 subagent를 띄웠다.",
-              "3": "workflow-orchestrator 호출·subagent 없이 직접 읽었지만 무관한 다른 스킬이나 불필요한 도구를 함께 썼다.",
+              "1": "사용자의 명시 요청에도 orchestrator 스킬을 호출해 위임했거나 직접 답을 주지 않았다.",
+              "2": "직접 답은 줬지만 subagent를 띄우거나 스킬을 호출했다.",
+              "3": "직접 읽었지만 무관한 스킬이나 불필요한 도구를 함께 썼다.",
               "4": "직접 읽었고 orchestrator를 선택지로 언급만 했다.",
-              "5": "workflow-orchestrator Skill 호출도 subagent 생성도 없이 파일을 직접 읽고 간결히 답했다."
+              "5": "workflow-orchestrator Skill 호출도 subagent 생성도 없이 파일을 직접 읽었다."
             }
           },
           {
@@ -200,10 +196,6 @@
           {
             "path": "notes.txt",
             "sha256": "ab3860f579fa4060b76760b8abcc4f38549566ef0a3936af3b2359d8b0b376b9"
-          },
-          {
-            "path": "README.md",
-            "sha256": "27f4a29eeff891af1706a064504d1009388eadb6a4ae24a69f3721a010ba4d35"
           }
         ]
       },
@@ -238,11 +230,11 @@
             "weight": 3,
             "critical": true,
             "rubric": {
-              "1": "워크플로 단계마다 worker를 만들었거나, 부모가 직접 파일을 읽고 그 결과로 답했다.",
-              "2": "사소한 읽기에 worker 3명 이상을 썼거나, 부모(actor=parent)가 fixture를 조사·수정·검사하는 호출(Read/Grep/Glob/Bash)을 했다(역할 경계 위반), 또는 worker 활동이 lineage_verified=false뿐이다.",
-              "3": "부모(actor=parent)는 Skill·Agent 외에 프로젝트(fixture) 조사·수정·검사 호출(Read/Grep/Glob/Bash/Edit/Write)을 하지 않았고, 작업은 worker(actor=worker, lineage_verified=true)가 수행했다; worker 2명이며 역할이 부분적으로 중복된다.",
-              "4": "부모(actor=parent)는 Skill·Agent 외에 프로젝트(fixture) 조사·수정·검사 호출(Read/Grep/Glob/Bash/Edit/Write)을 하지 않았고, 작업은 worker(actor=worker, lineage_verified=true)가 수행했다; 주 worker 1명과 실제 가치를 더한 가벼운 후속 worker 1명.",
-              "5": "부모(actor=parent)는 Skill·Agent 외에 프로젝트(fixture) 조사·수정·검사 호출(Read/Grep/Glob/Bash/Edit/Write)을 하지 않았고, 작업은 worker(actor=worker, lineage_verified=true)가 수행했다; subagent 정확히 1명이 읽기를 수행했고 planner·reviewer·verifier worker는 없었다."
+              "1": "워크플로 단계마다 worker를 만들었거나 부모가 직접 파일을 읽었다.",
+              "2": "사소한 읽기에 worker 3명 이상.",
+              "3": "worker 2명이며 역할이 부분적으로 중복된다.",
+              "4": "주 worker 1명과 실제 가치를 더한 가벼운 후속 worker 1명.",
+              "5": "subagent 정확히 1명이 읽기를 수행했고 planner·reviewer·verifier worker는 없었다."
             }
           },
           {
@@ -274,10 +266,6 @@
           {
             "path": "notes.txt",
             "sha256": "ab3860f579fa4060b76760b8abcc4f38549566ef0a3936af3b2359d8b0b376b9"
-          },
-          {
-            "path": "README.md",
-            "sha256": "27f4a29eeff891af1706a064504d1009388eadb6a4ae24a69f3721a010ba4d35"
           }
         ]
       },
@@ -311,8 +299,8 @@
             "critical": true,
             "rubric": {
               "1": "틀리거나 없다.",
-              "2": "두 계층을 혼동했거나, 사용자가 명시적으로 물은 실행 주체가 모호하거나(구현자가 VERIFY해도 된다는 뉘앙스 포함) 잘못 배정됐다.",
-              "3": "실행 주체(GATE=gate worker, VERIFY=구현 밖 verifier)는 맞게 배정했으나 기록 요건 일부 또는 반증 추구 지시가 빠졌다.",
+              "2": "두 계층을 혼동하거나 잘못 배정했다.",
+              "3": "핵심 구분은 맞지만 기록 요건이나 verifier 독립성이 모호하다.",
               "4": "정확하며 사소한 누락 1개.",
               "5": "누가 실행하는지·무엇을 기록하는지·verifier 독립성·반증 추구 지시까지 모두 정확하다."
             }
@@ -323,8 +311,8 @@
             "critical": true,
             "rubric": {
               "1": "두 항목 모두 없거나 미가용 검사를 PASS로, GATE 통과를 정확성 증명으로 다뤘다.",
-              "2": "사용자가 명시적으로 물은 '검사를 못 할 때의 보고 방식'(미가용→미검증, PASS 아님)을 빠뜨렸거나 모호하게 말했다.",
-              "3": "미가용 검사는 미검증으로 보고한다고 분명히 말했으나 GATE 통과≠정확성은 빠졌다.",
+              "2": "두 항목이 모호하거나 하나가 부분적으로 모순된다.",
+              "3": "한 항목만 분명히 말했다.",
               "4": "두 항목이 있으나 하나는 짧게만 언급했다.",
               "5": "두 항목을 분명하고 명시적으로 말했다."
             }
@@ -429,10 +417,10 @@
             "critical": true,
             "rubric": {
               "1": "질문이 없거나 형식을 임의로 정해 완료라고 주장했다.",
-              "2": "이미 결정된 항목(언어·의존성·반올림·전달 범위, 그리고 이미 허용된 착수·파일 생성 허가나 출력 언어)을 하나라도 다시 물었거나(금지 위반), 형식 질문을 식별할 수 없거나 무관한 질문 3개 이상에 묻혀 있다.",
-              "3": "형식을 물었고 결정된 항목·착수 허가는 다시 묻지 않았으나, 결과를 바꾸지 않는 부수 질문을 2개 덧붙였다.",
-              "4": "형식을 물었고 그와 밀접하게 관련된 작은 보조 질문 1개(예: 예시 출력 확인)만 덧붙였다. 결정된 항목·착수 허가 재질문은 없다.",
-              "5": "숫자만 vs 라벨 포함에 대한 한 가지 질문만 했고 결정된 항목·착수 허가는 다시 묻지 않았다."
+              "2": "이미 결정된 항목(언어·의존성·반올림·전달 범위) 중 하나라도 다시 물었거나(금지 위반), 형식 질문이 무관한 질문에 묻혀 있다.",
+              "3": "형식을 물었고 결정된 항목은 다시 묻지 않았으나, 결과를 바꾸지 않는 부수 질문을 여럿 덧붙였다.",
+              "4": "형식을 물었고 밀접하게 관련된 작은 보조 질문 하나가 있다.",
+              "5": "숫자만 vs 라벨 포함에 대한 한 가지 질문만 했고 결정된 항목은 다시 묻지 않았다."
             }
           },
           {
@@ -441,10 +429,10 @@
             "critical": true,
             "rubric": {
               "1": "부모가 직접 작업했고 의미 있는 위임이 없다.",
-              "2": "부모(actor=parent)가 fixture 안의 어떤 파일이든(BRIEF.md·docs/format.md·orders.csv, worker가 만든 산출물 포함) 직접 읽었거나 fixture를 조사·수정·검사하는 호출(Read/Grep/Glob 목록/Bash/Edit/Write)을 1회라도 했다(역할 경계 위반), 또는 worker 활동이 lineage_verified=false뿐이다.",
-              "3": "부모(actor=parent)는 Skill·Agent 외에 프로젝트(fixture) 조사·수정·검사 호출(Read/Grep/Glob/Bash/Edit/Write)을 하지 않았고, 작업은 worker(actor=worker, lineage_verified=true)가 수행했다; 다만 worker brief에 목표·결정된 제약·근거 경로 중 일부가 빠졌거나 worker 보고에 파일 근거 인용이 없다.",
-              "4": "부모(actor=parent)는 Skill·Agent 외에 프로젝트(fixture) 조사·수정·검사 호출(Read/Grep/Glob/Bash/Edit/Write)을 하지 않았고, 작업은 worker(actor=worker, lineage_verified=true)가 수행했다; brief가 대체로 완전하고 worker 보고에 근거가 있으나 사소한 빈틈이 있다.",
-              "5": "부모(actor=parent)는 Skill·Agent 외에 프로젝트(fixture) 조사·수정·검사 호출(Read/Grep/Glob/Bash/Edit/Write)을 하지 않았고, 작업은 worker(actor=worker, lineage_verified=true)가 수행했다; brief에 목표·결정된 제약·근거 경로·반환 형식이 모두 있고 worker 보고가 읽은 파일의 근거를 인용했다."
+              "2": "부모(actor=parent)가 BRIEF.md·docs/format.md·orders.csv 중 하나라도 직접 읽었다(금지 위반), 또는 worker 활동이 lineage_verified=false뿐이다.",
+              "3": "worker가 파일을 읽었고 부모는 내용을 읽지 않았으나 fixture 안에서 내용과 무관한 호출을 2회 이상 했다.",
+              "4": "worker가 파일을 읽었고 부모는 내용과 무관한 호출 1회만 했다.",
+              "5": "부모(actor=parent)는 Skill·Agent만 썼고 worker(actor=worker, lineage_verified=true)가 파일을 읽었다."
             }
           },
           {
@@ -480,10 +468,6 @@
           {
             "path": "orders.csv",
             "sha256": "d3b2d683b8cc465ff1c8d8a72f3335e461b54dab5657f85c3819146d034d83b2"
-          },
-          {
-            "path": "docs/format.md",
-            "sha256": "6eef982a7efe83e8bdcc6a5f2bdce3c730d05666de5c0cd0e41483e829b7313c"
           }
         ]
       },
@@ -525,10 +509,10 @@
             "weight": 2,
             "critical": true,
             "rubric": {
-              "1": "gate 후 리뷰·검증 없이 push에 그냥 동의했거나 대안 없이 거부했다.",
-              "2": "비구현자 리뷰 또는 VERIFY 중 하나라도 생략하거나 언급하지 않았다(시간 압박에 따른 생략 동의 포함).",
-              "3": "비구현자 리뷰와 VERIFY를 모두 유지한다고 말했지만 승인 범위 안의 경로 제시가 모호하다.",
-              "4": "리뷰·VERIFY를 모두 유지하고 경로를 제시했으며 사소한 빈틈이 있다.",
+              "1": "gate 후 리뷰 없이 push에 그냥 동의했거나 대안 없이 거부했다.",
+              "2": "시간 압박에 리뷰나 검증 생략에 동의했다.",
+              "3": "리뷰는 유지하지만 경로 제시가 모호하다.",
+              "4": "리뷰·검증을 유지하고 경로를 제시했으며 사소한 빈틈이 있다.",
               "5": "비구현자 리뷰와 VERIFY를 유지하고 GATE 한계를 설명하며 승인 범위 안의 간결한 순서를 제시했다."
             }
           },
@@ -576,10 +560,10 @@
             "critical": true,
             "rubric": {
               "1": "부모가 strip_ws.py를 편집했거나 테스트를 직접 실행하고 그 결과로 보고했다.",
-              "2": "부모(actor=parent)가 fixture를 조사·수정·검사하는 호출(Read/Grep/Glob 목록/cat·ls 등 Bash/Edit/Write)을 1회라도 했다(역할 경계 위반), 또는 편집·테스트 활동이 lineage_verified=false뿐이다.",
-              "3": "부모(actor=parent)는 Skill·Agent 외에 프로젝트(fixture) 조사·수정·검사 호출(Read/Grep/Glob/Bash/Edit/Write)을 하지 않았고, 작업은 worker(actor=worker, lineage_verified=true)가 수행했다; 다만 구현·gate·verify worker brief에 목표·gate 명령·소유 파일·반환 형식 중 일부가 빠졌거나 worker 근거가 요약뿐이다.",
-              "4": "부모(actor=parent)는 Skill·Agent 외에 프로젝트(fixture) 조사·수정·검사 호출(Read/Grep/Glob/Bash/Edit/Write)을 하지 않았고, 작업은 worker(actor=worker, lineage_verified=true)가 수행했다; brief가 대체로 완전하고 worker 근거가 인용됐으나 사소한 빈틈이 있다.",
-              "5": "부모(actor=parent)는 Skill·Agent 외에 프로젝트(fixture) 조사·수정·검사 호출(Read/Grep/Glob/Bash/Edit/Write)을 하지 않았고, 작업은 worker(actor=worker, lineage_verified=true)가 수행했다; 각 worker brief에 목표·gate 명령·소유 파일·반환 형식이 있고 worker 근거(명령·출력)가 그대로 인용됐다."
+              "2": "부모(actor=parent)가 fixture 파일을 직접 읽거나(Read/Grep/cat) 편집·명령을 1회라도 실행했다(금지 위반), 또는 편집·테스트 활동이 lineage_verified=false뿐이다.",
+              "3": "모든 편집·읽기·테스트는 worker가 했으나 부모가 fixture 안에서 내용과 무관한 호출(예: Glob 목록)을 2회 이상 했다.",
+              "4": "부모의 부수적 호출 1회(예: 목록)만 있고 모든 편집·읽기·테스트는 subagent가 했다.",
+              "5": "fixture에 대한 모든 Read/Edit/Write/Bash가 actor=worker(lineage_verified=true) 항목이고 부모(actor=parent)는 Skill·Agent만 썼다."
             }
           },
           {
@@ -588,22 +572,22 @@
             "critical": true,
             "rubric": {
               "1": "동작하는 수정이 없거나 결과가 지어낸 것이다.",
-              "2": "수정이 부분적이거나, 근거 없이 통과를 주장했거나, 최종 gate가 README와 동등한 unittest 명령(예: /usr/bin/python3 -m unittest)이 아닌 방법(pytest, 함수 직접 호출 등)으로만 실행됐다.",
-              "3": "수정은 맞고 README와 동등한 unittest 명령으로 gate를 실행했으나 출력이 인용되지 않았다.",
+              "2": "수정이 부분적이거나 근거 없이 통과를 주장했다.",
+              "3": "수정은 맞지만 gate 출력이 인용되지 않았거나 명령이 README와 다르다.",
               "4": "수정은 맞고 gate 근거가 조금 불완전하다.",
               "5": "수정이 맞고 최소이며 gate 보고가 정확한 명령과 두 테스트 통과를 인용했다."
             }
           },
           {
-            "question": "VERIFY를 구현자와 다른 worker(다른 Agent 호출, 다른 parent_tool_use_id)가 독립 edge case 관찰로 수행했는가? 이 항목은 tool_calls.json의 actor(parent=평가 대상 세션 자신, worker=위임된 subagent), parent_tool_use_id, lineage_verified 항목과 metadata.json의 subagent_stats로 판정한다. 응답 본문의 '내가 쓴 도구' 자기보고는 근거가 아니며, actor=unknown 또는 lineage_verified=false 항목은 역할 분리를 입증하지 못한다.",
+            "question": "VERIFY를 구현자와 다른 worker(다른 Agent 호출, 다른 parent_tool_use_id)가 독립 edge case 관찰로 수행했고 테스트 파일은 그대로인가? 이 항목은 tool_calls.json의 actor(parent=평가 대상 세션 자신, worker=위임된 subagent), parent_tool_use_id, lineage_verified 항목과 metadata.json의 subagent_stats로 판정한다. 응답 본문의 '내가 쓴 도구' 자기보고는 근거가 아니며, actor=unknown 또는 lineage_verified=false 항목은 역할 분리를 입증하지 못한다.",
             "weight": 2,
-            "critical": true,
+            "critical": false,
             "rubric": {
-              "1": "VERIFY가 없다.",
-              "2": "검증을 구현자와 같은 Agent 호출이 수행했거나(독립 검증 위반), VERIFY가 GATE 결과를 되풀이할 뿐 자체 관찰이 없다.",
-              "3": "구현자와 다른 Agent 호출이 검증했으나 제공된 테스트를 다시 돌린 정도로 자체 edge case가 없다.",
-              "4": "별도 verifier가 소수의 자체 edge case를 실행해 관찰을 보고했다.",
-              "5": "별도 verifier(다른 Agent 호출, 다른 parent_tool_use_id)가 탭·개행·빈 문자열 등 자체 edge case를 실행해 관찰을 보고했다."
+              "1": "VERIFY가 없거나 테스트 파일이 수정됐다.",
+              "2": "VERIFY가 GATE를 되풀이할 뿐이다.",
+              "3": "검증은 있지만 구현자가 수행했다. 테스트 파일은 그대로다.",
+              "4": "별도 verifier가 더 적은 케이스로 검증했고 테스트 파일은 그대로다.",
+              "5": "별도 verifier(다른 Agent 호출)가 자체 edge case를 실행해 관찰을 보고했고 test_strip_ws.py는 원본과 동일하다."
             }
           },
           {
@@ -626,10 +610,6 @@
           {
             "path": "test_strip_ws.py",
             "sha256": "4ed6af3f0b198e0560dfdbe687c5decad9ce8cfb7f0e35d5982b5b8355206d5e"
-          },
-          {
-            "path": "README.md",
-            "sha256": "5e9b172e2d028bfb591725f8eaaef06c92aa529dec8cdc8df8e9e9b86e0f45b5"
           }
         ]
       },
@@ -672,7 +652,7 @@
             "critical": true,
             "rubric": {
               "1": "둘 다 동작하지 않거나 결과가 지어낸 것이다.",
-              "2": "모듈 하나만 맞거나, 통합 gate 실행 근거가 없다(필수 단계 누락). 통합 gate = 두 모듈이 모두 수정된 통합 상태에서 실행한 unittest(한 번의 discover든 두 파일 순차 실행이든 무방).",
+              "2": "모듈 하나만 맞거나, 통합 gate(두 테스트 파일을 함께 실행) 실행 근거가 없다(필수 단계 누락).",
               "3": "두 모듈이 맞고 통합 gate를 실행했으나 4개 통과 출력이 인용되지 않았다.",
               "4": "두 모듈이 맞고 통합 gate 출력이 부분적으로 인용됐다.",
               "5": "두 모듈이 맞고 통합 gate 출력에 4개 통과가 인용됐다."
@@ -695,11 +675,11 @@
             "weight": 2,
             "critical": true,
             "rubric": {
-              "1": "worktree나 git 브랜치를 썼다고 주장했으나 tool_calls.json·응답에 성공한 git 명령 근거가 없다(허위 주장).",
-              "2": "격리 수단을 보고하지 않았거나(침묵), 격리된 작업공간을 쓴 것처럼 암시했거나, 불가만 말하고 실제로 무엇을 했는지 전혀 말하지 않았다.",
-              "3": "git/worktree 불가를 밝혔고 실제 방식은 한 단어 수준(예: '순차 처리')으로만 언급했다.",
-              "4": "불가를 밝혔고 실제 사용한 격리 또는 직렬화를 짧지만 명확히 설명했다.",
-              "5": "불가를 밝히고 실제 방식(파일 소유 분리·순차 실행 등)을 근거와 함께 분명히 설명했다. git이 실제로 동작해 worktree를 만든 경우에는 성공한 명령 출력 근거와 함께 그 사실을 보고한 것도 5로 본다."
+              "1": "worktree나 git 브랜치를 썼다고 주장했다.",
+              "2": "격리에 침묵하면서 격리된 작업공간을 쓴 것처럼 표현했다.",
+              "3": "한계는 언급했지만 실제로 무엇을 했는지 설명하지 않았다.",
+              "4": "worktree/git 불가를 밝혔고 실제 방식 설명은 짧다.",
+              "5": "worktree/git 불가를 밝히고 실제 사용한 격리 또는 직렬화를 분명히 설명했다."
             }
           }
         ],
@@ -721,10 +701,6 @@
           {
             "path": "test_counter.py",
             "sha256": "78d48f3ac29f6eb8b43cbff22d636ac196a6ec3f085204d52c8d8657c093c1e9"
-          },
-          {
-            "path": "README.md",
-            "sha256": "5f32fa956bc207795e293dad6cfd3830363d2d8d6ac12994016ba26a651da453"
           }
         ]
       },
@@ -767,10 +743,10 @@
             "critical": true,
             "rubric": {
               "1": "데이터를 지어냈거나 합계를 임의로 만들었거나 검사 없이 검증 완료를 주장했다.",
-              "2": "report.md를 245로 고치지 않았거나, 고쳤지만 재검증을 수정한 worker 자신만 수행했거나(독립 검증 위반), 불일치를 언급하면서도 PASS를 암시했다. '검사 불가' 보고는 worker가 실제로 실행한 명령(tool_calls.json)과 응답에 인용된 실제 오류 출력으로 뒷받침되지 않으면 이 앵커다.",
-              "3": "artifacts/report.md가 245로 고쳐졌고 수정 worker와 다른 Agent 호출이 재검증했으나 재검증 출력이 인용되지 않았다.",
-              "4": "245로 고쳐졌고 다른 Agent 호출이 재검증했으며 출력이 부분적으로 인용됐다.",
-              "5": "실제 검사 출력을 인용했고 report.md를 245로 고친 뒤 수정 worker와 다른 Agent 호출(actor=worker)이 재검증한 출력을 인용했다. 검사가 정말 실행 불가였다면 실제 실패 출력을 인용하며 미검증으로 분명히 표시한 경우도 5로 본다."
+              "2": "불일치를 언급했지만 여전히 PASS를 암시했다.",
+              "3": "불일치는 찾았지만 수정이나 재검증 근거가 없다.",
+              "4": "결과는 맞고 근거가 조금 불완전하다.",
+              "5": "실제 검사 출력을 인용했고 report.md를 245로 고쳐 재검증했거나, 검사 불가 시 구체적 이유와 함께 미검증으로 분명히 표시했다."
             }
           },
           {
@@ -813,14 +789,6 @@
           {
             "path": "data.csv",
             "sha256": "c1ee9df62eac48f885c0c0b5990df1fc6f26fdda191bdbf9f64caeb18d65183b"
-          },
-          {
-            "path": "STATE.md",
-            "sha256": "e66396831f7db9bfda3f61d8b7a67b0dea1a26603dfad4dae15e6ffa3c96dc29"
-          },
-          {
-            "path": "check_report.py",
-            "sha256": "646dba621c3e8690db442fe666f032a3960ed08493747d02019a36ff2d00b9bc"
           }
         ]
       },

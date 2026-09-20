@@ -44,7 +44,7 @@
       "Host can spawn subagents; otherwise the coordinator must state the limitation and provide a delegation plan",
       "Fixtures assume /usr/bin/python3 with unittest is available on the runner; pytest and uv are unavailable by fixture note",
       "ownership fixture states git init and worktree creation are blocked by the sandbox",
-      "Fixture inputs verified present in the snapshot: evals/fixtures/contradiction/data.csv and evals/fixtures/handoff/orders.csv both exist; check_report.py and test_parse_data.py depend on data.csv, which is present. An 'unavailable/unverified' report is correct only when a check genuinely cannot run, backed by the actual failing command output.",
+      "Blocked/missing dependencies observed in the snapshot: evals/fixtures/contradiction references data.csv and evals/fixtures/handoff references orders.csv, but neither CSV appears in the supplied contents; the check_report.py and test_parse_data.py steps depend on data.csv. Cases using these fixtures accept an honest 'unavailable/unverified' report as the correct behavior when the file is present.",
       "No MCP, internal CLI or local scripts; no mock contracts are invented"
     ],
     "expected_outputs": [
