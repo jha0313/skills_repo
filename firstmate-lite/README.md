@@ -40,7 +40,11 @@ The complete workflow and compact worker brief are in [SKILL.md](SKILL.md). This
 
 ## Verified smoke scope
 
-On 2026-09-19, a real Claude Code session loaded this skill and delegated a four-line read-only fixture investigation to one native Explore worker. The parent used only Skill and Agent calls; only the worker read the project file. The final answer reported the correct line count and labels with quoted line evidence, and the fixture remained unchanged. Frontmatter validation also passed. This verifies routing and the orchestrator/worker boundary for that bounded task, not a complete implementation, merge, deployment or recovery workflow.
+On 2026-09-19, a real Claude Code session loaded this skill and delegated a four-line read-only fixture investigation to one native Explore worker. The parent used only Skill and Agent calls; only the worker read the project file. The final answer reported the correct line count and labels with quoted line evidence, and the fixture remained unchanged. Frontmatter validation also passed.
+
+A second real session fixed a three-line Python whitespace-normalization function through one implementation worker, then used a different review/verification worker. The parent again used only Skill and Agent calls. The provided two-test suite failed before the change, passed after it, and passed the independent re-run (**GATE**). The independent reviewer separately ran eight direct edge cases including tabs, newlines, empty input and mixed case (**VERIFY**). Only the worker edited the one source line; the provided test file kept its original hash. No commit, merge, deployment or external publication occurred in the fixture.
+
+These bounded probes verify natural loading, delegation, the no-parent-edit boundary, a small local mutation, independent review and separate GATE/VERIFY reporting. They do not establish full production integration, browser verification, parallel-worktree reconciliation, deployment or interruption-recovery guarantees.
 
 ## Source and design scope
 
