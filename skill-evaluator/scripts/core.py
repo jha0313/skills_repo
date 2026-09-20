@@ -196,6 +196,10 @@ def validate_criteria(data, mode, binary):
                 )
         for check in qc["artifact_checks"]:
             safe_relative(check["path"])
+            if "sha256" in check and not re.fullmatch(
+                r"[0-9a-f]{64}", str(check["sha256"])
+            ):
+                raise EvalError(f"{cid}: artifact sha256 must be 64 lowercase hex")
         patterns = case.get("intercept_patterns", [])
         tools = case.get("intercept_mcp_tools", [])
         if (patterns or tools) and not case.get("mock_data"):
@@ -401,10 +405,14 @@ def deterministic_checks(case, execution):
     # Only response/tool evidence, never the echoed user prompt, participates in textual checks.
     files = {a["path"]: a for a in execution["artifacts"].get("files", [])}
     artifact_failures = []
+    hash_mismatches = []
     for check in qc["artifact_checks"]:
         obj = files.get(check["path"])
         if not obj or not obj.get("exists"):
             artifact_failures.append(check["path"])
+        elif check.get("sha256") and obj.get("sha256") != check["sha256"]:
+            # A protected file must match its original bytes; existence alone is not preservation.
+            hash_mismatches.append(check["path"])
     invocations = execution["metadata"].get("skill_invocations", [])
     routing_failure = False
     if case["category"] == "invocation":
@@ -417,6 +425,7 @@ def deterministic_checks(case, execution):
         "required_present_misses": misses,
         "forbidden_hits": forbidden,
         "missing_artifacts": artifact_failures,
+        "artifact_hash_mismatches": hash_mismatches,
         "routing_failure": routing_failure,
     }
 
@@ -429,6 +438,7 @@ def grade_case(case, execution, judgments, binary, mode):
             "required_present_misses",
             "forbidden_hits",
             "missing_artifacts",
+            "artifact_hash_mismatches",
             "routing_failure",
         )
     )

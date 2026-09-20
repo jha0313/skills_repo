@@ -249,6 +249,23 @@ class EvaluatorTests(unittest.TestCase):
         native = core.read_data(stage / "skill-evaluator-cases/TC-001/case.yaml")
         self.assertNotIn("append_system_prompt", native["execution"])
 
+    def test_scaffold_script_is_staged_beside_case_yaml(self):
+        # The native runner resolves context.scaffold_script relative to the case directory.
+        fixture = self.root / "fixture"
+        fixture.mkdir()
+        (fixture / "notes.txt").write_text("alpha: first\n")
+        analysis = discover(str(FIXTURES / "observatory-greeting"))
+        case = dict(self.case, working_directory=str(fixture))
+        stage = adapters.native_stage(
+            analysis, case, self.root / "case", {"timeout": 120}
+        )
+        case_dir = stage / "skill-evaluator-cases/TC-001"
+        native = core.read_data(case_dir / "case.yaml")
+        script = case_dir / native["context"]["scaffold_script"]
+        self.assertTrue(script.is_file())
+        self.assertIn(str(stage / "fixture"), script.read_text())
+        self.assertTrue((stage / "fixture/notes.txt").is_file())
+
     def test_idempotent_publisher_and_config_required(self):
         with self.assertRaises(core.EvalError):
             publish(self.root, {"run_id": "test"}, {}, "skillwatch")
@@ -280,6 +297,95 @@ class EvaluatorTests(unittest.TestCase):
             ]
         )
         self.assertEqual(adapters.parse_trace(text)[4], "actual answer")
+
+    def test_protected_artifact_requires_matching_hash(self):
+        case = copy.deepcopy(self.case)
+        case["quality_criteria"]["artifact_checks"] = [
+            {"path": "USER_NOTES.md", "sha256": "a" * 64}
+        ]
+        e = copy.deepcopy(self.execution)
+        e["artifacts"]["files"] = [
+            {"path": "USER_NOTES.md", "exists": True, "sha256": "b" * 64}
+        ]
+        checks = core.deterministic_checks(case, e)
+        self.assertEqual(checks["missing_artifacts"], [])
+        self.assertEqual(checks["artifact_hash_mismatches"], ["USER_NOTES.md"])
+        result = core.grade_case(case, e, [self.judgment()] * 3, False, "basic")
+        self.assertTrue(result["critical_failure"])
+        self.assertEqual(result["verdict"], "FAIL")
+        e["artifacts"]["files"][0]["sha256"] = "a" * 64
+        self.assertEqual(
+            core.deterministic_checks(case, e)["artifact_hash_mismatches"], []
+        )
+        case["quality_criteria"]["artifact_checks"][0]["sha256"] = "not-hex"
+        data = core.read_data(FIXTURES / "basic.yaml")
+        data["test_cases"][0] = case
+        with self.assertRaises(core.EvalError):
+            core.validate_criteria(data, "basic", False)
+
+    def test_native_trace_preserves_worker_attribution(self):
+        # Judges may only cite tool_calls.json, so actor attribution, lineage and the
+        # raw trace coordinate must survive normalization and citation verification.
+        def use(tool_id, name):
+            return {"type": "tool_use", "id": tool_id, "name": name, "input": {}}
+
+        events = [
+            {"type": "system", "subtype": "init"},
+            {
+                "type": "assistant",
+                "parent_tool_use_id": None,
+                "message": {"content": [use("toolu_parent_read", "Read")]},
+            },
+            {
+                "type": "assistant",
+                "parent_tool_use_id": None,
+                "message": {"content": [use("toolu_agent", "Agent")]},
+            },
+            {
+                "type": "assistant",
+                "parent_tool_use_id": "toolu_agent",
+                "message": {"content": [use("toolu_child_read", "Read")]},
+            },
+            {
+                "type": "assistant",
+                "parent_tool_use_id": "toolu_never_spawned",
+                "message": {"content": [use("toolu_orphan", "Grep")]},
+            },
+            {
+                "type": "assistant",
+                "message": {"content": [use("toolu_unknown", "Read")]},
+            },
+            {"type": "result", "result": "done"},
+        ]
+        calls = adapters.parse_trace("\n".join(json.dumps(e) for e in events))[3]
+        self.assertEqual(
+            [
+                (c["name"], c["actor"], c["parent_tool_use_id"], c["lineage_verified"])
+                for c in calls
+            ],
+            [
+                ("Read", "parent", None, None),
+                ("Agent", "parent", None, None),
+                ("Read", "worker", "toolu_agent", True),
+                ("Grep", "worker", "toolu_never_spawned", False),
+                ("Read", "unknown", None, None),
+            ],
+        )
+        self.assertEqual([c["trace_line"] for c in calls], [2, 3, 4, 5, 6])
+        core.write_json(self.root / "cases/TC-001/tool_calls.json", calls)
+        lines = (self.root / "cases/TC-001/tool_calls.json").read_text().splitlines()
+        worker_line = next(
+            i for i, line in enumerate(lines, 1) if '"toolu_child_read"' in line
+        )
+        core.verify_citation(
+            {
+                "path": "cases/TC-001/tool_calls.json",
+                "line_start": worker_line,
+                "line_end": worker_line + 4,
+                "quote": '"actor": "worker"',
+            },
+            self.root,
+        )
 
     def test_process_timeout_stops_children(self):
         adapters.reset_cancellation()

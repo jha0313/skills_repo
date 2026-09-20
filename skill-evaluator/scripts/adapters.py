@@ -194,7 +194,8 @@ def native_stage(analysis, case, case_dir, options):
                 shutil.rmtree(config_path)
             elif config_path.exists():
                 config_path.unlink()
-        scaffold = stage / "scaffold.sh"
+        # The native runner resolves scaffold_script relative to the case directory.
+        scaffold = casepath / "scaffold.sh"
         scaffold.write_text(
             "#!/bin/sh\nset -eu\ncp -R "
             + shlex.quote(str(stage / "fixture"))
@@ -260,20 +261,32 @@ def native_stage(analysis, case, case_dir, options):
 
 
 def parse_trace(text):
-    events = []
-    for line in text.splitlines():
+    indexed = []
+    for line_no, line in enumerate(text.splitlines(), 1):
         if line.strip():
             try:
-                events.append(json.loads(line))
+                indexed.append((line_no, json.loads(line)))
             except json.JSONDecodeError as exc:
                 raise EvalError("Malformed native JSONL transcript") from exc
+    events = [event for _, event in indexed]
     final = next((e for e in reversed(events) if e.get("type") == "result"), {})
     init = next((e for e in events if e.get("subtype") == "init"), {})
     calls = []
     responses = []
-    for event in events:
+    agent_ids = set()
+    for line_no, event in indexed:
         if event.get("type") != "assistant":
             continue
+        # Actor attribution comes from the native event, never from assistant text:
+        # an explicit null parent_tool_use_id is the evaluated session itself, a set
+        # value is a delegated worker, and a missing key is unknown.
+        if "parent_tool_use_id" not in event:
+            actor = "unknown"
+        elif event["parent_tool_use_id"] is None:
+            actor = "parent"
+        else:
+            actor = "worker"
+        parent = event.get("parent_tool_use_id")
         for part in event.get("message", {}).get("content", []):
             if part.get("type") == "tool_use":
                 calls.append(
@@ -281,8 +294,16 @@ def parse_trace(text):
                         "name": part["name"],
                         "input": part.get("input", {}),
                         "id": part.get("id"),
+                        "actor": actor,
+                        "parent_tool_use_id": parent,
+                        "lineage_verified": (parent in agent_ids)
+                        if actor == "worker"
+                        else None,
+                        "trace_line": line_no,
                     }
                 )
+                if part["name"] == "Agent" and part.get("id"):
+                    agent_ids.add(part["id"])
             elif part.get("type") == "text":
                 responses.append(part["text"])
     response = final.get("result") or "\n".join(responses)
@@ -495,6 +516,7 @@ def native_execute(analysis, case, case_dir, options):
             c["input"].get("skill", "") for c in calls if c["name"] == "Skill"
         ],
         "permission_denials": final.get("permission_denials", []),
+        "subagent_stats": final.get("subagent_stats"),
         "error": arm.get("error"),
         "mock_status": arm.get("mocks"),
         "mock_unmatched": any(

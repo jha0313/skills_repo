@@ -87,6 +87,7 @@ The values below describe the portable file accepted by `validate_criteria`, not
 | `semantic_checks[].rubric` | map | Exactly integer keys 1–5 for Likert or 0/1 for binary. Each value is a behavior anchor. |
 | `semantic_checks[].critical` | boolean, default `false` | Failure forces the case verdict to FAIL, regardless of dimension composite. |
 | `artifact_checks[].path` | relative string | Required captured artifact, no traversal. Additional domain checks belong in semantic rubrics or a verified renderer. |
+| `artifact_checks[].sha256` | optional 64-hex string | Expected SHA-256 of the captured file. A mismatch is a deterministic critical failure; use it for protected files that must remain byte-for-byte unchanged. Existence alone is not preservation. |
 | `intercept_patterns` | optional list of regex strings | Full-match Bash interceptions, with matching entries in `mock_data`. |
 | `intercept_mcp_tools` | optional list of runtime names | Exact, inventory-verified `mcp__server__tool` names. |
 | `mock_data` | optional mapping | Required for any interception. Do not put secrets or live credentials in fixtures. |
