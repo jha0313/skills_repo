@@ -35,10 +35,11 @@ For the Lighthouse example, success checks should name page/device/auth state, b
 
 A clear goal starts work immediately. Missing decisions that matter get a short interview. Existing authorization persists; commit, push, merge and deployment follow the exact scope the user/host has already authorized. Read-only measurement does not authorize an optimization change.
 
-The complete workflow and compact worker brief are in [SKILL.md](SKILL.md). This package intentionally stays small; it does not claim the original Firstmate distro's supervision, recovery or backend guarantees.
-
+The complete workflow and compact worker brief are in [SKILL.md](SKILL.md); reusable delegation and review prompts are in [orchestration-prompts.md](references/orchestration-prompts.md). This package intentionally stays small; it does not claim the original Firstmate distro's supervision, recovery or backend guarantees.
 
 ## Verified smoke scope
+
+The records below predate the version 1.2.0 prompt guidance; that guidance has not received an additional live execution test.
 
 The original 2026-09-19 probes below ran under the previous package name `firstmate-lite`; their retained execution records are unchanged.
 
@@ -50,34 +51,4 @@ These bounded probes verify natural loading, delegation, the no-parent-edit boun
 
 After the rename to `workflow-orchestrator`, both bounded probes were repeated through the real Skill tool under the new name. The coordinator again used only Skill and Agent calls. The read-only fixture was unchanged; the mutation fixture passed the original two tests with their original hash preserved, and a separate worker verified seven direct whitespace edge cases. These are regression checks of loading and delegated behavior, not production feature verification.
 
-## Source and design scope
-
-Inspired by [kunchenguid/firstmate](https://github.com/kunchenguid/firstmate), inspected at commit [`90cd351ac8b828d7074fe4a432acda246355bec7`](https://github.com/kunchenguid/firstmate/tree/90cd351ac8b828d7074fe4a432acda246355bec7) on 2026-09-19. The reference describes a coordinator with delegated workers, isolated workspaces, bounded task briefs, supervision and faithful outcome reporting. Its full product is an agent distro, not a standalone copyable orchestration skill.
-
-This is an independently written simplification, with the requested Context/Plan/Implement/GATE+VERIFY/Review+Land/feedback workflow. It does not copy the original runtime, internal skills, nautical persona, helper commands, registry, merge policy or lifecycle machinery. It is not an official Firstmate release or a claim of identical behavior.
-
-The upstream reference is MIT-licensed. Its copyright/permission notice is retained below for attribution and any adapted instructional substance:
-
-```text
-MIT License
-
-Copyright (c) 2026 Kun Chen
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
+Inspired by [kunchenguid/firstmate](https://github.com/kunchenguid/firstmate); see the [source revision and MIT notice](THIRD_PARTY_NOTICES.md).
