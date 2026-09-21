@@ -1,10 +1,10 @@
-# Third-party notices
+# 제3자 출처와 라이선스 고지
 
-## Firstmate reference
+## Firstmate 참고 자료
 
-This skill was inspired by [kunchenguid/firstmate](https://github.com/kunchenguid/firstmate), inspected at revision [`90cd351ac8b828d7074fe4a432acda246355bec7`](https://github.com/kunchenguid/firstmate/tree/90cd351ac8b828d7074fe4a432acda246355bec7) on 2026-09-19. It is an independently written simplification, not an official Firstmate release.
+이 스킬은 [kunchenguid/firstmate](https://github.com/kunchenguid/firstmate)에서 영감을 받았다. 2026-09-19에 revision [`90cd351ac8b828d7074fe4a432acda246355bec7`](https://github.com/kunchenguid/firstmate/tree/90cd351ac8b828d7074fe4a432acda246355bec7)을 확인했다. 독립적으로 작성한 간소화 버전이며 공식 Firstmate 릴리스가 아니다.
 
-The following upstream notice is retained for that reference and any adapted instructional substance; it does not set the license for this repository as a whole.
+참고 자료와 차용한 지침 내용에 대해 아래 원본 고지를 그대로 보존한다. 이 고지가 저장소 전체의 라이선스를 정하는 것은 아니다.
 
 ```text
 MIT License

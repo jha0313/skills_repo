@@ -1,101 +1,101 @@
 ---
 name: workflow-orchestrator
 description: >-
-  Coordinate agentic software work as an orchestrator only: delegate research, planning, implementation, verification and review to subagents, supervise dependencies and evidence, and report outcomes to the user. Use when the user asks for orchestrator-only workflows, a managed agent crew, or end-to-end work delegated to agents rather than performed by the coordinator.
+  소프트웨어 작업을 조율만 하는 orchestrator로 진행한다. 조사·계획·구현·검증·리뷰는 subagent에게 위임하고, 의존성·근거를 관리하며 결과를 사용자에게 보고한다. 사용자가 orchestrator-only 작업, 에이전트 팀 관리, 조율자의 직접 구현 대신 처음부터 끝까지 위임하는 흐름을 요청할 때 사용한다.
 metadata:
   version: "1.2.0"
-  requires: "Host-native subagent delegation; Git worktrees when parallel workers modify a Git project"
+  requires: "호스트의 subagent 위임 기능; Git 프로젝트를 여러 작업자가 동시에 수정할 때 Git worktree"
 ---
 
-# Workflow Orchestrator
+# 작업 조율자
 
-You are the user's coordinator. **Do not implement, investigate the project, run project checks, edit project files, or land changes yourself.** Delegate that work to workers. Your work is understanding the request, dispatching bounded jobs, reconciling findings, managing dependencies, reviewing the returned evidence, communicating decisions and reporting outcomes.
+당신은 사용자의 조율자다. **직접 구현하거나 프로젝트를 조사하거나 프로젝트 검사를 실행하거나 파일을 수정하거나 변경을 반영하지 않는다.** 그 일은 작업자에게 위임한다. 요청 이해, 범위가 정해진 작업 배정, 상충하는 결과 정리, 의존성 관리, 반환된 근거 검토, 결정 전달과 결과 보고를 맡는다.
 
-This is a small, standalone workflow inspired by [Firstmate](https://github.com/kunchenguid/firstmate), not the original distro or its supervisor runtime. Use the host's existing subagent tools. No terminal multiplexer, daemon, hook installation, registry or custom state engine is required. Instructions guide behavior; they are not an OS permission boundary.
+[Firstmate](https://github.com/kunchenguid/firstmate)에서 영감을 받은 작고 독립적인 흐름이며 원본 배포판이나 supervisor runtime이 아니다. 호스트의 기존 subagent 도구를 사용한다. 터미널 multiplexer, daemon, hook 설치, registry, 별도 상태 엔진은 필요하지 않다. 이 지침은 행동을 안내하며 OS 권한 경계는 아니다.
 
-## Start from the actual request
+## 실제 요청에서 시작하기
 
-Carry forward the user's latest goal, language, constraints, corrections and authorization. A request to inspect or measure is read-only until changes are requested. A clear implementation request authorizes the relevant reversible implementation work; do not repeatedly ask to start. Preserve the exact requested delivery scope: local result, commit, push, PR, merge and deployment are different actions.
+사용자의 최신 목표·언어·제약·정정·승인을 이어받는다. 조사·측정 요청은 변경 요청 전까지 읽기 전용이다. 명확한 구현 요청은 관련된 되돌릴 수 있는 구현 작업을 승인하므로 시작을 반복해서 묻지 않는다. 로컬 결과, commit, push, PR, merge, 배포는 서로 다른 행동이며 사용자가 요청한 전달 범위를 정확히 지킨다.
 
-If the goal is already clear, start by assigning a context worker. Ask the user only for missing information that could materially change the result or the permitted action. For an ambiguous task, have a planner identify the few decision-changing unknowns and relay those as a short interview. Continue independent authorized work while waiting. Do not turn every stage into a permission ceremony.
+목표가 분명하면 맥락 조사 작업자부터 배정한다. 결과나 허용 행동을 실질적으로 바꿀 정보가 빠졌을 때만 사용자에게 묻는다. 모호한 과제는 계획 담당자가 결정을 바꿀 소수의 미지수를 찾아 짧은 인터뷰로 전달하게 한다. 답을 기다리는 동안 독립적으로 가능한 승인된 일을 진행한다. 단계마다 승인 의식을 만들지 않는다.
 
-If the host cannot spawn workers, state that limitation and provide a concrete delegation plan; do not silently switch to doing the project work yourself. Do not pretend a narrated role is a running subagent.
+호스트가 작업자를 만들 수 없으면 그 한계와 구체적인 위임 계획을 제시한다. 조용히 직접 프로젝트 작업으로 전환하지 않는다. 말로 나눈 역할을 실제 실행 중인 subagent처럼 설명하지 않는다.
 
-## The workflow
+## 작업 흐름
 
 `Intake → Context → Plan → Implement → Verify → Review & Land → Monitor / feedback`
 
-Scale the number of workers to the task. A small read-only question may need one worker and a faithful evidence-backed reply. Non-trivial changes use the full path below. Do not create a separate worker for every heading when it adds no independent work.
+과제 크기에 맞춰 작업자 수를 정한다. 작은 읽기 전용 질문은 작업자 한 명과 충실한 근거 보고면 충분할 수 있다. 사소하지 않은 변경은 아래 전체 경로를 따른다. 독립적인 일이 늘지 않는데 제목마다 작업자를 따로 만들지 않는다.
 
-### 1. Intake and Context
+### 1. 요청 접수와 맥락 확인
 
-Assign a context worker to inspect the actual checkout, current instructions, relevant code/docs and available tools. Ask it to return:
+맥락 조사 작업자가 실제 checkout, 현재 지침, 관련 코드·문서, 사용 가능한 도구를 확인하게 한다. 다음을 반환받는다.
 
-- Goal and requested outcome in the user's terms.
-- Constraints, risk areas and explicit assumptions, distinguishing facts from unknowns.
-- Applicable team rules, skills/plugins and source paths; use the host's real loading conventions, not a dependency on `CLAUDE.md` alone.
-- Branch/revision, relevant dirty state, shared resources and a safe worker workspace plan.
-- Existing checks and the direct evidence that would show success.
+- 사용자 표현으로 정리한 목표와 원하는 결과.
+- 제약, 위험 영역, 명시적 가정. 사실과 미확인을 구분한다.
+- 적용할 팀 규칙·스킬/plugin·소스 경로. `CLAUDE.md` 하나에 의존하지 않고 호스트의 실제 로드 방식을 따른다.
+- branch/revision, 관련 dirty 상태, 공유 자원, 안전한 작업공간 계획.
+- 기존 검사와 성공을 직접 보여줄 근거.
 
-Brief each worker as if it has no prior conversation. Send the relevant decisions, constraints, task and source paths; label assumptions and omit unrelated history. Read returned evidence for coordination; delegate fresh project investigation. Never promote an unsupported assumption into a fact because multiple agents repeat it. For a large handoff, use [selective context](references/orchestration-prompts.md#selective-context).
+작업자가 이전 대화를 모른다고 가정하고 브리프를 전달한다. 관련 결정·제약·과제·소스 경로를 넣고 가정은 표시하며 무관한 이력은 뺀다. 반환된 근거는 조율 목적으로 검토하고 새로운 프로젝트 조사는 위임한다. 여러 에이전트가 반복했다고 근거 없는 가정을 사실로 바꾸지 않는다. 큰 인계는 [선별적 맥락 전달](references/orchestration-prompts.md#selective-context)을 참고한다.
 
-### 2. Plan and review the plan
+### 2. 계획 수립과 계획 검토
 
-Have a planner turn the intake into a short plan with success checks, dependencies, scope, file ownership, verification evidence and delivery boundaries. For multi-day/multi-surface work, keep the specification and decision history as the shared contract: SDD means **Spec-Driven Development** here.
+계획 담당자가 성공 검사, 의존성, 범위, 파일 소유권, 검증 근거, 전달 경계를 포함한 짧은 계획을 만들게 한다. 며칠에 걸치거나 여러 영역을 다루는 작업은 명세·결정 이력을 공유 계약으로 유지한다. 여기서 SDD는 **Spec-Driven Development**다.
 
-For non-trivial implementation, give a separate plan reviewer the goal, constraints and proposed plan. Ask it to find missing paths, incompatible assumptions and inadequate success checks. Resolve findings before starting dependent implementation. The user reviews consequential product/architecture choices when needed; routine planning/review can proceed under the existing authorization.
+사소하지 않은 구현은 별도 계획 검토자에게 목표·제약·계획을 준다. 빠진 경로, 맞지 않는 가정, 부족한 성공 검사를 찾게 하고 의존 구현 전에 해결한다. 중요한 제품·아키텍처 선택은 필요할 때 사용자가 검토한다. 일상적인 계획·리뷰는 기존 승인으로 진행할 수 있다.
 
-### 3. Implement through workers
+### 3. 작업자를 통한 구현
 
-Assign one accountable owner per change. Use independent Git worktrees for workers modifying a Git project in parallel; a setup worker creates them from an explicit base revision without switching, stashing, resetting or cleaning the user's working copy. Where worktrees do not apply, use an equivalent isolated copy with a clear integration owner.
+각 변경에 책임 있는 소유자 한 명을 둔다. Git 프로젝트를 병렬 수정하는 작업자는 별도 worktree를 쓴다. 설정 작업자가 명시한 기준 revision에서 생성하되 사용자 working copy를 switch/stash/reset/clean하지 않는다. Worktree가 맞지 않으면 격리 사본과 명확한 통합 담당자를 둔다.
 
-Worktrees isolate file state; they do not prevent merge or semantic conflicts. Have workers account for shared DBs, ports, external accounts, caches and environment resources separately. Establish shared interfaces/types first, then parallelize genuinely independent jobs. Serialize actual dependencies and conflicting shared mutations.
+Worktree는 파일 상태를 격리하지만 merge·의미 충돌까지 막지는 않는다. 공유 DB, 포트, 외부 계정, 캐시, 환경 자원은 따로 고려하게 한다. 공통 인터페이스·타입을 먼저 정하고 실제로 독립적인 일만 병렬화한다. 의존 작업과 충돌하는 공유 변경은 순차 실행한다.
 
-Use ordinary subagents or Agent Teams according to the host's available capabilities. Background/CI workers also need a fixed revision/input, bounded runtime and a return artifact.
+호스트 가용 기능에 따라 일반 subagent나 Agent Teams를 쓴다. Background/CI 작업자도 고정 revision·입력, 제한된 실행 시간, 반환 산출물이 필요하다.
 
-### 4. Verify in two distinct layers
+### 4. 두 층으로 나눠 검증
 
-**GATE:** delegate the repository's cheap, deterministic checks—appropriate build, tests, lint, type/schema checks—to a gate worker. Reuse existing hooks/CI commands where available. Have it record the exact revision, command, outcome and relevant logs. Failed gates go back to the responsible implementer.
+**GATE:** 저장소의 빠르고 결정적인 build/test/lint/type/schema 검사를 gate 작업자에게 맡긴다. 기존 hook·CI 명령을 재사용하고 정확한 revision, 명령, 결과, 관련 로그를 기록하게 한다. 실패는 책임 있는 구현자에게 돌려보낸다.
 
-**VERIFY:** assign a verifier outside the implementation role to examine ground-truth evidence and domain behavior: actual browser flow, DB/log/trace records, measured benchmark, rendered artifact, or a domain owner's interpretation. Give it the requirements, changes and raw evidence; distinguish the implementer's claims from observations and do not prescribe a successful verdict. Seek a check that could disprove the claim. Resolve conflicting reports with the smallest discriminating check, not a vote. Passing GATE does not establish correctness. Define side-effect limits before live verification. Use [verification and disagreement prompts](references/orchestration-prompts.md#independent-verification) when needed.
+**VERIFY:** 구현 역할과 분리된 검증자가 실제 브라우저 흐름, DB·log·trace, 측정 benchmark, 렌더링 산출물, 도메인 담당자 해석 같은 실제 동작 근거를 확인하게 한다. 요구사항·변경·원시 근거를 주고 구현자의 주장과 관찰을 구분하되 성공 판정을 미리 정하지 않는다. 주장을 반증할 수 있는 검사를 찾는다. 보고서가 충돌하면 투표 대신 두 설명을 가르는 최소 검사를 한다. GATE 통과는 정답성을 입증하지 않는다. 실제 검증 전에 허용할 부수 효과를 정한다. 필요하면 [독립 검증·불일치 프롬프트](references/orchestration-prompts.md#independent-verification)를 쓴다.
 
-A read-only investigation can return verified findings without inventing a build step. An unavailable browser, credential or domain check is **unverified**, not PASS. Keep planned, executed, passed, failed and unavailable evidence distinct.
+읽기 전용 조사는 가짜 build 단계 없이 검증된 결과를 반환할 수 있다. 브라우저·자격 증명·도메인 검사가 없으면 **미검증**이며 PASS가 아니다. 계획, 실행, 통과, 실패, 미가용을 구분한다.
 
-### 5. Review, land and monitor
+### 5. 리뷰·반영·모니터링
 
-Delegate code review to a worker who did not implement the change, or reuse the project's verified automated review infrastructure. Combine required status checks, change risk and AI review evidence. Focus human attention on logic, architecture and consequential risk; an AI risk label alone does not authorize landing.
+코드 리뷰는 구현하지 않은 작업자에게 맡기거나 프로젝트의 검증된 자동 리뷰 체계를 사용한다. 필수 상태 검사, 변경 위험도, AI 리뷰 근거를 결합한다. 사람의 주의는 논리·아키텍처·중요 위험에 집중한다. AI 위험 라벨만으로 반영 권한이 생기지는 않는다.
 
-For low-risk work, use existing authorized auto-review/auto-land rules if the host/project has them. Otherwise follow the user's actual delivery authorization. Do not invent a new blanket approval gate, and do not infer merge/deploy authority merely from permission to edit or run checks.
+낮은 위험 작업은 호스트·프로젝트에 이미 승인된 auto-review/auto-land 규칙이 있으면 따른다. 그 외에는 사용자의 실제 전달 승인을 따른다. 새로운 일괄 승인 게이트를 만들지 않으며 편집·검사 허용만으로 merge·배포 권한을 추론하지 않는다.
 
-Have the responsible worker perform authorized integration/commit/push/PR/merge/deploy. Match each success condition to the actual artifact, verified revision/environment and observed result; separate worker PASS reports do not establish integrated success. Recheck only evidence affected by integration or changed conditions. Merge, deployment and operating successfully remain separate facts. Use the [completion evidence check](references/orchestration-prompts.md#completion-evidence) before claiming completion.
+책임 작업자가 승인된 통합/commit/push/PR/merge/배포를 수행하게 한다. 성공 조건마다 실제 산출물, 검증 revision·환경, 관찰 결과를 대응시킨다. 각 작업자의 PASS를 모았다고 통합 성공이 되는 것은 아니다. 통합·조건 변경의 영향을 받은 근거만 다시 확인한다. Merge, 배포, 정상 운영은 별개 사실이다. 완료 주장 전에 [완료 근거 대조](references/orchestration-prompts.md#completion-evidence)를 사용한다.
 
-Finally, delegate a small feedback update where appropriate: a deterministic failure becomes a lint/test, domain knowledge becomes a rule, and skill behavior becomes an eval. Keep it within the requested scope and the project's existing structure. Never write private memories without the user's explicit request. Do not delete worktrees until their work is safely preserved and cleanup is authorized.
+마지막으로 적절한 작은 피드백을 위임한다. 결정적 실패는 lint/test, 도메인 지식은 규칙, 스킬 동작은 eval로 남긴다. 요청 범위와 기존 프로젝트 구조 안에서 수행한다. 사용자의 명시적 요청 없이 개인 memory를 쓰지 않는다. 작업이 안전하게 보존되고 정리가 승인되기 전에는 worktree를 삭제하지 않는다.
 
-## Every worker gets a bounded brief
+## 모든 작업자에게 범위가 있는 브리프 전달
 
-Provide this compact contract in the spawn message, filling only relevant fields:
+배정 메시지에 아래 계약에서 관련 있는 필드만 채운다.
 
 ```text
-Goal / success checks:
-Relevant context and evidence paths:
-Authorized scope and delivery actions:
-Owned files / isolated workspace / base revision:
-Dependencies and shared resources:
-GATE commands and VERIFY evidence required:
-Time/retry boundary:
-Return: changes/findings, exact evidence, unresolved issues, next dependency.
+목표 / 성공 검사:
+관련 맥락과 근거 경로:
+승인된 범위와 전달 행동:
+소유 파일 / 격리 작업공간 / 기준 revision:
+의존성과 공유 자원:
+GATE 명령과 필요한 VERIFY 근거:
+시간 / 재시도 경계:
+반환: 변경·발견, 정확한 근거, 미해결 문제, 다음 의존성.
 ```
 
-Ask workers to report a concrete blocker promptly. Their reports return to you; you give the user one coherent update. Relay changed goals, language, scope, authorization and success conditions to affected workers; distinguish sent, acknowledged and applied changes. Rebrief or stop superseded work while preserving partial results; let unaffected work continue. Do not assume a busy worker has applied a message. Use the [steering and resume procedure](references/orchestration-prompts.md#steering-and-resume) when work is already active.
+구체적인 장애는 빨리 보고하게 한다. 작업자는 당신에게 보고하고 당신은 사용자에게 일관된 소식을 전한다. 목표·언어·범위·승인·성공 조건이 바뀌면 영향을 받는 작업자에게 전달하고 전송·수신 확인·반영을 구분한다. 기존 작업과 충돌하는 부분을 재지시하거나 멈추되 부분 결과를 보존하고 무관한 일은 계속한다. 바쁜 작업자가 메시지를 반영했다고 가정하지 않는다. 진행 중인 일에는 [수정 지시와 재개](references/orchestration-prompts.md#steering-and-resume)를 따른다.
 
-## Supervise without taking over
+## 대신 수행하지 않고 감독하기
 
-Keep a small task table in the session (or existing project task notes maintained by a worker): `task | owner | depends on | state | latest evidence | next action`. Distinguish assigned, executing, blocked, execution-complete and verified using host acknowledgments or observed work. Record worker/job IDs when available; a submitted prompt or live pane alone does not prove execution. Track meaningful checkpoints through existing host events, not a new supervisor or busy polling. If the host cannot confirm receipt or progress, report that uncertainty. See [evidence-backed status](references/orchestration-prompts.md#evidence-backed-status) for examples.
+세션 또는 작업자가 유지하는 기존 작업 메모에 작은 표를 둔다: `과제 | 담당자 | 의존성 | 상태 | 최신 근거 | 다음 행동`. 호스트 응답이나 실제 작업으로 배정·실행 중·막힘·실행 완료·검증 완료를 구분한다. 가능하면 worker/job ID를 기록한다. 프롬프트 전송이나 켜진 pane만으로 실행을 입증하지 않는다. 기존 호스트 이벤트로 의미 있는 체크포인트를 추적하고 새 supervisor나 빈번한 반복 조회를 만들지 않는다. 수신·진행을 확인할 수 없으면 그 불확실성을 보고한다. [근거 기반 상태](references/orchestration-prompts.md#evidence-backed-status)를 참고한다.
 
-For repeated failures, inspect the worker's evidence, narrow or change the assignment, then allow at most **two retries of the same approach by default**. A materially different recovery is a new approach with an explicit reason. Preserve partial work. If a worker stops producing useful evidence, ask for a short checkpoint and then reassign or stop that worker; do not silently start doing its job yourself.
+반복 실패는 작업자의 근거를 보고 범위를 줄이거나 방식을 바꾼다. 기본적으로 **같은 방식은 최대 두 번 재시도**한다. 실질적으로 다른 복구는 이유가 명시된 새 접근이다. 부분 작업은 보존한다. 유용한 근거가 더 나오지 않으면 짧은 체크포인트를 요청한 뒤 재배정하거나 멈춘다. 조용히 직접 작업을 대신하지 않는다.
 
-On interruption/resume, reconcile live workers and commands through available host state and worker reports before dispatching replacements. Have a worker check the current revision, dirty state and existing artifacts. Reuse valid completed results and resume the current owner when possible; do not duplicate a live or completed operation because its conversation was interrupted. If ownership or execution state is unknown, report it and resolve that uncertainty before repeating a potentially mutating operation. Keep unrelated work moving. Never claim completion while required work remains.
+중단·재개 시 새 작업자를 배정하기 전에 호스트 상태와 작업자 보고로 살아 있는 작업자·명령을 대조한다. 작업자가 현재 revision, dirty 상태, 기존 산출물을 확인하게 한다. 유효한 완료 결과를 재사용하고 가능하면 기존 담당자를 재개한다. 대화가 끊겼다는 이유로 실행 중이거나 완료된 작업을 중복하지 않는다. 소유권·실행 상태가 불명확하면 보고하고 잠재적 변경 작업을 반복하기 전에 해소한다. 무관한 작업은 계속하며 필수 일이 남았는데 완료를 주장하지 않는다.
 
-## Report the outcome
+## 결과 보고
 
-Lead with what was accomplished, then what changed, how it was checked and what remains. Link the actual artifact/PR/report. Separate static review, executed tests, browser/domain verification and measured results. State failed or unavailable checks plainly. Do not claim causal gains from one measurement or call a planned demo a completed experiment.
+달성한 결과를 먼저 말하고 변경 내용, 확인 방법, 남은 일을 설명한다. 실제 산출물·PR·보고서에 연결한다. 정적 검토, 실행한 테스트, 브라우저·도메인 검증, 실측 결과를 구분한다. 실패·미가용 검사를 명확히 알린다. 측정 한 번으로 인과적 개선을 주장하거나 계획된 데모를 완료된 실험이라고 부르지 않는다.

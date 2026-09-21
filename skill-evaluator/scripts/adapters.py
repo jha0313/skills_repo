@@ -47,7 +47,7 @@ def reset_cancellation():
 def run_process(argv, cwd, timeout, log_prefix, input_text=None, env=None):
     """Bound the whole process group; retain stdout/stderr even on interruption."""
     if _CANCEL.is_set():
-        raise EvalError("Run interrupted; queued process cancelled")
+        raise EvalError("실행이 중단되어 대기 중인 프로세스를 취소했습니다")
     prefix = Path(log_prefix)
     prefix.parent.mkdir(parents=True, exist_ok=True)
     started = time.monotonic()
@@ -88,7 +88,7 @@ def run_process(argv, cwd, timeout, log_prefix, input_text=None, env=None):
     prefix.with_suffix(".stdout").write_text(out)
     prefix.with_suffix(".stderr").write_text(err)
     if _CANCEL.is_set():
-        raise EvalError("Run interrupted; active process cancelled")
+        raise EvalError("실행이 중단되어 진행 중인 프로세스를 취소했습니다")
     return {
         "stdout": out,
         "stderr": err,
@@ -101,7 +101,7 @@ def run_process(argv, cwd, timeout, log_prefix, input_text=None, env=None):
 def check_dependencies(run_dir=None):
     if not shutil.which("claude"):
         raise EvalError(
-            "Claude Code CLI missing. Install: https://code.claude.com/docs/en/setup ; then claude auth login"
+            "Claude Code CLI가 없습니다. 설치: https://code.claude.com/docs/en/setup ; 설치 후 claude auth login을 실행하세요"
         )
     help_result = subprocess.run(
         ["claude", "plugin", "eval", "--help"],
@@ -112,7 +112,7 @@ def check_dependencies(run_dir=None):
     required = ("--no-publish", "--keep-temp", "--ablation", "--output-dir", "--mocks")
     if help_result.returncode or any(v not in help_result.stdout for v in required):
         raise EvalError(
-            "Current Claude CLI lacks native eval features. Run: claude update ; then claude plugin eval --help"
+            "현재 Claude CLI에 필요한 native eval 기능이 없습니다. claude update 후 claude plugin eval --help를 확인하세요"
         )
     version = subprocess.run(
         ["claude", "--version"], capture_output=True, text=True, timeout=30
@@ -142,7 +142,7 @@ def native_stage(analysis, case, case_dir, options):
             {
                 "name": "evaluated-skill",
                 "version": "1.0.0",
-                "description": "Isolated source snapshot for skill evaluation",
+                "description": "스킬 평가를 위한 격리된 소스 스냅샷",
             },
         )
         copy_tree(analysis["installed_path"], stage / "skills" / name)
@@ -177,7 +177,7 @@ def native_stage(analysis, case, case_dir, options):
         native["execution"]["model"] = options["model"]
     if case["category"] != "invocation" and case.get("forced_context", True):
         native["execution"]["append_system_prompt"] = (
-            f"Use the {analysis.get('plugin_name', 'evaluated-skill')}:{name} skill for this behavior test. Read its references as needed."
+            f"이 동작 평가에서는 {analysis.get('plugin_name', 'evaluated-skill')}:{name} 스킬을 사용하세요. 필요한 참고 문서를 읽으세요."
         )
     wd = case.get("working_directory", options.get("default_working_directory", "."))
     # Blank '.' is an intentional empty sandbox. Explicit directories are copied as data by
@@ -187,7 +187,7 @@ def native_stage(analysis, case, case_dir, options):
         if not source.is_absolute():
             source = Path(analysis["source_path"]) / source
         if not source.is_dir():
-            raise EvalError(f"Working directory does not exist: {wd}")
+            raise EvalError(f"작업 디렉터리가 없습니다: {wd}")
         copy_tree(source, stage / "fixture")
         for config_path in (stage / "fixture/.claude", stage / "fixture/.mcp.json"):
             if config_path.is_dir():
@@ -266,7 +266,9 @@ def parse_trace(text):
             try:
                 events.append(json.loads(line))
             except json.JSONDecodeError as exc:
-                raise EvalError("Malformed native JSONL transcript") from exc
+                raise EvalError(
+                    "native JSONL 실행 기록의 형식이 잘못되었습니다"
+                ) from exc
     final = next((e for e in reversed(events) if e.get("type") == "result"), {})
     init = next((e for e in events if e.get("subtype") == "init"), {})
     calls = []
@@ -300,7 +302,7 @@ def collect_native_files(trace_path, case_dir):
         or not sandbox.name.startswith(("e-", "claude-eval-"))
     ):
         raise EvalError(
-            "Unexpected native sandbox layout; inspect current CLI before collecting artifacts"
+            "예상과 다른 native sandbox 구조입니다. 산출물을 수집하기 전에 현재 CLI를 확인하세요"
         )
     sealed = sandbox / "sealed"
     if not sealed.is_dir() or sealed.is_symlink():
@@ -323,14 +325,14 @@ def collect_native_files(trace_path, case_dir):
                     {
                         "path": str(rel),
                         "exists": False,
-                        "error": "symlink artifact not followed",
+                        "error": "심볼릭 링크 산출물은 따라가지 않았습니다",
                     }
                 )
                 continue
             if p.is_file():
                 if p.stat().st_size > 20_000_000:
                     raise EvalError(
-                        f"Artifact exceeds 20MB capture cap: {rel}; configure a targeted artifact export"
+                        f"산출물이 수집 한도 20MB를 초과합니다: {rel}; 필요한 산출물만 내보내도록 설정하세요"
                     )
                 target = Path(case_dir) / "artifacts" / rel
                 target.parent.mkdir(parents=True, exist_ok=True)
@@ -361,7 +363,7 @@ def native_execute(analysis, case, case_dir, options):
             category="task_completion",
             forced_context=False,
             _mock_probe=True,
-            prompt="Use Bash to run exactly: printf skill-evaluator-mock-probe. Report the observed output.",
+            prompt="Bash로 정확히 printf skill-evaluator-mock-probe를 실행하고 관찰한 출력을 보고하세요.",
             intercept_patterns=["printf skill-evaluator-mock-probe"],
             intercept_mcp_tools=[],
             mock_data={
@@ -381,7 +383,7 @@ def native_execute(analysis, case, case_dir, options):
         ]
         if not any(marker in str(value) for value in observed):
             raise EvalError(
-                "Current native runner did not honor Bash mock hooks; refusing live case. See mock-capability-probe."
+                "현재 native runner가 Bash mock hook을 적용하지 않아 실제 사례 실행을 거부합니다. mock-capability-probe를 확인하세요."
             )
     stage = native_stage(analysis, case, case_dir, options)
     rawpath = case_dir / "native-result.json"
@@ -434,7 +436,9 @@ def native_execute(analysis, case, case_dir, options):
         env=env,
     )
     if not rawpath.exists():
-        raise EvalError("Native runner produced no result: " + result["stderr"][-1200:])
+        raise EvalError(
+            "native runner가 결과를 만들지 못했습니다: " + result["stderr"][-1200:]
+        )
     raw = json.loads(rawpath.read_text())
     plugins = raw.get("suite", {}).get("plugins", [])
     if not plugins or any(
@@ -442,22 +446,22 @@ def native_execute(analysis, case, case_dir, options):
         for p in plugins
     ):
         raise EvalError(
-            "Native plugin did not load; refusing false invocation evidence"
+            "native plugin이 로드되지 않았습니다. 잘못된 호출 근거로 인정하지 않습니다"
         )
     if len(raw.get("cases", [])) != 1 or raw["cases"][0].get("name") != case["id"]:
         raise EvalError(
-            "Native runner selected unexpected cases; refusing mixed-case scores"
+            "native runner가 예상하지 않은 사례를 선택했습니다. 섞인 사례의 점수를 인정하지 않습니다"
         )
     try:
         arm = raw["cases"][0]["arms"]["with"][0]
     except (KeyError, IndexError, TypeError) as exc:
         raise EvalError(
-            "Native output schema changed; inspect native-result.json"
+            "native 출력 스키마가 바뀌었습니다. native-result.json을 확인하세요"
         ) from exc
     tracepath = arm.get("tracePath", "")
     if not tracepath or not Path(tracepath).is_file():
         raise EvalError(
-            "No readable native execution transcript: " + str(arm.get("error"))
+            "읽을 수 있는 native 실행 기록이 없습니다: " + str(arm.get("error"))
         )
     trace = Path(tracepath).read_text()
     (case_dir / "trace.jsonl").write_text(trace)
@@ -555,7 +559,7 @@ def agent_json(prompt, out_dir, model=None, timeout=300):
     (out_dir / "prompt.txt").write_text(prompt)
     result = run_process(argv, out_dir, timeout, out_dir / "agent", prompt)
     if result["timed_out"] or result["exit_code"]:
-        raise EvalError("Independent agent failed: " + result["stderr"][-800:])
+        raise EvalError("독립 에이전트 실행에 실패했습니다: " + result["stderr"][-800:])
     try:
         outer = json.loads(result["stdout"])
         answer = outer.get("structured_output") or outer.get("result", "")
@@ -563,10 +567,10 @@ def agent_json(prompt, out_dir, model=None, timeout=300):
             answer = json.loads(re.sub(r"^```(?:json)?\s*|\s*```$", "", answer.strip()))
     except (ValueError, TypeError) as exc:
         raise EvalError(
-            "Independent agent did not return valid JSON; raw output retained"
+            "독립 에이전트가 유효한 JSON을 반환하지 않았습니다. 원시 출력은 보존했습니다"
         ) from exc
     if outer.get("is_error"):
-        raise EvalError("Independent agent reported infrastructure error")
+        raise EvalError("독립 에이전트가 실행 환경 오류를 보고했습니다")
     write_json(out_dir / "result.json", answer)
     return answer, {
         "cost_usd": outer.get("total_cost_usd"),
@@ -586,11 +590,11 @@ def bridge_call(config, operation, payload, out_dir, timeout=300):
         or not argv
         or not all(isinstance(v, str) for v in argv)
     ):
-        raise EvalError("Bridge command must be argv list, never shell text")
+        raise EvalError("bridge command는 셸 문자열이 아닌 argv 목록이어야 합니다")
     proof = config.get("contract_provenance")
     if not proof:
         raise EvalError(
-            "Bridge requires contract_provenance: current help/schema source and date"
+            "bridge에는 현재 help/schema의 출처와 날짜를 담은 contract_provenance가 필요합니다"
         )
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
@@ -598,12 +602,14 @@ def bridge_call(config, operation, payload, out_dir, timeout=300):
     write_json(out / "request.json", request)
     r = run_process(argv, out, timeout, out / "bridge", json.dumps(request))
     if r["timed_out"] or r["exit_code"]:
-        raise EvalError("Bridge infrastructure failure; inspect bridge.stderr")
+        raise EvalError("bridge 실행 환경 오류입니다. bridge.stderr를 확인하세요")
     try:
         response = json.loads(r["stdout"])
     except ValueError as exc:
-        raise EvalError("Bridge returned malformed JSON") from exc
+        raise EvalError("bridge가 잘못된 JSON을 반환했습니다") from exc
     write_json(out / "response.json", response)
     if response.get("status") != "ok":
-        raise EvalError("Bridge unavailable: " + str(response.get("reason", "unknown")))
+        raise EvalError(
+            "bridge를 사용할 수 없습니다: " + str(response.get("reason", "unknown"))
+        )
     return response

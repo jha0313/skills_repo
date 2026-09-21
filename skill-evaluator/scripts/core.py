@@ -81,7 +81,7 @@ def read_data(path):
         with Path(path).open() as stream:
             return yaml.safe_load(stream)
     except (OSError, yaml.YAMLError) as exc:
-        raise EvalError(f"Cannot read {path}: {exc}") from exc
+        raise EvalError(f"{path} 파일을 읽을 수 없습니다: {exc}") from exc
 
 
 def backup_write(path, data):
@@ -104,28 +104,30 @@ def backup_write(path, data):
 def safe_relative(value):
     path = Path(value)
     if path.is_absolute() or ".." in path.parts or not path.parts:
-        raise EvalError(f"Expected a relative path without traversal: {value}")
+        raise EvalError(f"상위 디렉터리 이동이 없는 상대 경로가 필요합니다: {value}")
     return path
 
 
 def portable_directory(value):
     if not isinstance(value, str) or not value:
-        raise EvalError("working_directory must be a nonempty string")
+        raise EvalError("working_directory는 비어 있지 않은 문자열이어야 합니다")
     if value.startswith(("/Users/", "/home/")):
         raise EvalError(
-            "Use ~/ or a repo-relative working_directory, never a personal absolute home"
+            "working_directory에는 ~/ 또는 저장소 상대 경로를 사용하세요. 개인 홈의 절대 경로는 사용할 수 없습니다"
         )
     return value
 
 
 def validate_criteria(data, mode, binary):
     if not isinstance(data, dict) or not isinstance(data.get("test_cases"), list):
-        raise EvalError("Criteria require top-level test_cases list")
+        raise EvalError("평가 기준 최상위에 test_cases 목록이 필요합니다")
     portable_directory(data.get("default_working_directory", "."))
     cases = data["test_cases"]
     ids = set()
     if len(cases) != sum(DISTRIBUTIONS[mode]):
-        raise EvalError(f"{mode} requires exactly {sum(DISTRIBUTIONS[mode])} cases")
+        raise EvalError(
+            f"{mode} 모드에는 정확히 {sum(DISTRIBUTIONS[mode])}개 사례가 필요합니다"
+        )
     for case in cases:
         for field in (
             "id",
@@ -140,31 +142,31 @@ def validate_criteria(data, mode, binary):
             "quality_criteria",
         ):
             if field not in case:
-                raise EvalError(f"Case missing {field}")
+                raise EvalError(f"사례에 {field} 필드가 없습니다")
         cid = case["id"]
         if not re.fullmatch(r"TC-\d{3}", cid) or cid in ids:
-            raise EvalError(f"Invalid/duplicate case ID: {cid}")
+            raise EvalError(f"잘못되었거나 중복된 사례 ID: {cid}")
         ids.add(cid)
         if case["category"] not in DIMENSIONS:
-            raise EvalError(f"{cid}: invalid category")
+            raise EvalError(f"{cid}: category 값이 올바르지 않습니다")
         if not isinstance(case["prompt"], str) or not case["prompt"].strip():
-            raise EvalError(f"{cid}: empty prompt")
+            raise EvalError(f"{cid}: prompt가 비어 있습니다")
         if case["category"] == "invocation" and (
             case.get("forced_context") or re.search(r"(^|\s)/[\w:-]+", case["prompt"])
         ):
             raise EvalError(
-                f"{cid}: invocation requires natural routing, no slash invocation or forced context"
+                f"{cid}: invocation은 자연어 라우팅으로 확인해야 하며 슬래시 호출이나 강제 맥락 주입은 사용할 수 없습니다"
             )
         if not isinstance(case["target_skills"], list) or not case["target_skills"]:
-            raise EvalError(f"{cid}: target_skills required")
+            raise EvalError(f"{cid}: target_skills가 필요합니다")
         for target in case["target_skills"]:
             safe_relative(target)
         if case["eval_target"] not in ("response", "artifact", "tool_usage", "all"):
-            raise EvalError(f"{cid}: invalid eval_target")
+            raise EvalError(f"{cid}: eval_target 값이 올바르지 않습니다")
         portable_directory(case.get("working_directory", "."))
         qc = case["quality_criteria"]
         if not isinstance(qc, dict):
-            raise EvalError(f"{cid}: quality_criteria must be an object")
+            raise EvalError(f"{cid}: quality_criteria는 객체여야 합니다")
         for key in (
             "required_present",
             "required_absent",
@@ -172,54 +174,56 @@ def validate_criteria(data, mode, binary):
             "artifact_checks",
         ):
             if not isinstance(qc.get(key), list):
-                raise EvalError(f"{cid}: {key} must be a list")
+                raise EvalError(f"{cid}: {key}는 목록이어야 합니다")
         if not qc["semantic_checks"]:
-            raise EvalError(f"{cid}: at least one semantic check required")
+            raise EvalError(f"{cid}: semantic_checks에 최소 한 개의 검사가 필요합니다")
         for check in qc["semantic_checks"]:
             if (
                 not isinstance(check.get("question"), str)
                 or not check["question"].strip()
             ):
-                raise EvalError(f"{cid}: question required")
+                raise EvalError(f"{cid}: question이 필요합니다")
             if (
                 not isinstance(check.get("weight"), (int, float))
                 or isinstance(check["weight"], bool)
                 or not math.isfinite(check["weight"])
                 or check["weight"] <= 0
             ):
-                raise EvalError(f"{cid}: positive finite weight required")
+                raise EvalError(f"{cid}: weight는 유한한 양수여야 합니다")
             if {str(k) for k in check.get("rubric", {})} != (
                 {"0", "1"} if binary else {"1", "2", "3", "4", "5"}
             ):
                 raise EvalError(
-                    f"{cid}: rubric must contain exactly the selected scale"
+                    f"{cid}: rubric에는 선택한 척도의 키만 빠짐없이 있어야 합니다"
                 )
         for check in qc["artifact_checks"]:
             safe_relative(check["path"])
         patterns = case.get("intercept_patterns", [])
         tools = case.get("intercept_mcp_tools", [])
         if (patterns or tools) and not case.get("mock_data"):
-            raise EvalError(f"{cid}: interception requires mock_data")
+            raise EvalError(f"{cid}: 호출을 가로채려면 mock_data가 필요합니다")
         for pattern in patterns:
             try:
                 re.compile(pattern)
             except re.error as exc:
-                raise EvalError(f"{cid}: malformed Bash pattern: {exc}") from exc
+                raise EvalError(f"{cid}: Bash 패턴이 잘못되었습니다: {exc}") from exc
         for name in tools:
             if not re.fullmatch(r"mcp__[A-Za-z0-9_-]+__[A-Za-z0-9_-]+", name):
-                raise EvalError(f"{cid}: exact runtime MCP name required")
+                raise EvalError(
+                    f"{cid}: 실제 런타임의 정확한 MCP 도구 이름이 필요합니다"
+                )
             entry = case["mock_data"].get(name, {})
             if not entry.get("runtime_name_verified") or not entry.get("input_schema"):
                 raise EvalError(
-                    f"{cid}: MCP mock requires verified runtime name and tools/list input_schema"
+                    f"{cid}: MCP 모킹에는 확인된 런타임 이름과 tools/list의 input_schema가 필요합니다"
                 )
         timeout = case.get("timeout_seconds", 300)
         if not isinstance(timeout, int) or not 1 <= timeout <= 3600:
-            raise EvalError(f"{cid}: timeout_seconds must be 1..3600")
+            raise EvalError(f"{cid}: timeout_seconds는 1~3600이어야 합니다")
     counts = collections.Counter(c["category"] for c in cases)
     if tuple(counts[d] for d in DIMENSIONS) != DISTRIBUTIONS[mode]:
         raise EvalError(
-            f"{mode} distribution must be {dict(zip(DIMENSIONS, DISTRIBUTIONS[mode]))}"
+            f"{mode} 범주별 사례 수는 {dict(zip(DIMENSIONS, DISTRIBUTIONS[mode]))}이어야 합니다"
         )
     return data
 
@@ -228,9 +232,9 @@ def normalize_execution(raw, adapter):
     """Both adapters cross this required contract; no guessed MSL field mapping."""
     required = ("conversation", "metadata", "artifacts")
     if any(key not in raw for key in required):
-        raise EvalError("Adapter must emit conversation, metadata, artifacts")
+        raise EvalError("어댑터는 conversation, metadata, artifacts를 반환해야 합니다")
     if not isinstance(raw["conversation"], str):
-        raise EvalError("conversation must be text")
+        raise EvalError("conversation은 문자열이어야 합니다")
     md = raw["metadata"]
     for key in (
         "model",
@@ -244,13 +248,13 @@ def normalize_execution(raw, adapter):
         "cost_basis",
     ):
         if key not in md:
-            raise EvalError(f"Adapter metadata missing {key}")
+            raise EvalError(f"어댑터 metadata에 {key}가 없습니다")
     if not isinstance(md["usage"], dict):
-        raise EvalError("usage must be object; unavailable counters are null")
+        raise EvalError("usage는 객체여야 하며 확인할 수 없는 수치는 null이어야 합니다")
     if md["cost_usd"] is not None and (
         not isinstance(md["cost_usd"], (int, float)) or md["cost_usd"] < 0
     ):
-        raise EvalError("Invalid cost")
+        raise EvalError("비용 값이 올바르지 않습니다")
     return {
         "schema_version": SCHEMA,
         "conversation": raw["conversation"],
@@ -264,29 +268,29 @@ def normalize_execution(raw, adapter):
 def verify_citation(citation, run_dir):
     """Reject fabricated excerpts, wrong line ranges and path escapes."""
     if not isinstance(citation, dict):
-        raise EvalError("Evidence must be an object")
+        raise EvalError("근거는 객체여야 합니다")
     path = Path(run_dir) / safe_relative(citation.get("path", ""))
     root = Path(run_dir).resolve()
     if not path.resolve().is_relative_to(root):
-        raise EvalError("Evidence path escapes run directory")
+        raise EvalError("근거 경로가 실행 디렉터리를 벗어납니다")
     try:
         lines = path.read_text().splitlines()
     except (OSError, UnicodeError) as exc:
-        raise EvalError(f"Unreadable evidence: {path}") from exc
+        raise EvalError(f"근거 파일을 읽을 수 없습니다: {path}") from exc
     start, end = citation.get("line_start"), citation.get("line_end")
     if (
         type(start) is not int
         or type(end) is not int
         or not (1 <= start <= end <= len(lines))
     ):
-        raise EvalError("Evidence line range out of bounds")
+        raise EvalError("근거의 줄 범위가 파일 범위를 벗어납니다")
     quote = citation.get("quote")
     if (
         not isinstance(quote, str)
         or not quote.strip()
         or quote not in "\n".join(lines[start - 1 : end])
     ):
-        raise EvalError("Evidence quote is not present at cited lines")
+        raise EvalError("인용한 줄에 해당 인용문이 없습니다")
     return citation
 
 
@@ -298,19 +302,19 @@ def _score_item(item, binary, run_dir, case, derived=False):
             or not math.isfinite(item["score"])
             or not 1 <= item["score"] <= 5
         ):
-            raise EvalError("Derived dimension score outside scale")
+            raise EvalError("계산된 차원 점수가 척도 범위를 벗어납니다")
         if (
             item.get("rubric_level") not in allowed
             and item.get("rubric_level") != item["score"]
         ):
-            raise EvalError("Invalid derived rubric level")
+            raise EvalError("계산된 rubric_level이 올바르지 않습니다")
     else:
         if type(item.get("score")) not in (int, float) or item["score"] not in allowed:
-            raise EvalError("Judge score outside selected scale")
+            raise EvalError("채점 점수가 선택한 척도 범위를 벗어납니다")
         if item.get("rubric_level") != item["score"]:
-            raise EvalError("Matched rubric level must equal score")
+            raise EvalError("선택한 rubric_level과 score가 같아야 합니다")
     if not item.get("evidence"):
-        raise EvalError("Every score needs evidence")
+        raise EvalError("모든 점수에는 근거가 필요합니다")
     prefix = f"cases/{case['id']}/"
     target = case["eval_target"]
     allowed = {"metadata.json"}
@@ -324,17 +328,17 @@ def _score_item(item, binary, run_dir, case, derived=False):
         artifact = target in ("artifact", "all") and rel.startswith("artifacts/")
         if rel not in allowed and not artifact:
             raise EvalError(
-                "Citation must cite this case output, never user prompts, skill instructions or another case"
+                "해당 사례의 출력을 인용해야 합니다. 사용자 프롬프트, 스킬 지침, 다른 사례는 근거가 될 수 없습니다"
             )
         verify_citation(citation, run_dir)
 
 
 def validate_judgment(judgment, case, binary, run_dir):
     if judgment.get("case_id") != case["id"]:
-        raise EvalError("Judge case_id mismatch")
+        raise EvalError("채점 결과의 case_id가 일치하지 않습니다")
     dims = DIMENSIONS if case.get("_mode") != "basic" else DIMENSIONS[:4]
     if set(judgment.get("dimensions", {})) != set(dims):
-        raise EvalError("Judge must grade every selected dimension")
+        raise EvalError("채점자는 선택된 모든 차원을 채점해야 합니다")
     for dimension, item in judgment["dimensions"].items():
         _score_item(
             item,
@@ -348,15 +352,15 @@ def validate_judgment(judgment, case, binary, run_dir):
         ("business_impact_subcriteria", BI),
     ):
         if set(judgment.get(field, {})) != set(names):
-            raise EvalError(f"Judge missing {field}")
+            raise EvalError(f"채점 결과에 {field}가 없습니다")
         for item in judgment[field].values():
             _score_item(item, binary, run_dir, case)
     checks = judgment.get("semantic_checks", [])
     if len(checks) != len(case["quality_criteria"]["semantic_checks"]):
-        raise EvalError("Judge semantic check count mismatch")
+        raise EvalError("semantic_checks 개수가 채점 결과와 일치하지 않습니다")
     for index, item in enumerate(checks):
         if item.get("index") != index:
-            raise EvalError("Semantic check index mismatch")
+            raise EvalError("semantic_checks의 index가 일치하지 않습니다")
         _score_item(item, binary, run_dir, case)
     return judgment
 
@@ -576,7 +580,7 @@ def aggregate(results, manifest):
             {
                 "case_id": r["case_id"],
                 "action": r.get("error")
-                or "Inspect failed checks and cited rubric gaps before changing the skill.",
+                or "스킬을 바꾸기 전에 실패한 검사와 인용된 루브릭 차이를 확인하세요.",
             }
             for r in results
             if r["verdict"] != "PASS"
@@ -627,19 +631,19 @@ def evidence_hashes(run_dir, case_id, include_evaluation=False):
     values = {}
     for p in paths:
         if p.is_symlink() or not p.is_file():
-            raise EvalError(f"Execution evidence missing or unsafe: {p}")
+            raise EvalError(f"실행 근거가 없거나 안전하지 않은 경로입니다: {p}")
         values[str(p.relative_to(root))] = hash_bytes(p.read_bytes())
     return values
 
 
 def verify_evidence_hashes(run_dir, values):
     if not values:
-        raise EvalError("Missing evidence hashes; cannot reuse a score")
+        raise EvalError("근거 해시가 없어 점수를 재사용할 수 없습니다")
     for rel, expected in values.items():
         p = Path(run_dir) / safe_relative(rel)
         if p.is_symlink() or not p.is_file() or hash_bytes(p.read_bytes()) != expected:
             raise EvalError(
-                f"Execution evidence changed or missing: {rel}; start a new run"
+                f"실행 근거가 바뀌었거나 없습니다: {rel}; 새 실행을 만드세요"
             )
 
 
@@ -651,6 +655,6 @@ def validate_artifact_files(run_dir, case_id, execution):
         rel = Path("cases") / case_id / "artifacts" / safe_relative(artifact["path"])
         p = root / rel
         if p.is_symlink() or not p.resolve().is_relative_to(root) or not p.is_file():
-            raise EvalError(f"Missing real artifact: {rel}")
+            raise EvalError(f"실제 산출물 파일이 없습니다: {rel}")
         if hash_bytes(p.read_bytes()) != artifact.get("sha256"):
-            raise EvalError(f"Artifact hash mismatch: {rel}")
+            raise EvalError(f"산출물 해시가 일치하지 않습니다: {rel}")

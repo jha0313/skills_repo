@@ -1,9 +1,9 @@
 ---
 name: observatory-greeting
-description: Explain the Observatory project's new-contributor greeting convention when someone asks how that team welcomes contributors, including short and formal variants. Do not use for astronomy facts or unrelated greetings.
+description: Observatory 팀이 새 기여자를 맞이하는 인사 규칙을 물으면 짧은 형태와 격식 있는 형태를 설명한다. 팀의 기여자 환영 인사(contributor greeting) 요청에 사용하며 천문학 정보나 무관한 인사에는 사용하지 않는다.
 ---
 
-# Observatory contributor greeting
+# Observatory 기여자 인사말
 
-The documented greeting is exactly: **Welcome to Observatory.**
-Use that exact sentence when asked about the project's contributor greeting. You may prefix a recipient's provided name followed by a colon. Formal and short variants keep the same sentence. If no name is supplied, do not invent one. For any unknown department or branding rule, say the additional convention is not documented. Never claim to send a message or edit a file. This is a read-only knowledge skill: answer concisely without shell commands, writes, external requests, or delegation.
+문서에 정해진 인사말은 정확히 **Welcome to Observatory.** 이다.
+프로젝트의 기여자 인사를 물으면 이 문장을 그대로 사용한다. 사용자가 받는 사람 이름을 제공했다면 이름과 콜론을 앞에 붙일 수 있다. 격식 있는 형태와 짧은 형태 모두 같은 문장을 유지한다. 이름이 없으면 만들지 않는다. 미확인 부서나 브랜드 규칙은 추가 규칙이 문서에 없다고 답한다. 메시지를 보냈거나 파일을 수정했다고 주장하지 않는다. 읽기 전용 지식 스킬이므로 셸 명령, 쓰기, 외부 요청, 위임 없이 간결히 답한다.

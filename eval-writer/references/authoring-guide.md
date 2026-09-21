@@ -1,58 +1,58 @@
-# Authoring checks and handoff
+# 작성 점검과 인계
 
-The canonical schema and formulas live in the sibling **skill-evaluator** package. Resolve and read its `references/test_case_format.md`, selected grading rubric and CLI help. This guide adds authoring decisions, not a second schema.
+정식 스키마·공식은 형제 **skill-evaluator**에 있다. 해당 references/test_case_format.md, 선택한 채점 루브릭, CLI help를 찾아 읽는다. 이 문서는 작성 판단을 돕는 것이며 두 번째 스키마가 아니다.
 
-## Contract map
+## 계약 대응표
 
-| Source | Case to derive | Evidence to require |
+| 소스 | 도출할 사례 | 요구할 근거 |
 |---|---|---|
-| Description and trigger phrases | Natural positive/negative/ambiguous routing | Actual Skill call, resistance to unrelated requests |
-| Argument hint and parsing rules | Missing input, inferred argument, nonexistent target | Appropriate clarification/error or correctly resolved argument |
-| Workflow/MUST rules | Happy path plus pressure to skip a required step | Actual sequence and completed outputs |
-| NEVER rules | Conflicting instruction or tempting shortcut | Forbidden behavior absent from the complete observed output/tool trace |
-| Output contract | Missing/incorrect artifact and realistic happy path | Real file, format/content/domain checks; prose claiming success is insufficient |
-| Tool/dependency contract | Expected calls and recoverable failure | Observed runtime names, checked mock fixtures, explicit errors |
-| References/examples | Domain-specific edge conditions | The relevant rule is applied to a new example, not copied blindly |
+| 설명·트리거 | 자연스러운 긍정·부정·모호한 라우팅 | 실제 Skill 호출, 무관한 요청에 오호출하지 않음 |
+| 인자 힌트·해석 규칙 | 입력 누락, 인자 추론, 없는 대상 | 적절한 질문·오류 또는 정확히 해석한 인자 |
+| Workflow/MUST | 정상 경로와 필수 단계 생략 압박 | 실제 순서와 완성한 출력 |
+| NEVER | 충돌 지시·유혹적인 지름길 | 전체 관찰 출력·도구 trace에 금지 동작이 없음 |
+| 출력 계약 | 누락·잘못된 산출물과 현실적 정상 경로 | 실제 파일, 형식·내용·도메인 검사. 성공 주장만으로 부족 |
+| 도구·의존성 계약 | 예상 호출과 복구 가능한 실패 | 관찰한 runtime 이름, 확인한 mock fixture, 명시적 오류 |
+| 참고 문서·예시 | 도메인 경계 조건 | 예시를 무작정 복사하지 않고 새 상황에 해당 규칙 적용 |
 
-For every proposed case, ask: **What different failure does this catch? Which source rule justifies it? What evidence separates pass from failure?** If two cases have the same answers, merge or replace one.
+사례마다 **어떤 다른 실패를 잡는가? 어떤 원문 규칙에 근거하는가? 무엇으로 통과·실패를 구별하는가?**를 묻는다. 두 사례의 답이 같으면 합치거나 하나를 바꾼다.
 
-## Prompt choices
+## 프롬프트 선택
 
-- Knowledge: “Using the release-conventions skill, what should I check before a rollback?” This intentionally makes the skill available and checks its knowledge.
-- Invocation: “We need a rollback readiness checklist; what should I look at?” No explicit slash invocation or injected skill content. Make normal routing possible and inspect actual calls.
-- Completion: “Create the release checklist for this fixture and save it as release-checklist.md.” Use artifact/tool evidence and authorized isolated execution.
-- Negative: a nearby but out-of-scope task where this skill should not be invoked. Set the evaluator's negative invocation expectation, rather than demanding an unnecessary refusal of the user task.
+- 지식: 'release-conventions 스킬 기준으로 rollback 전에 무엇을 확인해야 하나요?' 스킬을 의도적으로 사용 가능하게 하고 지식을 확인한다.
+- 호출: 'rollback 준비 체크리스트가 필요한데 무엇을 봐야 하나요?' 슬래시 호출·스킬 본문 주입 없이 정상 라우팅을 허용하고 실제 호출을 확인한다.
+- 완수: '이 fixture의 release 체크리스트를 만들고 release-checklist.md로 저장해주세요.' 승인된 격리 실행과 산출물·도구 근거를 쓴다.
+- 부정: 비슷하지만 스킬 범위 밖인 과제. 불필요하게 사용자 요청을 거절하게 하지 않고 evaluator의 부정 호출 기대값을 설정한다.
 
-Do not turn every task into a question: task completion must exercise a real deliverable. Do not turn every knowledge check into an imperative: that can start unintended execution.
+모든 과제를 질문으로 바꾸지 않는다. 완수는 실제 산출물을 만들어야 한다. 모든 지식 검사를 명령으로 바꾸지도 않는다. 의도하지 않은 실행을 시작할 수 있다. 한국어가 기본이며 영어 트리거 자체가 평가 대상일 때만 그 목적을 표시해 영어 사례를 쓴다.
 
-## Rubrics
+## 루브릭
 
-Use anchored observable behavior. A good rule might require separating confirmed incident facts from hypotheses and citing the supplied event timestamps. “Be helpful,” “follow best practices,” or “good quality” alone are not scoreable anchors.
+관찰 가능한 수준을 정의한다. 예를 들어 확인된 장애 사실과 가설을 구분하고 제공한 이벤트 시각을 인용하도록 할 수 있다. '도움이 되게', '모범 사례를 따라', '좋은 품질'만으로는 채점할 수 없다.
 
-Derive lower levels from meaningful failure severity, not a count of decorative words. Mandatory behavior is marked critical. Keep the Likert/binary scale consistent throughout all cases, selected options and report labels. Do not encode the separate 0.0–1.0 team grading convention as an evaluator Likert rubric.
+낮은 수준은 장식적 단어 개수가 아니라 의미 있는 실패 정도로 정한다. 필수 행동은 critical로 표시한다. 모든 사례·옵션·보고서에서 Likert/Binary 척도를 일관되게 유지한다. 별도 팀 규칙인 0.0~1.0을 evaluator의 Likert 루브릭으로 넣지 않는다.
 
-Semantic weighting and the dimension composite are separate evaluator fields. If a missed rule must prevent passing, mark it critical. A large weight by itself does not veto the final dimension verdict.
+의미 검사 가중치와 차원 종합 점수는 별도 필드다. 규칙 누락이 통과를 막아야 하면 critical로 표시한다. 가중치가 크다는 이유만으로 최종 차원 판정을 무효화하지는 않는다.
 
-The evaluator allocates ten cases as 2 invocation /1 efficiency /2 best practices /2 business impact /3 completion. This documented rounding choice cannot satisfy every original percentage range at ten cases. Thirty-case deep mode uses 7/4/7/5/7. BASIC is 1/1/1/1/0. Do not pad the suite with duplicates to satisfy counts.
+10개 배분은 호출2/효율1/모범 사례2/업무 효과2/완수3이다. 문서화된 이 정수 배분으로 원래 모든 비율 범위를 만족할 수는 없다. 30개 deep은 7/4/7/5/7, BASIC은 1/1/1/1/0이다. 개수를 채우려고 같은 사례를 반복하지 않는다.
 
-## Mocks and isolation
+## Mock과 격리
 
-Use stable fixture identifiers, synthetic nonsecret data and exact expected calls. Include malformed/missing fields only when the case tests them. A mock that always returns success hides dependency recovery behavior.
+안정적인 fixture ID, 비밀 없는 합성 데이터, 정확한 예상 호출을 쓴다. 잘못되거나 빠진 필드는 해당 동작을 검사할 때만 넣는다. 항상 성공하는 mock은 의존성 복구 동작을 숨긴다.
 
-Record the source of real MCP runtime names and `input_schema`; a text alias in settings is not tool discovery. Do not invent verification provenance. Unavailable runtime inventory is a reported gap, not permission to run the live service.
+실제 MCP runtime 이름·input_schema의 출처를 기록한다. 설정의 문자열 alias는 도구 발견이 아니다. 확인하지 않은 출처를 만들지 않는다. Runtime 목록이 없으면 빈틈으로 보고하며 실제 서비스 호출 허가로 보지 않는다.
 
-Set timeout and turn budgets to actual task needs. For nested evaluator tests, explicitly justify the larger budget and use one bounded fixture; never recursively evaluate the evaluator without a stopping condition. Capture mutation behavior and copied fixtures so that the original working copy remains intact.
+과제에 맞는 timeout·턴 예산을 둔다. 중첩 evaluator는 큰 예산의 이유와 범위가 정해진 fixture 하나를 사용한다. 종료 조건 없이 evaluator를 재귀 평가하지 않는다. 변경 동작과 복사한 fixture를 기록해 원본 working copy를 보존한다.
 
-## Persistence and review
+## 저장과 검토
 
-The target owns `evals/eval_criteria.yaml`. The evaluator's `prepare` command preserves the previous file before replacement and retains a reviewable run copy. For manual refinement, call the existing `core.backup_write` helper in the evaluator's pinned uv/PyYAML environment; it accepts `(path, data)` and creates an exclusive timestamped backup before writing JSON-compatible YAML. Do not implement a second backup helper.
+대상이 evals/eval_criteria.yaml을 소유한다. evaluator prepare는 교체 전에 기존 파일을 보존하고 검토 가능한 실행 사본을 남긴다. 수동 수정도 고정된 uv/PyYAML 환경에서 기존 `core.backup_write(path, data)`를 사용한다. JSON 호환 YAML을 쓰기 전 배타적인 타임스탬프 백업을 만든다. 두 번째 백업 도우미를 만들지 않는다.
 
-Show ID, category, working directory, exact prompt and key criteria. Include a short mapping from critical checks to target source rules. When publication was not requested, keep all artifacts local. A prepared suite and a schema-valid file are not execution results.
+ID, 범주, working directory, 정확한 prompt, 핵심 기준을 보여준다. Critical 검사와 대상 원문 규칙의 짧은 대응도 포함한다. 발행 요청이 없으면 모두 로컬에 둔다. 준비된 모음·스키마 유효 파일은 실행 결과가 아니다.
 
-After criteria edits, pass the edited canonical file to a new run. The prepared run's criteria hash remains a truthful record of the earlier version. Do not patch its hash to make a stale run appear reproducible.
+기준을 편집하면 새 실행에 그 파일을 준다. 준비된 실행의 해시는 이전 버전을 사실대로 보존한다. 오래된 실행을 재현 가능한 것처럼 보이게 하려고 해시를 고치지 않는다.
 
-## Eval-first and lift
+## Eval-first와 개선 효과
 
-New behavior case → actual intended failure → skill update → same-case pass → old-case regression checks → land. Preserve failed evidence. If the first run fails on authentication or a missing tool, fix the environment before claiming the skill was shown to fail.
+새 동작 사례 → 의도한 실제 실패 → 스킬 수정 → 같은 사례 통과 → 기존 사례 회귀 확인 → 반영. 실패 근거를 보존한다. 첫 실행이 인증·도구 누락으로 실패했다면 환경을 고친 뒤 스킬 실패를 주장한다.
 
-A/B needs matching real tasks, initial state, model, tool permissions, mock version and completion criteria. Compare tokens and wall-clock only alongside completed outcome quality. Keep execution variance separate from three independent judges grading one execution. Neither repeated votes nor a prettier rubric establishes a measured productivity increase.
+A/B는 같은 실제 과제, 초기 상태, 모델, 도구 권한, mock 버전, 완수 기준이 필요하다. 완료한 결과 품질과 함께 토큰·실제 경과 시간을 비교한다. 대상 실행의 변동과 같은 실행에 대한 독립 채점 3회는 다르다. 반복 투표나 더 보기 좋은 루브릭만으로 생산성 향상 실측을 입증할 수 없다.
