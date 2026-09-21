@@ -1,143 +1,149 @@
 # skill-evaluator
 
-An auditable Claude Code skill-evaluation orchestrator. It discovers a skill, prepares portable criteria, delegates execution to the installed Claude Code native eval runner, grades preserved evidence in independent judge sessions, and writes linked local reports.
+실행 근거를 보존하는 Claude Code 스킬 평가 도구다. 스킬을 찾고 재사용 가능한 기준을 준비한 뒤, 설치된 Claude Code native eval runner에 실행을 맡긴다. 독립 채점 세션이 보존된 근거를 평가하고 서로 연결된 로컬 보고서를 만든다.
 
-The local path is implemented over `claude plugin eval`, rather than a second agent execution framework. MSL Judge, SkillWatch and PixelCloud require an operator-supplied bridge based on those services' current help/schema. Their names in this package are not evidence of a working internal-service connection.
+로컬 실행은 `claude plugin eval` 위에 구현되어 있다. 별도의 에이전트 실행 프레임워크를 만들지 않는다. MSL Judge, SkillWatch, PixelCloud는 실제 서비스의 현재 help/schema에 맞춘 운영자 bridge가 필요하다. 이 문서에 이름이 있다는 이유만으로 내부 서비스 연동이 작동하는 것은 아니다.
 
-## Install and check the environment
+## 설치와 환경 확인
 
-Keep this entire `skill-evaluator/` directory together: `SKILL.md` depends on its scripts and references. From a checkout of [jha0313/skills_repo](https://github.com/jha0313/skills_repo), install through your normal Claude Code skill mechanism, or copy the whole directory into `~/.claude/skills/skill-evaluator` when that destination does not already exist. Do not overwrite an existing installation without preserving its changes. The CLI examples below also work directly from the repository root without installing the skill.
+`SKILL.md`는 scripts와 references를 사용하므로 `skill-evaluator/` 전체를 함께 둔다. [jha0313/skills_repo](https://github.com/jha0313/skills_repo) checkout에서 호스트의 일반 스킬 설치 방식을 사용하거나, 대상 경로가 없을 때 폴더 전체를 `~/.claude/skills/skill-evaluator`로 복사한다. 기존 설치의 변경 사항을 보존하지 않고 덮어쓰지 않는다. 아래 CLI는 설치 없이 저장소 루트에서도 실행할 수 있다.
 
-Requirements: Python 3.11+, [uv](https://docs.astral.sh/uv/getting-started/installation/), and an authenticated Claude Code version whose native eval help exposes the required flags. `uv run` installs the pinned `PyYAML==6.0.3` dependency in an isolated environment. Bare `python3` needs that dependency installed separately.
+필수 환경: Python 3.11+, [uv](https://docs.astral.sh/uv/getting-started/installation/), 필요한 native eval flag가 help에 있는 인증된 Claude Code. `uv run`이 고정된 `PyYAML==6.0.3`을 격리 환경에 설치한다. 일반 `python3` 실행은 이 의존성을 별도 설치해야 한다.
 
 ```bash
 uv run skill-evaluator/scripts/evaluate.py doctor
 ```
 
-If Claude Code is absent, follow the official [installation instructions](https://code.claude.com/docs/en/setup). If present but missing native eval capabilities, run `claude update`, then `claude plugin eval --help`. Authenticate with `claude auth login`. The development environment exposed Claude Code 2.1.275 on 2026-09-19; compatibility is checked at startup, not inferred from that historical version.
+Claude Code가 없으면 공식 [설치 안내](https://code.claude.com/docs/en/setup)를 따른다. 설치되어 있지만 native eval 기능이 없으면 `claude update` 후 `claude plugin eval --help`를 확인한다. 인증은 `claude auth login`이다. 개발 당시 2026-09-19의 CLI는 2.1.275였지만 호환성은 그 과거 버전으로 추정하지 않고 시작 때 확인한다.
 
-A missing bundled discovery/report helper means the package is incomplete: obtain a fresh checkout with `git clone https://github.com/jha0313/skills_repo.git` into a new directory and reinstall the complete skill folder. These helpers replace the unavailable internal template-discovery and visualization dependencies.
+내장 발견·보고서 도우미가 없으면 패키지가 불완전하다. 새 디렉터리에 `git clone https://github.com/jha0313/skills_repo.git` 후 전체 스킬 폴더를 다시 설치한다. 이 도우미는 사용할 수 없는 내부 template-discovery·visualization 의존성을 대신한다.
 
-## Two smoke commands
+## 빠른 실제 평가 두 가지
 
-Run from the repository root. These use the included small greeting fixture, real agent executions and independent judges; they consume the authenticated account's normal model usage. They do not call SkillWatch or PixelCloud.
+저장소 루트에서 실행한다. 포함된 작은 인사말 fixture를 **실제 에이전트와 독립 채점자**로 평가하므로 인증 계정의 모델 사용량이 발생한다. SkillWatch나 PixelCloud는 호출하지 않는다.
 
-BASIC, exactly four cases:
+BASIC: 정확히 4개 사례.
 
 ```bash
 uv run skill-evaluator/scripts/evaluate.py run skill-evaluator/tests/fixtures/observatory-greeting --basic --local --criteria skill-evaluator/tests/fixtures/basic.yaml --trust-target --no-visualize
 ```
 
-Default THOROUGH, ten cases, local HTML enabled:
+기본 THOROUGH: 10개 사례, 로컬 HTML 생성.
 
 ```bash
 uv run skill-evaluator/scripts/evaluate.py run skill-evaluator/tests/fixtures/observatory-greeting --local --criteria skill-evaluator/tests/fixtures/thorough.yaml --accept-criteria --trust-target
 ```
 
-`--trust-target` asserts that this target and any parent-plugin code are already within the host user's authorized trust scope. It does not grant Bash, Write/Edit, network tools, live MCP, or publication. Read the fixture and criteria before using that assertion. `--accept-criteria` records the host decision to execute the presented criteria; it is not a substitute for reviewing unknown criteria.
+`--trust-target`은 대상과 상위 plugin 코드가 이미 호스트 사용자의 승인된 신뢰 범위 안에 있다는 확인이다. Bash, Write/Edit, 네트워크 도구, 실제 MCP, 발행 권한을 추가하지 않는다. 지정 전에 fixture와 기준을 읽는다. `--accept-criteria`는 제시된 기준을 실행하기로 한 호스트 결정을 기록하며 미확인 기준의 검토를 대신하지 않는다.
 
-A failed skill case exits 1. Configuration, infrastructure or publication errors exit 2. An interrupted process exits 130 and retains checkpoints. Exit 0 means the completed suite passed; `prepare` and `validate` also exit 0 without evaluating a skill, so read the command and report state.
+스킬 사례 실패는 종료 코드 1, 설정·환경·발행 오류는 2, 중단은 체크포인트를 보존하고 130이다. 실행 완료 후 0은 전체 통과를 뜻한다. 다만 `prepare`·`validate`도 실제 평가 없이 0을 반환하므로 명령과 보고서 상태를 함께 읽는다.
 
-## Evaluate an installed skill
+## 설치된 스킬 평가
 
 ```bash
 uv run skill-evaluator/scripts/evaluate.py prepare TARGET --local
 ```
 
-Use a unique installed name or the exact directory containing `SKILL.md`. Pass `--source /path/to/writable/skill` when the installed read path is a plugin cache. The tool writes criteria beside the **target** source, with a timestamped backup before replacement, and prints a review table. It does not reset or clean the source working copy.
+고유한 설치 이름이나 SKILL.md가 있는 정확한 디렉터리를 지정한다. 설치 읽기 경로가 plugin 캐시라면 `--source /path/to/writable/skill`을 사용한다. 기준은 **대상** 소스 옆에 쓰고 덮어쓰기 전에 타임스탬프 백업을 만든 뒤 검토 표를 출력한다. 원본 working copy를 reset/clean하지 않는다.
 
-After reviewing/editing those criteria:
+기준을 검토·수정한 뒤:
 
 ```bash
 uv run skill-evaluator/scripts/evaluate.py run TARGET --local --criteria /path/to/writable/skill/evals/eval_criteria.yaml --accept-criteria --trust-target
 ```
 
-Or resume the unchanged prepared run after review:
+준비한 실행이 변경되지 않았다면 검토 후 재개할 수도 있다.
 
 ```bash
 uv run skill-evaluator/scripts/evaluate.py run --resume ~/skill-eval/TARGET/RUN-ID
 ```
 
-Resume uses persisted options, criteria and hashes; do not add new evaluation flags. Changes to the skill, evaluator, criteria or adapter configuration require a new run. Completed case execution and valid judge checkpoints are reused.
+재개는 저장된 옵션·기준·해시를 사용하므로 새 평가 flag를 추가하지 않는다. 스킬·evaluator·기준·어댑터 설정이 바뀌면 새 실행이 필요하다. 완료된 사례 실행과 유효한 채점 체크포인트는 재사용한다.
 
-## Modes and controls
+## 모드와 옵션
 
-| Control | Behavior |
+| 옵션 | 동작 |
 |---|---|
-| `--basic` | Exactly 4 cases: invocation, efficiency, best practices, business impact. No dedicated task-completion case. |
-| No size flag | Default THOROUGH: 10 cases across all 5 dimensions. |
-| `--deep` / `--comprehensive` | 30 cases. In conversational use, explicit “thorough/deep/comprehensive” depth requests route here; there is no separate `--thorough` CLI flag. |
-| `--binary` | PASS/FAIL grading with weighted binary semantic checks. Default is Likert 1–5. |
-| `--local` | Bypass any configured MSL bridge and use native local isolation. |
-| `--no-visualize` | Skip HTML and PixelCloud; keep Markdown/JSON and optional SkillWatch. |
-| `--model MODEL` | Select evaluated-agent model. |
-| `--judge-model MODEL` | Select independent author/judge model. Without an approved repository default, inherit the authenticated CLI default and record it. |
-| `--concurrency N` | 1–8; default 3. Mutation behavior forces sequential case execution. |
-| `--judge-rounds N` | 1, 3 or 5; default 3. These grade the same execution evidence in independent sessions. |
-| `--timeout SECONDS` | Evaluated-session default, 300; per-case override wins, maximum 3,600. |
-| `--judge-timeout SECONDS` | Per author/judge process limit, default 300, maximum 3,600. |
-| `--allow-tool TOOL` | Repeatable explicit grant for tools needed by the authorized task. |
-| `--reuse-criteria` | Reuse existing target criteria explicitly; BASIC still needs the standardized four-case suite. |
-| `--config FILE` | Opt-in operator bridge definitions with current contract provenance. |
+| `--basic` | 호출·효율·모범 사례·업무 효과 각 1개, 총 4개. 전용 완수 사례는 없다. |
+| 크기 flag 없음 | 기본 THOROUGH: 5개 차원에 걸친 10개 사례. |
+| `--deep` / `--comprehensive` | 30개. 대화에서 명시적으로 thorough/deep/comprehensive의 깊이를 요청하면 여기에 대응한다. 별도 `--thorough` CLI flag는 없다. |
+| `--binary` | 가중 이진 의미 검사와 PASS/FAIL. 기본은 Likert 1~5. |
+| `--local` | 설정된 MSL bridge를 건너뛰고 native 로컬 격리를 사용한다. |
+| `--no-visualize` | HTML·PixelCloud 생략. Markdown/JSON과 선택한 SkillWatch는 유지한다. |
+| `--model MODEL` | 평가 대상 모델 선택. |
+| `--judge-model MODEL` | 독립 작성자·채점 모델 선택. 저장소 승인 기본값이 없으면 인증된 CLI 기본값을 따르고 기록한다. |
+| `--concurrency N` | 1~8, 기본 3. 변경 동작은 사례를 강제로 순차 실행한다. |
+| `--judge-rounds N` | 1/3/5, 기본 3. 같은 실행 근거를 독립 세션에서 채점한다. |
+| `--timeout SECONDS` | 대상 기본 300초, 사례별 값 우선, 최대 3600초. |
+| `--judge-timeout SECONDS` | 작성자·채점 프로세스별 기본 300초, 최대 3600초. |
+| `--allow-tool TOOL` | 승인된 과제에 필요한 도구의 명시적 허용. 반복 가능. |
+| `--reuse-criteria` | 기존 대상 기준을 명시적으로 재사용. BASIC은 여전히 표준 4개가 필요하다. |
+| `--config FILE` | 현재 계약 출처가 있는 선택적 운영자 bridge 설정. |
 
-Discovery analyzes actual mutation behavior. Read-only cases can run concurrently; mutating skills execute sequentially in native clean sandboxes. Invocation uses normal skill discovery in a fresh session. Explicitly loading skill context is allowed only for other categories and is recorded as such.
+발견 단계는 실제 변경 동작을 분석한다. 읽기 전용 사례는 동시 실행할 수 있고 변경 스킬은 깨끗한 native sandbox에서 순차 실행한다. Invocation은 새 세션의 정상 스킬 발견을 사용한다. 스킬 맥락을 명시적으로 로드하는 방식은 다른 범주에서만 허용하고 기록한다.
 
-See [case schema and mocking](references/test_case_format.md), [Likert rubric](references/grading_rubric.md), [binary rubric](references/grading_rubric_binary.md), [result/bridge schemas](references/result_schema.md), and [report contract](references/report_template.md).
+[사례 스키마·모킹](references/test_case_format.md), [Likert 루브릭](references/grading_rubric.md), [Binary 루브릭](references/grading_rubric_binary.md), [결과·bridge 스키마](references/result_schema.md), [보고서 계약](references/report_template.md)을 참고한다.
 
-## What is saved
+## 보존하는 파일
 
-Default run location: `~/skill-eval/<skill-name>/<run-id>/`.
+기본 실행 위치는 `~/skill-eval/<skill-name>/<run-id>/`다.
 
-- `manifest.json`, `analysis.json`, `criteria.yaml`, `CRITERIA_REVIEW.md`, captured native CLI help.
-- `cases/TC-001/`: prompt, complete transcript, native trace, output-only response, actual tool calls, metadata, artifacts, normalized execution and adapter logs.
-- `judges/`: independent raw judge inputs/results and validated checkpoints.
-- `evaluations/TC-001.md` and `.json`: exact evidence citations, matched rubric levels and deterministic check results.
-- `summary.json`, `REPORT.md`, optional `REPORT.html`: totals, breakdowns, failures, recommendations and evidence links.
+- `manifest.json`, `analysis.json`, `criteria.yaml`, `CRITERIA_REVIEW.md`, 수집한 native CLI help.
+- `cases/TC-001/`: 프롬프트, 전체 실행 기록, native trace, 출력만 담은 응답, 실제 도구 호출, metadata, 산출물, 정규화 실행, 어댑터 로그.
+- `judges/`: 독립 채점 입력·결과 원문과 검증된 체크포인트.
+- `evaluations/TC-001.md/.json`: 정확한 근거 인용, 일치한 루브릭 수준, 결정적 검사 결과.
+- `summary.json`, `REPORT.md`, 선택적 `REPORT.html`: 합계, 세부 결과, 실패, 개선안, 근거 링크.
 
-Unknown usage/cost is null. CLI cost estimates are not invoices. Agent cost, judge cost and criteria-author cost are retained separately; inspect `author_cost_usd` as well as execution/judge totals. Sum of case durations is not elapsed wall-clock when cases run concurrently.
+미확인 사용량·비용은 null이며 CLI 추정치는 청구서가 아니다. 대상·채점·작성 비용을 따로 보존하므로 실행·채점 합계와 `author_cost_usd`를 함께 확인한다. 병렬 실행의 사례별 시간 합은 실제 경과 시간과 다르다.
 
-A case's primary category is its coverage label. Judges still score every selected dimension for that execution. The semantic weighted score is diagnostic; `critical: true` makes a mandatory semantic failure override an otherwise passing dimension composite. The suite's final verdict is conservative: every case must pass. Read scores, failed requirements and infrastructure errors together.
+사례 대표 범주는 커버리지 라벨이다. 채점자는 그 실행의 모든 선택 차원을 채점한다. 의미 검사 가중 점수는 진단용이며 `critical: true`는 필수 의미 검사 실패가 통과 종합 점수를 무효화하게 한다. 전체 최종 판정은 모든 사례 통과를 요구한다. 점수·필수 조건 실패·환경 오류를 함께 읽는다.
 
-## A/B: demonstrate added value
+## A/B로 추가 가치 확인
 
-The orchestrator's `compare RUN_A RUN_B` compares two existing canonical runs. It does **not** run a no-skill arm automatically, and matching criteria hashes alone do not prove that the model, fixtures, tools or environment match.
+`compare RUN_A RUN_B`는 기존 정규화 실행 두 개를 비교한다. 무스킬 대조군을 자동 실행하지 않는다. 기준 해시만 같다고 모델·fixture·도구·환경까지 같다고 할 수 없다.
 
-For real with/without execution, reuse the native runner's current ablation support. Prepare a trusted native plugin eval case with a neutral task prompt, identical fixtures and domain graders. Do not force the skill name/body in the baseline; do not use only the orchestrator's nonempty-output capture grader as a quality measurement. From a directory where the named output paths are appropriate:
+실제 스킬 사용 유무 비교는 native runner의 현재 ablation 지원을 재사용한다. 중립적인 과제 프롬프트, 같은 fixture와 도메인 채점기를 가진 신뢰할 수 있는 native plugin 사례를 준비한다. 대조군에 스킬 이름·본문을 강제하지 않는다. 이 orchestrator의 '출력이 비어 있지 않음' 수집 채점기만으로 품질을 측정하지 않는다. 아래 출력 경로가 적절한 디렉터리에서 실행한다.
 
 ```bash
 claude plugin eval /path/to/trusted-plugin --ablation with-without --runs 3 --concurrency 1 --mocks record --no-publish --keep-temp --json ab-result.json --output-dir ab-results
 ```
 
-This command runs three evaluated-agent attempts per arm, not three independent judges of one transcript. It uses the native plugin's own grader schema and native aggregate format, distinct from this orchestrator's canonical result schema. Keep both arms' raw traces, apply the same evidence-backed domain criteria, and compare completion, tokens and wall-clock. A native report is not accepted directly by `compare` without a verified canonical translation.
+이 명령은 대조군별 대상 실행 3회이며 한 기록에 대한 독립 채점 3회가 아니다. Native plugin 자체 grader 스키마·집계 형식은 이 orchestrator의 정규화 결과와 다르다. 두 조건의 원시 trace를 보존하고 같은 근거 기반 도메인 기준으로 완수·토큰·실제 경과 시간을 비교한다. 검증된 정규화 변환 없이 native 보고서를 `compare`에 직접 넣을 수 없다.
 
-Do not claim measured time savings, revenue or causal productivity from a rubric's business-impact score. Fix the task, starting revision, model/budget, mocks and completion threshold; repeat or vary ordering to inspect variance. A lower token count caused by incomplete work is not efficiency lift.
+업무 효과 루브릭으로 실제 시간 절감·매출·인과적 생산성을 주장하지 않는다. 과제, 시작 revision, 모델·예산, mock, 완수 임계값을 고정하고 반복 또는 실행 순서를 바꿔 변동을 확인한다. 미완성 때문에 토큰이 적은 것은 효율 향상이 아니다.
 
-## Internal services and publication
+## 내부 서비스와 발행
 
-Default runs are local. `--publish-skillwatch` and `--publish-pixelcloud` require separate opt-in and a configured bridge. Project creation additionally requires `--create-project`. Bridges must preserve host authorization, validate the real service schema, and enforce the run ID as an idempotency key. The package deliberately does not guess private service endpoints or `fbcode//msl/judge:run_eval` flags.
+기본은 로컬 실행이다. `--publish-skillwatch`·`--publish-pixelcloud`에는 별도 명시적 선택과 설정된 bridge가 필요하다. 프로젝트 생성은 추가로 `--create-project`가 필요하다. Bridge는 호스트 권한을 보존하고 실제 서비스 스키마를 검증하며 run ID를 멱등 키로 강제해야 한다. 비공개 endpoint나 `fbcode//msl/judge:run_eval` flag를 추측하지 않는다.
 
-MSL preference/fallback is available through the normalized bridge interface. A configured MSL first-case infrastructure error can retry through local execution; a legitimate failed skill case is not grounds for changing adapters. Real MSL/SkillWatch/PixelCloud integration must be reported separately from deterministic mock bridge tests.
+정규화 bridge로 MSL 우선·fallback을 지원한다. 첫 사례의 MSL 환경 오류는 로컬 재시도할 수 있지만 실제 스킬 실패는 어댑터 변경 이유가 아니다. 실제 MSL/SkillWatch/PixelCloud 연동은 결정적 mock bridge 테스트와 구분해 보고한다.
 
-## Explicit deviations and limits
+## 명세 차이와 한계
 
-- Ten cases cannot satisfy all requested percentage ranges as integer counts: the largest allowed counts sum to nine. Default allocation is **2/1/2/2/3**, prioritizing completion at 30%; deep uses **7/4/7/5/7**, meeting the stated ranges.
-- No approved high-quality judge model was configured in this repository. The CLI default is inherited unless selected explicitly; that is recorded rather than called “repository approved.”
-- Bundled discovery and HTML helpers replace absent internal discovery/visualization tools. Internal services use operator bridges; an interface and mocked contract do not establish live integration.
-- Nontext artifacts require a domain-specific renderer before judgment; the generic judge does not claim to inspect images, PDFs or executable behavior from filenames or binary bytes.
-- Mocked tool inputs make dependencies reproducible, not the LLM itself deterministic. Three judge rounds reduce one kind of variation; they do not establish truth or eliminate shared bias.
-- Generic sandbox execution cannot guarantee an arbitrary plugin works unchanged. Unsupported dependencies require a materialized environment or a clear error, not a fabricated score.
+- 요청된 비율을 정수 10개로 모두 만족할 수 없다(허용 최대 합계 9). 기본 **2/1/2/2/3**은 완수 30%를 우선하며 deep **7/4/7/5/7**은 범위를 만족한다.
+- 저장소에 승인된 고품질 채점 모델 설정은 없다. 명시하지 않으면 CLI 기본값을 따르고 기록하며 '저장소 승인'이라고 부르지 않는다.
+- 내장 발견·HTML 도우미가 없는 내부 도구를 대신한다. 내부 서비스는 운영자 bridge를 사용하며 인터페이스·mock 계약만으로 실제 연동을 입증하지 않는다.
+- 비텍스트 산출물은 도메인 렌더러가 필요하다. 파일 이름·바이너리 바이트만 보고 이미지·PDF·실행 동작을 검사했다고 주장하지 않는다.
+- 도구 mock은 의존성 재현성을 높일 뿐 LLM을 결정적으로 만들지 않는다. 채점 3라운드는 일부 변동을 줄이지만 진실·공통 편향 제거를 보장하지 않는다.
+- 일반 sandbox가 모든 plugin을 변경 없이 실행한다고 보장할 수 없다. 미지원 의존성은 실제 환경 사본 또는 명확한 오류로 드러내고 점수를 지어내지 않는다.
 
-Validation results belong to a specific code revision and retained run. Read the final run's manifest and report before describing a skill as successfully evaluated.
+검증 결과는 특정 코드 revision과 보존한 실행에 속한다. 성공적으로 평가됐다고 설명하기 전에 최종 manifest와 보고서를 읽는다.
 
-## Verification recorded during development
+## 개발 당시 기록된 검증
 
-On 2026-09-19, with Claude Code 2.1.275:
+다음은 **한국어 현지화 이전**, 2026-09-19 Claude Code 2.1.275에서 수행한 기록이다. 과거 결과·원문은 번역하지 않았으며 이 기록이 한국어판의 실제 모델 실행 검증을 대신하지 않는다.
 
-- 31 deterministic regression tests passed, including cancellation, criteria backups, exact distributions, prompt/cross-case evidence rejection, missing/modified artifacts, publisher idempotency, binary thresholds, and bounded schema repair.
-- Ruff lint/format and mypy passed. The repository workflow repeats deterministic checks on relevant pull requests and pushes; it does not require paid model credentials.
-- Real BASIC Likert evaluation passed 4/4 cases; real default THOROUGH passed 10/10. Each execution was independently judged three times. Their CLI-estimated execution/judge costs were about $2.21 and $5.42 respectively, not invoices or estimates for arbitrary skills.
-- Natural-language routing invoked `skill-evaluator` itself through the real Skill tool in a read-only explanation request.
-- Real native Bash PreToolUse interception returned a canned marker without executing the original command. Real native MCP stand-in executed one exact mocked lookup with no unmocked calls. Both tests were fixtures, not live external-service operations.
-- SkillWatch publication was exercised only through a deterministic fake bridge; MSL Judge and PixelCloud live integration were not exercised.
+- 결정적 회귀 31개 통과: 중단, 기준 백업, 정확한 배분, 프롬프트·다른 사례 근거 거부, 누락·변경 산출물, 발행 멱등성, Binary 임계값, 제한된 스키마 교정.
+- Ruff lint/format과 mypy 통과. 관련 PR·push의 저장소 workflow가 모델 인증 없이 결정적 검사를 반복한다.
+- 실제 BASIC Likert 4/4, 기본 THOROUGH 10/10 통과. 각 실행을 독립적으로 3번 채점했다. 실행·채점 CLI 추정 비용은 각각 약 $2.21/$5.42였으며 청구서나 임의 스킬의 비용 예측이 아니다.
+- 실제 Skill 도구가 자연어 읽기 전용 설명 요청에서 skill-evaluator를 호출했다.
+- 실제 native Bash PreToolUse가 원래 명령 대신 고정 표식을 반환했다. 실제 native MCP 대역은 정확한 mock 조회 1회를 실행했고 미모킹 호출은 없었다. 둘 다 fixture이며 실제 외부 서비스 작업이 아니다.
+- SkillWatch는 결정적 가짜 bridge로만 검사했다. 실제 MSL Judge·PixelCloud 연동은 실행하지 않았다.
 
-An initial live run exposed fractional derived-dimension validation, and initial criteria authoring exposed mixed binary/Likert critical rubrics. Invalid output was retained as an infrastructure error instead of scored; derived dimensions are now recomputed centrally and authoring permits one logged, bounded schema-only repair. Passing fixture runs establish the exercised orchestration paths, not correctness for every installed skill or artifact domain.
+초기 실제 실행에서 계산된 차원의 소수 검증 문제, 기준 작성에서 Binary/Likert critical 혼합 문제가 발견됐다. 잘못된 출력은 점수를 주지 않고 환경 오류로 보존했다. 현재 계산 차원은 중앙에서 다시 계산하며 기준 작성은 기록이 남는 스키마 교정 1회만 허용한다. Fixture 통과는 실행한 경로를 검증할 뿐 모든 설치 스킬·도메인의 정답성을 보장하지 않는다.
+
+## 한국어 사용 범위
+
+스킬 설명, 기준 작성·독립 채점 지시, 새 사례의 프롬프트·루브릭, CLI 안내, 로컬 보고서 화면은 한국어다. `SKILL.name`, 명령·flag, 스키마 키·enum, 점수 공식·임계값, 계약상 정확한 문구, 공급자 원시 출력, 과거 실행 기록은 유지한다. 새 채점 이유는 한국어로 쓰되 evidence.quote는 원문 그대로 남긴다. 포함된 인사말 fixture의 계약 문구 `Welcome to Observatory.`도 번역하지 않는다.
+
+한국어 현지화에서는 기존 회귀31개와 보고서의 원문·기계 필드·미확인 값·escaping 보존 검사1개, 총32개가 통과했다. Ruff lint/format, mypy, BASIC/Binary/THOROUGH 예시 형식 검증도 통과했다. 한국어판의 새 실제 모델 평가나 브라우저 시각 검증은 실행하지 않았다. Codex의 기본 skill validator는 기존 Claude 전용 `argument-hint`를 허용하지 않으므로 해당 두 스킬은 그 차이를 보존하고 YAML·이름·도구·인자 계약을 별도로 검증했다.

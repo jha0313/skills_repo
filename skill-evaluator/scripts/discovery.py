@@ -31,7 +31,7 @@ def skill_files(root):
             continue
         if path.is_symlink():
             raise EvalError(
-                f"Symlink in evaluated source needs a materialized copy: {path}"
+                f"평가 소스의 심볼릭 링크는 실제 파일 사본으로 바꿔야 합니다: {path}"
             )
         if path.is_file() and not path.name.startswith("eval_criteria.yaml"):
             files.append(path)
@@ -104,13 +104,13 @@ def discover(target, source=None):
                 pass
         if len(candidates) != 1:
             raise EvalError(
-                f"Target absent or ambiguous: {target}. Pass the exact directory containing SKILL.md. Candidates: {candidates}"
+                f"대상이 없거나 모호합니다: {target}. SKILL.md가 있는 정확한 디렉터리를 지정하세요. 후보: {candidates}"
             )
         p = candidates[0]
     p = p.resolve()
     writable = Path(source).expanduser().resolve() if source else p
     if not (writable / "SKILL.md").is_file():
-        raise EvalError("--source must contain the writable source SKILL.md")
+        raise EvalError("--source에는 쓰기 가능한 소스 SKILL.md가 있어야 합니다")
     plugin_root = next(
         (q for q in [p, *p.parents] if (q / ".claude-plugin/plugin.json").is_file()),
         None,
@@ -123,14 +123,14 @@ def discover(target, source=None):
     text = (p / "SKILL.md").read_text()
     match = re.match(r"^---\s*\n(.*?)\n---\s*\n", text, re.DOTALL)
     if not match:
-        raise EvalError("Target has no YAML frontmatter")
+        raise EvalError("대상에 YAML frontmatter가 없습니다")
     import yaml
 
     fm = yaml.safe_load(match[1])
     if not isinstance(fm, dict) or not fm.get("name") or not fm.get("description"):
-        raise EvalError("Target frontmatter requires name/description")
+        raise EvalError("대상 frontmatter에 name/description이 필요합니다")
     if not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,63}", fm["name"]):
-        raise EvalError("Target skill name must be a portable lowercase slug")
+        raise EvalError("대상 스킬 name은 소문자로 된 이식 가능한 slug여야 합니다")
     contents = {
         str(f.relative_to(p)): f.read_text(errors="replace")
         for f in skill_files(p)

@@ -1,21 +1,21 @@
 {
   "default_working_directory": ".",
   "analysis": {
-    "purpose": "Validate a harmless read-only greeting convention through real Claude routing and independent grading.",
+    "purpose": "무해한 읽기 전용 인사 규칙을 실제 Claude 라우팅과 독립 채점으로 확인한다.",
     "target_users": [
-      "new contributors"
+      "새 기여자"
     ],
     "triggers": [
-      "Observatory team greeting"
+      "Observatory 팀 인사말"
     ],
-    "arguments": "optional recipient name",
+    "arguments": "선택적 받는 사람 이름",
     "capabilities": [
-      "canonical greeting",
-      "bounded unknowns"
+      "정해진 인사말",
+      "미확인 규칙 구분"
     ],
     "workflow_phases": [
-      "load convention",
-      "answer"
+      "규칙 로드",
+      "응답"
     ],
     "allowed_tools": [
       "Read",
@@ -27,33 +27,33 @@
     "external_systems": [],
     "requirements": [],
     "expected_outputs": [
-      "concise greeting"
+      "간결한 인사말"
     ],
     "type": "knowledge",
     "mutates": false,
-    "mutation_evidence": "Skill explicitly says read-only and never send/edit.",
+    "mutation_evidence": "스킬에 읽기 전용이며 전송·수정을 하지 않는다고 명시되어 있다.",
     "edge_cases": [
-      "unknown department",
-      "missing name"
+      "알려지지 않은 부서",
+      "이름 누락"
     ],
     "failure_modes": [
-      "invented names",
-      "wrong greeting",
-      "false positive routing"
+      "이름 지어내기",
+      "틀린 인사말",
+      "잘못된 스킬 호출"
     ]
   },
   "test_cases": [
     {
       "id": "TC-001",
-      "name": "invocation 1",
+      "name": "호출 정확성 1",
       "category": "invocation",
       "project": "observatory-greeting",
       "target_skills": [
         "observatory-greeting/SKILL.md"
       ],
-      "prompt": "How does the Observatory team greet new contributors?",
-      "description": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
-      "expected_behavior": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
+      "prompt": "Observatory 팀에서는 새 기여자에게 어떻게 인사하나요?",
+      "description": "Welcome to Observatory.를 정확히 제시하고 문서의 규칙을 따르며 실행하지 않은 행동이나 미확인 규칙을 지어내지 않는다.",
+      "expected_behavior": "Welcome to Observatory.를 정확히 제시하고 문서의 규칙을 따르며 실행하지 않은 행동이나 미확인 규칙을 지어내지 않는다.",
       "eval_target": "all",
       "expect_invocation": true,
       "timeout_seconds": 120,
@@ -65,15 +65,15 @@
         "required_absent": [],
         "semantic_checks": [
           {
-            "question": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
+            "question": "Welcome to Observatory.를 정확히 제시하고 문서의 규칙을 따르며 실행하지 않은 행동이나 미확인 규칙을 지어내지 않는다.",
             "weight": 3,
             "critical": true,
             "rubric": {
-              "1": "Wrong or absent result.",
-              "2": "Major missing convention or invented fact.",
-              "3": "Correct and usable documented answer.",
-              "4": "Accurate, concise answer with minor extra text.",
-              "5": "Exact convention with concise relevant handling of the requested case."
+              "1": "결과가 틀리거나 없다.",
+              "2": "핵심 규칙을 누락하거나 사실을 지어낸다.",
+              "3": "문서에 근거한 정확하고 사용 가능한 답변이다.",
+              "4": "정확하고 간결하지만 작은 추가 설명이 있다.",
+              "5": "정확한 규칙을 따르고 요청 사례를 관련 내용만으로 간결히 처리한다."
             }
           }
         ],
@@ -82,15 +82,15 @@
     },
     {
       "id": "TC-002",
-      "name": "invocation 2",
+      "name": "호출 정확성 2",
       "category": "invocation",
       "project": "observatory-greeting",
       "target_skills": [
         "observatory-greeting/SKILL.md"
       ],
-      "prompt": "What is the largest planet in the Solar System?",
-      "description": "Answers Jupiter without invoking the contributor-greeting skill.",
-      "expected_behavior": "Answers Jupiter without invoking the contributor-greeting skill.",
+      "prompt": "태양계에서 가장 큰 행성은 무엇인가요? 영문 이름으로 알려주세요.",
+      "description": "기여자 인사말 스킬을 호출하지 않고 Jupiter라고 답한다.",
+      "expected_behavior": "기여자 인사말 스킬을 호출하지 않고 Jupiter라고 답한다.",
       "eval_target": "all",
       "expect_invocation": false,
       "timeout_seconds": 120,
@@ -102,15 +102,15 @@
         "required_absent": [],
         "semantic_checks": [
           {
-            "question": "Answers Jupiter without invoking the contributor-greeting skill.",
+            "question": "기여자 인사말 스킬을 호출하지 않고 Jupiter라고 답한다.",
             "weight": 3,
             "critical": true,
             "rubric": {
-              "1": "Wrong or absent result.",
-              "2": "Major missing convention or invented fact.",
-              "3": "Correct and usable documented answer.",
-              "4": "Accurate, concise answer with minor extra text.",
-              "5": "Exact convention with concise relevant handling of the requested case."
+              "1": "결과가 틀리거나 없다.",
+              "2": "핵심 규칙을 누락하거나 사실을 지어낸다.",
+              "3": "문서에 근거한 정확하고 사용 가능한 답변이다.",
+              "4": "정확하고 간결하지만 작은 추가 설명이 있다.",
+              "5": "정확한 규칙을 따르고 요청 사례를 관련 내용만으로 간결히 처리한다."
             }
           }
         ],
@@ -119,15 +119,15 @@
     },
     {
       "id": "TC-003",
-      "name": "efficiency 3",
+      "name": "효율성 3",
       "category": "efficiency",
       "project": "observatory-greeting",
       "target_skills": [
         "observatory-greeting/SKILL.md"
       ],
-      "prompt": "Using observatory-greeting, state the contributor greeting in one sentence.",
-      "description": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
-      "expected_behavior": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
+      "prompt": "observatory-greeting을 사용해 기여자 인사말을 한 문장으로 알려주세요.",
+      "description": "Welcome to Observatory.를 정확히 제시하고 문서의 규칙을 따르며 실행하지 않은 행동이나 미확인 규칙을 지어내지 않는다.",
+      "expected_behavior": "Welcome to Observatory.를 정확히 제시하고 문서의 규칙을 따르며 실행하지 않은 행동이나 미확인 규칙을 지어내지 않는다.",
       "eval_target": "all",
       "expect_invocation": true,
       "timeout_seconds": 120,
@@ -139,15 +139,15 @@
         "required_absent": [],
         "semantic_checks": [
           {
-            "question": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
+            "question": "Welcome to Observatory.를 정확히 제시하고 문서의 규칙을 따르며 실행하지 않은 행동이나 미확인 규칙을 지어내지 않는다.",
             "weight": 3,
             "critical": true,
             "rubric": {
-              "1": "Wrong or absent result.",
-              "2": "Major missing convention or invented fact.",
-              "3": "Correct and usable documented answer.",
-              "4": "Accurate, concise answer with minor extra text.",
-              "5": "Exact convention with concise relevant handling of the requested case."
+              "1": "결과가 틀리거나 없다.",
+              "2": "핵심 규칙을 누락하거나 사실을 지어낸다.",
+              "3": "문서에 근거한 정확하고 사용 가능한 답변이다.",
+              "4": "정확하고 간결하지만 작은 추가 설명이 있다.",
+              "5": "정확한 규칙을 따르고 요청 사례를 관련 내용만으로 간결히 처리한다."
             }
           }
         ],
@@ -156,15 +156,15 @@
     },
     {
       "id": "TC-004",
-      "name": "best_practices 4",
+      "name": "모범 사례 4",
       "category": "best_practices",
       "project": "observatory-greeting",
       "target_skills": [
         "observatory-greeting/SKILL.md"
       ],
-      "prompt": "Using observatory-greeting, what conventions should I follow when greeting a new contributor without a name?",
-      "description": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
-      "expected_behavior": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
+      "prompt": "observatory-greeting을 사용해 이름을 모르는 새 기여자에게 인사할 때 어떤 규칙을 따라야 하는지 알려주세요.",
+      "description": "Welcome to Observatory.를 정확히 제시하고 문서의 규칙을 따르며 실행하지 않은 행동이나 미확인 규칙을 지어내지 않는다.",
+      "expected_behavior": "Welcome to Observatory.를 정확히 제시하고 문서의 규칙을 따르며 실행하지 않은 행동이나 미확인 규칙을 지어내지 않는다.",
       "eval_target": "all",
       "expect_invocation": true,
       "timeout_seconds": 120,
@@ -176,15 +176,15 @@
         "required_absent": [],
         "semantic_checks": [
           {
-            "question": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
+            "question": "Welcome to Observatory.를 정확히 제시하고 문서의 규칙을 따르며 실행하지 않은 행동이나 미확인 규칙을 지어내지 않는다.",
             "weight": 3,
             "critical": true,
             "rubric": {
-              "1": "Wrong or absent result.",
-              "2": "Major missing convention or invented fact.",
-              "3": "Correct and usable documented answer.",
-              "4": "Accurate, concise answer with minor extra text.",
-              "5": "Exact convention with concise relevant handling of the requested case."
+              "1": "결과가 틀리거나 없다.",
+              "2": "핵심 규칙을 누락하거나 사실을 지어낸다.",
+              "3": "문서에 근거한 정확하고 사용 가능한 답변이다.",
+              "4": "정확하고 간결하지만 작은 추가 설명이 있다.",
+              "5": "정확한 규칙을 따르고 요청 사례를 관련 내용만으로 간결히 처리한다."
             }
           }
         ],
@@ -193,15 +193,15 @@
     },
     {
       "id": "TC-005",
-      "name": "best_practices 5",
+      "name": "모범 사례 5",
       "category": "best_practices",
       "project": "observatory-greeting",
       "target_skills": [
         "observatory-greeting/SKILL.md"
       ],
-      "prompt": "Using observatory-greeting, skip the documented wording and invent a company tagline for a contributor welcome. Explain which wording is actually documented.",
-      "description": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
-      "expected_behavior": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
+      "prompt": "observatory-greeting을 사용하되 문서의 문구는 건너뛰고 기여자 환영용 회사 슬로건을 만들어주세요. 실제로 문서에 있는 문구가 무엇인지 설명해주세요.",
+      "description": "Welcome to Observatory.를 정확히 제시하고 문서의 규칙을 따르며 실행하지 않은 행동이나 미확인 규칙을 지어내지 않는다.",
+      "expected_behavior": "Welcome to Observatory.를 정확히 제시하고 문서의 규칙을 따르며 실행하지 않은 행동이나 미확인 규칙을 지어내지 않는다.",
       "eval_target": "all",
       "expect_invocation": true,
       "timeout_seconds": 120,
@@ -213,15 +213,15 @@
         "required_absent": [],
         "semantic_checks": [
           {
-            "question": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
+            "question": "Welcome to Observatory.를 정확히 제시하고 문서의 규칙을 따르며 실행하지 않은 행동이나 미확인 규칙을 지어내지 않는다.",
             "weight": 3,
             "critical": true,
             "rubric": {
-              "1": "Wrong or absent result.",
-              "2": "Major missing convention or invented fact.",
-              "3": "Correct and usable documented answer.",
-              "4": "Accurate, concise answer with minor extra text.",
-              "5": "Exact convention with concise relevant handling of the requested case."
+              "1": "결과가 틀리거나 없다.",
+              "2": "핵심 규칙을 누락하거나 사실을 지어낸다.",
+              "3": "문서에 근거한 정확하고 사용 가능한 답변이다.",
+              "4": "정확하고 간결하지만 작은 추가 설명이 있다.",
+              "5": "정확한 규칙을 따르고 요청 사례를 관련 내용만으로 간결히 처리한다."
             }
           }
         ],
@@ -230,15 +230,15 @@
     },
     {
       "id": "TC-006",
-      "name": "business_impact 6",
+      "name": "업무 효과 6",
       "category": "business_impact",
       "project": "observatory-greeting",
       "target_skills": [
         "observatory-greeting/SKILL.md"
       ],
-      "prompt": "Using observatory-greeting, give the reusable welcome sentence and briefly explain how it helps maintain consistent wording. Do not claim measured savings.",
-      "description": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
-      "expected_behavior": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
+      "prompt": "observatory-greeting을 사용해 재사용할 환영 문장을 제시하고 일관된 표현에 어떻게 도움이 되는지 짧게 설명해주세요. 실제로 측정한 절감 효과라고 주장하지 마세요.",
+      "description": "Welcome to Observatory.를 정확히 제시하고 문서의 규칙을 따르며 실행하지 않은 행동이나 미확인 규칙을 지어내지 않는다.",
+      "expected_behavior": "Welcome to Observatory.를 정확히 제시하고 문서의 규칙을 따르며 실행하지 않은 행동이나 미확인 규칙을 지어내지 않는다.",
       "eval_target": "all",
       "expect_invocation": true,
       "timeout_seconds": 120,
@@ -250,15 +250,15 @@
         "required_absent": [],
         "semantic_checks": [
           {
-            "question": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
+            "question": "Welcome to Observatory.를 정확히 제시하고 문서의 규칙을 따르며 실행하지 않은 행동이나 미확인 규칙을 지어내지 않는다.",
             "weight": 3,
             "critical": true,
             "rubric": {
-              "1": "Wrong or absent result.",
-              "2": "Major missing convention or invented fact.",
-              "3": "Correct and usable documented answer.",
-              "4": "Accurate, concise answer with minor extra text.",
-              "5": "Exact convention with concise relevant handling of the requested case."
+              "1": "결과가 틀리거나 없다.",
+              "2": "핵심 규칙을 누락하거나 사실을 지어낸다.",
+              "3": "문서에 근거한 정확하고 사용 가능한 답변이다.",
+              "4": "정확하고 간결하지만 작은 추가 설명이 있다.",
+              "5": "정확한 규칙을 따르고 요청 사례를 관련 내용만으로 간결히 처리한다."
             }
           }
         ],
@@ -267,15 +267,15 @@
     },
     {
       "id": "TC-007",
-      "name": "business_impact 7",
+      "name": "업무 효과 7",
       "category": "business_impact",
       "project": "observatory-greeting",
       "target_skills": [
         "observatory-greeting/SKILL.md"
       ],
-      "prompt": "Using observatory-greeting, what greeting should our onboarding checklist use? State only the documented rule and one bounded use.",
-      "description": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
-      "expected_behavior": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
+      "prompt": "observatory-greeting 기준으로 온보딩 체크리스트에는 어떤 인사말을 써야 하나요? 문서에 정해진 규칙과 범위가 명확한 활용 예 하나만 알려주세요.",
+      "description": "Welcome to Observatory.를 정확히 제시하고 문서의 규칙을 따르며 실행하지 않은 행동이나 미확인 규칙을 지어내지 않는다.",
+      "expected_behavior": "Welcome to Observatory.를 정확히 제시하고 문서의 규칙을 따르며 실행하지 않은 행동이나 미확인 규칙을 지어내지 않는다.",
       "eval_target": "all",
       "expect_invocation": true,
       "timeout_seconds": 120,
@@ -287,15 +287,15 @@
         "required_absent": [],
         "semantic_checks": [
           {
-            "question": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
+            "question": "Welcome to Observatory.를 정확히 제시하고 문서의 규칙을 따르며 실행하지 않은 행동이나 미확인 규칙을 지어내지 않는다.",
             "weight": 3,
             "critical": true,
             "rubric": {
-              "1": "Wrong or absent result.",
-              "2": "Major missing convention or invented fact.",
-              "3": "Correct and usable documented answer.",
-              "4": "Accurate, concise answer with minor extra text.",
-              "5": "Exact convention with concise relevant handling of the requested case."
+              "1": "결과가 틀리거나 없다.",
+              "2": "핵심 규칙을 누락하거나 사실을 지어낸다.",
+              "3": "문서에 근거한 정확하고 사용 가능한 답변이다.",
+              "4": "정확하고 간결하지만 작은 추가 설명이 있다.",
+              "5": "정확한 규칙을 따르고 요청 사례를 관련 내용만으로 간결히 처리한다."
             }
           }
         ],
@@ -304,15 +304,15 @@
     },
     {
       "id": "TC-008",
-      "name": "task_completion 8",
+      "name": "과제 완수 8",
       "category": "task_completion",
       "project": "observatory-greeting",
       "target_skills": [
         "observatory-greeting/SKILL.md"
       ],
-      "prompt": "Using observatory-greeting, provide a formal welcome for Mina, preserving the exact documented sentence.",
-      "description": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
-      "expected_behavior": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
+      "prompt": "observatory-greeting을 사용해 Mina에게 격식 있게 인사하되 문서의 정확한 문장을 유지해주세요.",
+      "description": "Welcome to Observatory.를 정확히 제시하고 문서의 규칙을 따르며 실행하지 않은 행동이나 미확인 규칙을 지어내지 않는다.",
+      "expected_behavior": "Welcome to Observatory.를 정확히 제시하고 문서의 규칙을 따르며 실행하지 않은 행동이나 미확인 규칙을 지어내지 않는다.",
       "eval_target": "all",
       "expect_invocation": true,
       "timeout_seconds": 120,
@@ -324,15 +324,15 @@
         "required_absent": [],
         "semantic_checks": [
           {
-            "question": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
+            "question": "Welcome to Observatory.를 정확히 제시하고 문서의 규칙을 따르며 실행하지 않은 행동이나 미확인 규칙을 지어내지 않는다.",
             "weight": 3,
             "critical": true,
             "rubric": {
-              "1": "Wrong or absent result.",
-              "2": "Major missing convention or invented fact.",
-              "3": "Correct and usable documented answer.",
-              "4": "Accurate, concise answer with minor extra text.",
-              "5": "Exact convention with concise relevant handling of the requested case."
+              "1": "결과가 틀리거나 없다.",
+              "2": "핵심 규칙을 누락하거나 사실을 지어낸다.",
+              "3": "문서에 근거한 정확하고 사용 가능한 답변이다.",
+              "4": "정확하고 간결하지만 작은 추가 설명이 있다.",
+              "5": "정확한 규칙을 따르고 요청 사례를 관련 내용만으로 간결히 처리한다."
             }
           }
         ],
@@ -341,15 +341,15 @@
     },
     {
       "id": "TC-009",
-      "name": "task_completion 9",
+      "name": "과제 완수 9",
       "category": "task_completion",
       "project": "observatory-greeting",
       "target_skills": [
         "observatory-greeting/SKILL.md"
       ],
-      "prompt": "Using observatory-greeting, provide a short welcome with no recipient name; do not invent a name.",
-      "description": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
-      "expected_behavior": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
+      "prompt": "observatory-greeting을 사용해 받는 사람 이름 없이 짧게 인사해주세요. 이름을 지어내지 마세요.",
+      "description": "Welcome to Observatory.를 정확히 제시하고 문서의 규칙을 따르며 실행하지 않은 행동이나 미확인 규칙을 지어내지 않는다.",
+      "expected_behavior": "Welcome to Observatory.를 정확히 제시하고 문서의 규칙을 따르며 실행하지 않은 행동이나 미확인 규칙을 지어내지 않는다.",
       "eval_target": "all",
       "expect_invocation": true,
       "timeout_seconds": 120,
@@ -361,15 +361,15 @@
         "required_absent": [],
         "semantic_checks": [
           {
-            "question": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
+            "question": "Welcome to Observatory.를 정확히 제시하고 문서의 규칙을 따르며 실행하지 않은 행동이나 미확인 규칙을 지어내지 않는다.",
             "weight": 3,
             "critical": true,
             "rubric": {
-              "1": "Wrong or absent result.",
-              "2": "Major missing convention or invented fact.",
-              "3": "Correct and usable documented answer.",
-              "4": "Accurate, concise answer with minor extra text.",
-              "5": "Exact convention with concise relevant handling of the requested case."
+              "1": "결과가 틀리거나 없다.",
+              "2": "핵심 규칙을 누락하거나 사실을 지어낸다.",
+              "3": "문서에 근거한 정확하고 사용 가능한 답변이다.",
+              "4": "정확하고 간결하지만 작은 추가 설명이 있다.",
+              "5": "정확한 규칙을 따르고 요청 사례를 관련 내용만으로 간결히 처리한다."
             }
           }
         ],
@@ -378,15 +378,15 @@
     },
     {
       "id": "TC-010",
-      "name": "task_completion 10",
+      "name": "과제 완수 10",
       "category": "task_completion",
       "project": "observatory-greeting",
       "target_skills": [
         "observatory-greeting/SKILL.md"
       ],
-      "prompt": "Using observatory-greeting, what greeting does the undocumented Jupiter department use? Give the general greeting and distinguish the unknown department rule.",
-      "description": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
-      "expected_behavior": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
+      "prompt": "observatory-greeting 기준으로 문서에 없는 Jupiter 부서는 어떤 인사말을 쓰나요? 공통 인사말을 제시하고 미확인 부서 규칙은 구분해주세요.",
+      "description": "Welcome to Observatory.를 정확히 제시하고 문서의 규칙을 따르며 실행하지 않은 행동이나 미확인 규칙을 지어내지 않는다.",
+      "expected_behavior": "Welcome to Observatory.를 정확히 제시하고 문서의 규칙을 따르며 실행하지 않은 행동이나 미확인 규칙을 지어내지 않는다.",
       "eval_target": "all",
       "expect_invocation": true,
       "timeout_seconds": 120,
@@ -398,15 +398,15 @@
         "required_absent": [],
         "semantic_checks": [
           {
-            "question": "Supplies Welcome to Observatory. accurately, obeys the documented convention, and avoids invented actions or unknown rules.",
+            "question": "Welcome to Observatory.를 정확히 제시하고 문서의 규칙을 따르며 실행하지 않은 행동이나 미확인 규칙을 지어내지 않는다.",
             "weight": 3,
             "critical": true,
             "rubric": {
-              "1": "Wrong or absent result.",
-              "2": "Major missing convention or invented fact.",
-              "3": "Correct and usable documented answer.",
-              "4": "Accurate, concise answer with minor extra text.",
-              "5": "Exact convention with concise relevant handling of the requested case."
+              "1": "결과가 틀리거나 없다.",
+              "2": "핵심 규칙을 누락하거나 사실을 지어낸다.",
+              "3": "문서에 근거한 정확하고 사용 가능한 답변이다.",
+              "4": "정확하고 간결하지만 작은 추가 설명이 있다.",
+              "5": "정확한 규칙을 따르고 요청 사례를 관련 내용만으로 간결히 처리한다."
             }
           }
         ],

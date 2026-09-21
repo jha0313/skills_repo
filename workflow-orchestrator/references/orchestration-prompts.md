@@ -1,10 +1,11 @@
-# Orchestration prompts
+# 조율에 사용하는 프롬프트
 
-Use only the section relevant to the current handoff or failure. These prompts refine the existing workflow; they do not require extra workers, a new state service, fixed polling intervals or another approval at every stage. Adapt the Korean examples to the user's latest language and the host's actual capabilities.
+현재 인계나 실패에 필요한 절만 사용한다. 기존 흐름을 구체화하는 예시이며 작업자 추가, 새 상태 서비스, 고정 조회 간격, 단계마다 재승인을 요구하지 않는다. 한국어 예시는 사용자의 최신 언어와 호스트의 실제 기능에 맞춘다.
 
-## Selective context
+<a id="selective-context"></a>
+## 필요한 맥락만 전달하기
 
-A worker may not receive the coordinator's previous conversation. Even when history is inherited, identify the current contract so old decisions do not silently win. Include the task's goal, changed decisions, relevant constraints, owned scope and source paths. Label facts versus assumptions. Do not omit raw evidence needed for independent work, or paste every earlier message by default.
+작업자는 조율자의 이전 대화를 받지 못할 수 있다. 이력을 상속하더라도 현재 계약을 명시해 오래된 결정이 조용히 우선되지 않게 한다. 목표, 바뀐 결정, 관련 제약, 소유 범위, 소스 경로를 포함하고 사실·가정을 구분한다. 독립 작업에 필요한 원시 근거를 빼지 않으며 모든 이전 대화를 기본으로 붙이지 않는다.
 
 ```text
 이전 대화를 알고 있다고 가정하지 않고 필요한 맥락을 전달합니다.
@@ -17,11 +18,12 @@ A worker may not receive the coordinator's previous conversation. Even when hist
 돌려줄 내용은 결정·변경·근거·남은 의존성 중심으로 요약하세요.
 ```
 
-This is a way to fill the existing worker brief, not a second mandatory template. Keep bulky evidence at its source and pass a precise pointer instead of stripping away provenance.
+기존 작업자 브리프를 채우는 방법이지 두 번째 필수 양식이 아니다. 큰 근거는 원래 위치에 두고 출처를 없애는 대신 정확한 위치를 전달한다.
 
-## Independent verification
+<a id="independent-verification"></a>
+## 독립 검증
 
-Give the verifier the request, success conditions, actual changes and relevant raw evidence. Include useful design context and known failures, but separate these from the implementer's interpretation. Do not supply an expected PASS or ask it merely to confirm the implementer's conclusion. Respect the authorized side-effect limits.
+요청, 성공 조건, 실제 변경, 관련 원시 근거를 검증자에게 준다. 유용한 설계 맥락·알려진 실패도 주되 구현자의 해석과 구분한다. 예상 PASS를 주거나 구현자의 결론을 확인해달라고만 요청하지 않는다. 승인된 부수 효과 범위를 지킨다.
 
 ```text
 요구사항과 실제 변경, 원시 실행 근거를 기준으로 독립 검증하세요.
@@ -31,7 +33,7 @@ Give the verifier the request, success conditions, actual changes and relevant r
 실행 권한이나 도구가 없으면 그 한계를 보고하고 통과로 바꾸지 마세요.
 ```
 
-When reports disagree, first identify whether they checked different inputs, revisions, environments or success conditions. Ask the existing appropriate worker for the smallest observation that distinguishes the competing explanations. Do not default to adding more judges or taking a majority vote.
+보고서가 다르면 입력·revision·환경·성공 조건이 달랐는지 먼저 확인한다. 이미 있는 적절한 작업자에게 두 설명을 가를 가장 작은 관찰을 맡긴다. 채점자를 더 부르거나 다수결하는 방식을 기본으로 삼지 않는다.
 
 ```text
 두 보고서의 결론이 다릅니다. [주장 A / 주장 B]
@@ -41,19 +43,20 @@ When reports disagree, first identify whether they checked different inputs, rev
 확인 전에는 두 주장을 합쳐 하나의 확정 결론을 만들지 마세요.
 ```
 
-## Evidence-backed status
+<a id="evidence-backed-status"></a>
+## 근거에 따른 상태 보고
 
-Use the host's existing events and the current task table. Host capabilities vary: an ID may arrive at dispatch, during execution or only on completion. Do not invent an ID or an acknowledgment when none is available.
+호스트의 기존 이벤트와 현재 작업 표를 사용한다. 호스트에 따라 ID는 배정·실행·완료 중 다른 시점에 도착할 수 있다. 제공되지 않은 ID나 수신 확인을 만들어내지 않는다.
 
-| State | Evidence that supports it |
+| 상태 | 뒷받침하는 근거 |
 |---|---|
-| Assigned | The task was sent to an identified worker or accepted by the host. This alone does not prove execution. |
-| Executing | The host reports that execution has started, or a worker returns evidence of actual work. |
-| Blocked | A concrete unmet dependency or permission/tool limitation, with the next needed action. Silence alone does not establish the cause. |
-| Execution-complete | The worker returns its deliverable and execution outcome. Required independent verification may still be pending. |
-| Verified | The required success checks have supporting observations for the applicable revision and environment. Unchecked conditions remain explicit. |
+| 배정됨 | 식별된 작업자에게 과제를 보냈거나 호스트가 수락했다. 이것만으로 실행을 입증하지 못한다. |
+| 실행 중 | 호스트가 시작을 알렸거나 작업자가 실제 수행 근거를 반환했다. |
+| 막힘 | 미충족 의존성 또는 권한·도구 한계가 구체적이고 다음 행동이 정해져 있다. 침묵만으로 원인을 단정하지 않는다. |
+| 실행 완료 | 작업자가 산출물과 실행 결과를 반환했다. 필수 독립 검증은 남아 있을 수 있다. |
+| 검증 완료 | 적용 revision·환경의 성공 검사에 관찰 근거가 있다. 확인하지 못한 조건은 명시한다. |
 
-If dispatch, receipt or progress is unobservable, say “sent; receipt/progress unconfirmed” rather than upgrading the state. A pane, process or timer being alive is not a meaningful work checkpoint.
+배정·수신·진행을 관찰할 수 없으면 상태를 높이지 말고 '전송됨; 수신·진행 미확인'이라고 말한다. Pane·프로세스·타이머가 살아 있다는 것은 의미 있는 작업 체크포인트가 아니다.
 
 ```text
 진행 상황은 완료된 단계와 확인 가능한 근거로 보고하세요.
@@ -62,11 +65,12 @@ If dispatch, receipt or progress is unobservable, say “sent; receipt/progress 
 막혔다면 기다리는 대상과 이미 시도한 접근을 짧게 보고하세요.
 ```
 
-Choose checkpoints at useful task boundaries, such as a resolved contract, a reproduction, a completed diff or a finished check. Use existing completion events or bounded host waits. If a checkpoint stops advancing, request a concise reconciliation and apply the entrypoint's existing retry/reassignment rule; do not start a perpetual polling loop or another worker doing the same job.
+계약 확정, 재현, diff 완료, 검사 완료처럼 유용한 경계에서 체크포인트를 잡는다. 기존 완료 이벤트나 제한된 호스트 대기를 사용한다. 진척이 멈추면 짧은 상태 대조를 요청하고 SKILL.md의 재시도·재배정 규칙을 따른다. 무한 조회나 같은 일을 중복하는 작업자를 만들지 않는다.
 
-## Steering and resume
+<a id="steering-and-resume"></a>
+## 변경 지시와 재개
 
-Treat the latest user instruction as a change to the affected task contract, including language, scope, authorization and success conditions. Forward the changed part with enough context to identify the task and when the change applies. Keep unaffected work running.
+최신 사용자 지시는 언어·범위·승인·성공 조건을 포함한 해당 과제 계약의 변경으로 다룬다. 어떤 작업에 언제 적용되는지 알 수 있는 맥락과 바뀐 부분을 전달한다. 무관한 일은 계속한다.
 
 ```text
 이 작업의 최신 조건이 바뀌었습니다.
@@ -77,9 +81,9 @@ Treat the latest user instruction as a change to the affected task contract, inc
 이전 조건에서의 검증이 여전히 유효한지도 표시하세요.
 ```
 
-“Sent” means the host accepted a delivery request. “Acknowledged” requires an actual receipt response/event. “Applied” requires a changed plan, action or artifact consistent with the new instruction. Some hosts provide no separate acknowledgment; keep that state unconfirmed without inventing another user approval requirement. If a running tool cannot be interrupted, report the boundary and do not dispatch a duplicate or conflicting operation to compensate.
+'전송'은 호스트가 전달 요청을 받았다는 뜻이다. '수신 확인'에는 실제 응답·이벤트, '반영'에는 새 지시와 맞는 계획·행동·산출물 변경이 필요하다. 별도 수신 이벤트가 없는 호스트는 미확인으로 남기고 새로운 사용자 승인 조건을 만들지 않는다. 실행 도구를 중단할 수 없으면 경계를 보고하고 대신 중복·충돌 작업을 배정하지 않는다.
 
-On resume, use available host state and a worker's reconciliation to locate the previous owner, live commands and existing output. Follow up with that owner when possible. If it is gone, reassign only the unfinished work with the preserved evidence. A conversation restart is not permission to rerun a generation, migration, publication, merge or other operation whose outcome is unresolved.
+재개 시 가용 호스트 상태와 작업자 대조 보고로 이전 소유자, 살아 있는 명령, 기존 출력을 찾는다. 가능하면 기존 담당자에게 후속 작업을 준다. 담당자가 없으면 보존된 근거를 주고 미완료 범위만 재배정한다. 대화 재시작은 결과가 불명확한 생성·migration·발행·merge 등을 다시 실행할 허가가 아니다.
 
 ```text
 이전 작업을 새로 시작하지 말고 먼저 재개 상태를 확인하세요.
@@ -89,9 +93,10 @@ On resume, use available host state and a worker's reconciliation to locate the 
 호스트에서 확인할 수 없는 상태는 추측하지 말고 필요한 확인을 알려주세요.
 ```
 
-## Completion evidence
+<a id="completion-evidence"></a>
+## 완료 근거 대조
 
-Before the coordinator reports completion, ask the responsible worker or verifier to reconcile the success conditions against the delivered state. A report can be concise: use the existing task/report artifact instead of creating a new ledger.
+조율자가 완료를 보고하기 전에 책임 작업자·검증자가 성공 조건과 전달 상태를 대조하게 한다. 기존 작업·보고 산출물을 활용하면 되며 새 장부를 만들 필요는 없다.
 
 ```text
 최종 성공 조건을 실제 결과와 하나씩 대조하세요.
@@ -102,4 +107,4 @@ Before the coordinator reports completion, ask the responsible worker or verifie
 최종 전달 위치와 반영 상태도 사용자가 요청한 범위와 맞는지 확인하세요.
 ```
 
-For code, the evidence must apply to the integrated revision being delivered. For a rendered artifact, it must apply to the actual output and relevant viewing environment. For publication, a local file or feature-branch push does not establish the requested remote destination. Use only the delivery scope already authorized; this check does not create merge or deployment authority.
+코드 근거는 전달할 통합 revision, 렌더링 근거는 실제 산출물·보기 환경에 해당해야 한다. 발행 작업에서 로컬 파일이나 기능 branch push만으로 요청한 원격 목적지 반영을 입증할 수는 없다. 이미 승인된 전달 범위만 따른다. 이 대조가 merge·배포 권한을 새로 만들지는 않는다.

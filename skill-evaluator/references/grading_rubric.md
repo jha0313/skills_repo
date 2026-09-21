@@ -1,31 +1,31 @@
-# Evidence-backed Likert grading
+# 근거 기반 Likert 채점
 
-Each score is 1 Failure, 2 Major gaps, 3 Acceptable, 4 Good with minor gaps, 5 Excellent. Use the case's anchored semantic rubric. Match observable behavior, not writing style unless style is the contract. Record matched rubric level, exact supporting quote, case output/artifact path and line range. Every score needs evidence. Missing evidence is not an automatic 3.
+점수는 1 실패, 2 중대한 누락, 3 수용 가능, 4 작은 누락이 있지만 양호, 5 탁월이다. 사례별 관찰 가능한 수준별 루브릭을 사용한다. 문체 자체가 계약이 아닌 한 글솜씨가 아니라 관찰된 동작을 평가한다. 일치한 수준, 정확한 인용문, 사례 출력·산출물 경로와 줄 범위를 기록한다. 모든 점수에 근거가 필요하다. 근거가 없다는 이유로 자동 3점을 주지 않는다.
 
-Five dimensions:
+평가 차원 5개:
 
-1. Invocation: correct trigger, false-positive resistance and argument parsing. Inspect actual Skill calls; loading instructions later is not a natural invocation test.
-2. Efficiency: proportional tokens/tools/latency, useful batching/parallelism and appropriate model. A tiny task not spawning agents is often excellent. Unknown metrics remain unknown, never zero.
-3. Best practices is the mean of context_management, subagent_architecture, tool_selection, skill_design, process_adherence, error_handling_safety. Judge applicability to this actual case; no unnecessary subagent penalty for simple work.
-4. Business impact is the mean of time_saved, scale_potential, quality_ceiling, problem_difficulty, productivity_revenue_link. Score demonstrated deliverable usefulness/plausible pathway. Do not claim measured saved time, revenue or causal productivity from a hypothetical example; bounded uncertainty is good practice. A simple task has a limited ceiling/difficulty.
-5. Task completion: requested end-to-end deliverable exists and works. A claim or passing lint alone is insufficient; inspect artifacts and domain checks.
+1. **호출 정확성(invocation):** 올바른 트리거, 잘못된 호출 방지, 인자 해석. 실제 Skill 호출을 확인한다. 나중에 지침을 로드한 것은 자연 호출 검사가 아니다.
+2. **효율성(efficiency):** 과제에 비례하는 토큰·도구·지연, 유용한 일괄·병렬 처리, 적절한 모델. 작은 과제에서 에이전트를 추가하지 않는 것이 탁월할 수 있다. 미확인 지표는 미확인이며 0이 아니다.
+3. **모범 사례(best_practices):** context_management, subagent_architecture, tool_selection, skill_design, process_adherence, error_handling_safety의 평균이다. 각각 맥락 관리, 하위 에이전트 구성, 도구 선택, 스킬 설계, 절차 준수, 오류 처리·안전이다. 실제 사례에 적용 가능한지 판단하고 단순 작업에 불필요한 subagent를 요구하지 않는다.
+4. **업무 효과(business_impact):** time_saved, scale_potential, quality_ceiling, problem_difficulty, productivity_revenue_link의 평균이다. 각각 시간 절감, 확장 가능성, 품질 상한, 문제 난도, 생산성·매출과의 연결이다. 관찰한 산출물의 유용성과 합리적인 활용 경로를 평가한다. 가상 예시로 실제 절감 시간·매출·인과적 생산성을 주장하지 않는다. 불확실성의 범위를 밝히는 것은 좋은 실천이다. 단순 과제의 품질 상한·난도는 제한적이다.
+5. **과제 완수(task_completion):** 요청한 최종 산출물이 존재하고 작동하는가. 성공 주장이나 lint 통과만으로 충분하지 않다. 산출물과 도메인 검사를 확인한다.
 
-THOROUGH/deep composite = invocation×.10 + efficiency×.10 + best_practices×.15 + business_impact×.15 + task_completion×.50. BASIC is the equal mean of its four dimensions. Pass at >=3.0 only if all critical requirements pass. Letter thresholds use unrounded numbers: A >=4.50, B >=3.50, C >=3.00, D >=2.00, F >=1.00. Round for display only.
+THOROUGH/deep 종합 점수 = invocation×.10 + efficiency×.10 + best_practices×.15 + business_impact×.15 + task_completion×.50. BASIC은 4개 차원의 동일 가중 평균이다. **모든 필수 조건이 통과한 경우에만** >=3.0이면 사례가 통과한다. 등급은 반올림 전 값으로 A >=4.50, B >=3.50, C >=3.00, D >=2.00, F >=1.00이다. 표시할 때만 반올림한다.
 
-Each semantic question contributes score×weight / sum(weights). A critical question below 3, a required-present miss, forbidden hit, missing required artifact, or wrong routing fails the case even if the composite is high. The report preserves the score and separately marks `critical_failure`; do not erase diagnostic information. Aggregate pass rate counts ERROR as not passed and distinguishes failed cases from infrastructure errors.
+의미 검사 점수는 sum(score×weight)/sum(weights)다. critical 질문이 3 미만, 필수 문구 누락, 금지 문구 발견, 필수 산출물 누락, 잘못된 라우팅이면 종합 점수가 높아도 실패한다. 보고서는 진단 정보를 지우지 않고 점수와 `critical_failure`를 별도로 보존한다. 전체 통과율에서 ERROR는 미통과로 세되 스킬 실패와 실행 환경 오류를 구분한다.
 
-Three separate judge processes see the same complete execution evidence. Use median score per criterion (ordinal analogue of majority; preserves the middle anchored level). Each original judge vote and evidence remains in JSON. Judge consensus does not eliminate bias. Author/judge are separate sessions from the evaluated agent.
+독립 채점 프로세스 3개가 동일한 전체 실행 근거를 본다. 기준별 중앙값을 사용한다(순서 척도에서 다수결에 대응하며 가운데의 실제 루브릭 수준을 유지). 각 채점자의 원래 표와 근거는 JSON에 남긴다. 합의가 편향을 없애지는 않는다. 작성자·채점자는 평가 대상 에이전트와 별도 세션이다.
 
-Transcript parsing: preserve raw JSONL and complete conversation, but **response checks use only assistant final output**, tool checks use actual structured tool-use events, artifact checks use real copied files/hash. Synthetic skill content, prompt and criteria cannot substantiate execution. Citations from another case, missing files, wrong lines and fabricated quotes are rejected. Metadata citations support efficiency/infrastructure, not answer correctness.
+실행 기록 해석: 원시 JSONL과 전체 대화를 보존하되 **응답 검사는 assistant 최종 출력만**, 도구 검사는 실제 구조화 호출, 산출물 검사는 복사된 실제 파일·해시를 사용한다. 주입된 스킬 내용·프롬프트·평가 기준은 수행 근거가 아니다. 다른 사례, 없는 파일, 잘못된 줄, 조작한 인용은 거부한다. metadata는 효율·실행 환경 근거이며 정답 근거가 아니다.
 
-An unreadable/effectively empty transcript produces infrastructure ERROR (no numeric score). A timeout with substantive work is graded on that work, with `timed_out: true`; unfinished deliverables still fail completion. Nonempty error messages do not prove work. Every relevant artifact must be read; unsupported binary outputs require a domain renderer rather than a guessed grade.
+읽을 수 없거나 실질적으로 빈 기록은 숫자 점수 없는 환경 ERROR다. 시간 초과 전에 실질적인 작업이 있으면 그 작업을 채점하고 `timed_out: true`를 남긴다. 미완성 산출물은 완수 차원에서 여전히 실패한다. 빈 문자열이 아닌 오류 메시지 자체는 작업 수행의 증거가 아니다. 모든 관련 산출물을 읽는다. 미지원 바이너리 출력은 추측 채점 대신 도메인 렌더러가 필요하다.
 
-## Scoring layers and reporting
+## 점수 계층과 보고
 
-Each case has a primary **category**, but judges score every dimension selected by the run mode for that executed case. The primary category controls suite coverage and category breakdowns; it is not the only dimension graded. Best-practice and business-impact dimensions are recomputed from their six/five subcriteria after votes.
+각 사례의 대표 **category**는 범주별 커버리지를 정한다. 채점자는 그 사례에 대해 실행 모드가 선택한 모든 차원을 평가한다. 대표 범주 하나만 채점하지 않는다. 모범 사례·업무 효과 차원은 투표 후 6개·5개 하위 기준으로 다시 계산한다.
 
-The semantic weighted score is a separate diagnostic field. It does not silently replace the documented dimension composite. Mark required semantic behavior `critical: true` when failing it must fail the case; an unmarked semantic gap can lower its diagnostic score without overriding an otherwise passing composite. Judge dimension anchors should reflect relevant case-specific behavior as well.
+의미 검사 가중 점수는 별도 진단 필드이며 차원 종합 점수를 대체하지 않는다. 실패 시 사례를 탈락시켜야 하는 조건은 `critical: true`로 표시한다. 표시하지 않은 의미 검사 결함은 진단 점수를 낮추지만 통과하는 종합 점수를 자동 무효화하지 않는다. 차원 루브릭도 관련 사례의 실제 동작을 반영해야 한다.
 
-The suite's `score` is the mean composite of scored cases. `pass_rate` counts passed cases divided by all cases, including infrastructure errors. The implementation's suite `verdict` requires every case to PASS; this conservative suite policy is stricter than the **per-case** composite >=3 threshold. A high mean/letter grade can therefore coexist with a FAIL suite. Preserve both and show the failing IDs.
+전체 `score`는 채점된 사례들의 종합 점수 평균이다. `pass_rate`는 환경 오류를 포함한 전체 사례 중 통과 수의 비율이다. 구현의 전체 `verdict`는 **모든 사례 PASS**를 요구하므로 사례별 >=3 기준보다 엄격하다. 높은 평균·등급과 전체 FAIL이 함께 나올 수 있다. 둘 다 보존하고 실패 ID를 표시한다.
 
-No numeric score is assigned to infrastructure ERROR. If a required artifact is missing but the response/tool trace contains substantive evidence, the case can receive diagnostic scores while its deterministic artifact check forces FAIL. Failed requirements should not be hidden by smoothing or rounding.
+환경 ERROR에는 숫자 점수를 주지 않는다. 필수 산출물은 없지만 응답·도구 기록에 실질 근거가 있으면 진단 점수는 줄 수 있으며 결정적 산출물 검사가 FAIL을 강제한다. 실패 조건을 평활화나 반올림으로 숨기지 않는다.

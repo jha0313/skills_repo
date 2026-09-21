@@ -1,13 +1,15 @@
-# Report contract
+# 보고서 계약
 
-Write `REPORT.md`, `summary.json`, every `evaluations/TC-ID.md/.json`; optional `REPORT.html` is self-contained. Local reports always exist, including infrastructure failures. Never present a mocked run as a real agent score or a bridge receipt as verified live publication.
+`REPORT.md`, `summary.json`, 각 `evaluations/TC-ID.md/.json`을 작성한다. 선택적 `REPORT.html`은 독립 실행형이다. 환경 오류가 있어도 로컬 보고서는 남긴다. mock 실행을 실제 에이전트 점수로, bridge 영수증을 실제 서비스 발행 확인으로 표시하지 않는다.
 
-Report sections: skill purpose, execution mode/grading, executive grade (Likert) or PASS/FAIL badge (binary), total/pass/fail/error/pass-rate, what was tested, category/dimension/six best-practice breakdowns, token/duration/cost totals, failure clusters/missing requirements, actionable recommendations with motivating IDs, audit/provenance links.
+보고서에는 스킬 목적, 실행·채점 모드, 대표 등급(Likert) 또는 PASS/FAIL 배지(Binary), 전체/통과/실패/오류/통과율, 평가 내용, 범주·차원·모범 사례 6항목, 토큰·시간·비용 합계, 실패 유형·누락 조건, 근거 ID를 붙인 개선안, 감사·출처 링크를 포함한다.
 
-HTML includes metric cards (pass rate/case count/mode/tokens/duration/cost), What this skill does / What we tested / How it turned out, sortable per-case table (ID/name/category/score-or-verdict/tokens/cost/evidence), collapsible prompt/check/quote/artifact evidence, and complete raw-data footer. Every row links to its evaluation and transcript. Use semantic headings, accessible table controls, responsive overflow, escaped untrusted text, print styling. Scores never stand alone without evidence links.
+HTML에는 지표 카드(통과율/사례 수/모드/토큰/시간/비용), '이 스킬이 하는 일 / 평가한 내용 / 평가 결과', 정렬 가능한 사례 표(ID/이름/범주/점수 또는 판정/토큰/비용/근거), 접을 수 있는 프롬프트·검사·인용·산출물 근거, 전체 원시 데이터 하단 영역을 넣는다. 각 행은 평가와 실행 기록에 연결한다. 의미 있는 제목, 접근 가능한 표 제어, 반응형 넘침 처리, 신뢰하지 않는 텍스트의 escaping, 인쇄 스타일을 사용한다. 점수를 근거 링크 없이 단독으로 보여주지 않는다.
 
-Binary labels are PASS/FAIL and pass rates; no letter grades or 1–5 score display. Literal source text in raw audit evidence may mention other grading modes; do not rewrite evidence to conceal it. Likert letter thresholds use raw values. Unknown cost is not zero. All costs identify CLI list estimates and include judge cost separately. Run elapsed duration and sum of case durations differ under concurrency; label them correctly.
+Binary는 PASS/FAIL과 통과율만 표시하며 문자 등급·1~5점 화면을 사용하지 않는다. 원시 감사 근거에 다른 채점 모드가 언급돼도 숨기려고 원문을 바꾸지 않는다. Likert 등급 임계값은 반올림 전 값을 쓴다. 미확인 비용은 0이 아니다. 비용은 CLI 정가 추정임을 표시하고 채점 비용을 구분한다. 병렬 실행에서 전체 경과 시간과 사례별 시간 합계는 다르므로 정확히 표시한다.
 
-Recommendations target specific failing checks/IDs, not vague "improve quality". State whether publication was actually exercised, mocked, unavailable or not requested. Business impact is a bounded rubric assessment; A/B with identical task/model/criteria/mock environment is required before claiming lift, and judge lift does not establish causal financial gain.
+개선안은 '품질 개선' 같은 모호한 문구 대신 실패한 검사·ID를 가리킨다. 발행이 실제 실행/mock/미가용/미요청 중 무엇인지 밝힌다. 업무 효과는 근거 범위의 루브릭 평가다. 개선 효과를 논하려면 같은 과제·모델·기준·mock 환경의 A/B가 필요하며 채점 개선이 인과적 금전 효과를 입증하지 않는다.
 
-Anti-patterns: score-only reports, prompt-text-as-performance, fabricated excerpts, unclickable/missing artifacts, stale source mixed during resume, binary letters, zero for missing usage, unlabeled fixtures, or automatic external publication.
+피할 것: 점수만 있는 보고서, 프롬프트를 실적으로 취급, 조작 인용, 접근 불가·누락 산출물, 재개 중 오래된 소스 혼합, Binary 문자 등급, 미확인 사용량을 0으로 처리, fixture를 실측 업무로 오인시키는 표시, 자동 외부 발행.
+
+한국어 화면·설명과 원시 근거를 구분한다. 새 보고서 제목·라벨·개선 설명은 한국어를 사용하되 JSON 키·enum·명령·실제 인용·기존 보고서의 원문은 번역하지 않는다.

@@ -453,10 +453,58 @@ class EvaluatorTests(unittest.TestCase):
         summary = core.aggregate([graded], manifest)
         write_reports(self.root, summary, manifest)
         page = (self.root / "REPORT.html").read_text()
-        self.assertIn("Dimension pass rates", page)
+        self.assertIn("차원별 통과율", page)
         self.assertIn("PASS", page)
         self.assertNotIn('"grade":', page)
-        self.assertNotIn("Composite score:", (self.root / "REPORT.md").read_text())
+        self.assertNotIn("종합 점수:", (self.root / "REPORT.md").read_text())
+
+    def test_korean_reports_preserve_structured_evidence_and_unknown_metrics(self):
+        import html
+
+        for binary in (False, True):
+            case = copy.deepcopy(self.case)
+            if binary:
+                case["quality_criteria"]["semantic_checks"][0]["rubric"] = {
+                    "0": "실패",
+                    "1": "통과",
+                }
+            evaluate.persist_execution(self.root, case, self.execution)
+            result = core.grade_case(
+                case, self.execution, [self.judgment(binary)] * 3, binary, "basic"
+            )
+            result["judge_cost_usd"] = 0
+            core.write_json(self.root / "evaluations/TC-001.json", result)
+            manifest = {
+                "run_id": "locale-fixture",
+                "options": {"mode": "basic", "binary": binary},
+                "skill": {"name": "observatory-greeting", "description": "한국어 설명"},
+                "analysis": {"purpose": "<script>원문 보존 & escaping</script>"},
+                "cases": {
+                    "TC-001": {
+                        "evidence_hashes": core.evidence_hashes(
+                            self.root, "TC-001", True
+                        )
+                    }
+                },
+            }
+            summary = core.aggregate([result], manifest)
+            original = copy.deepcopy(summary)
+            write_reports(self.root, summary, manifest)
+            self.assertEqual(summary, original)
+            self.assertEqual(core.read_data(self.root / "summary.json"), original)
+            self.assertEqual(
+                core.read_data(self.root / "evaluations/TC-001.json"), result
+            )
+            self.assertIsNone(summary["cost_usd"])
+            page = (self.root / "REPORT.html").read_text()
+            self.assertIn('<html lang="ko">', page)
+            self.assertIn("미확인", page)
+            self.assertIn("호출 정확성", page)
+            self.assertIn("Welcome to Observatory.", page)
+            self.assertIn(html.escape(manifest["analysis"]["purpose"]), page)
+            self.assertNotIn(manifest["analysis"]["purpose"], page)
+            self.assertIn('href="evaluations/TC-001.md"', page)
+            self.assertIn('href="cases/TC-001/conversation.txt"', page)
 
     def test_resume_rejects_changed_options_and_skill(self):
         import argparse

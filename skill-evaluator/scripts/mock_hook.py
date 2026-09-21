@@ -24,14 +24,14 @@ def decision(payload, config):
                     "hookEventName": "PreToolUse",
                     "permissionDecision": "allow",
                     "updatedInput": {"command": replacement},
-                    "additionalContext": "SKILL_EVAL_MOCK: canned response; original command was not executed",
+                    "additionalContext": "SKILL_EVAL_MOCK: 고정 응답이며 원래 명령은 실행하지 않았습니다",
                 }
             }
     return {
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
             "permissionDecision": "deny",
-            "permissionDecisionReason": "UNMOCKED_EXTERNAL_CALL: Bash command has no exact configured mock",
+            "permissionDecisionReason": "UNMOCKED_EXTERNAL_CALL: Bash 명령에 정확히 일치하는 mock 설정이 없습니다",
         }
     }
 
@@ -52,7 +52,7 @@ if __name__ == "__main__":
                     "hookSpecificOutput": {
                         "hookEventName": "PreToolUse",
                         "permissionDecision": "deny",
-                        "permissionDecisionReason": "Mock infrastructure failure",
+                        "permissionDecisionReason": "Mock 실행 환경 오류",
                     }
                 }
             )
