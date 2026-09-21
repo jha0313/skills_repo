@@ -3,7 +3,7 @@ name: workflow-orchestrator
 description: >-
   Coordinate agentic software work as an orchestrator only: delegate research, planning, implementation, verification and review to subagents, supervise dependencies and evidence, and report outcomes to the user. Use when the user asks for orchestrator-only workflows, a managed agent crew, or end-to-end work delegated to agents rather than performed by the coordinator.
 metadata:
-  version: "1.2.0"
+  version: "1.3.0"
   requires: "Host-native subagent delegation; Git worktrees when parallel workers modify a Git project"
 ---
 
@@ -25,7 +25,7 @@ If the host cannot spawn workers, state that limitation and provide a concrete d
 
 `Intake → Context → Plan → Implement → Verify → Review & Land → Monitor / feedback`
 
-Scale the number of workers to the task. A small read-only question may need one worker and a faithful evidence-backed reply. Non-trivial changes use the full path below. Do not create a separate worker for every heading when it adds no independent work.
+Scale the number of workers to the task. A small read-only question may need one worker and a faithful evidence-backed reply. Non-trivial changes use the full path below. Do not create a separate worker for every heading when it adds no independent work. For a small, self-contained change (a few files, checks already provided), use the minimum crew: one context worker with a bounded brief (only the files, checks and constraints the task names; no exhaustive toolchain inventory), one implementer per independent file set, and one gate-plus-verify worker who did not implement. Skip separate planner, integrator and cleanup workers unless the task actually needs them, and do not create isolated copies when each file has a single owner. Treat the session's turn and time budget as a constraint: deliver the evidence-backed final report before optional steps such as cleanup or feedback updates.
 
 ### 1. Intake and Context
 
@@ -36,6 +36,8 @@ Assign a context worker to inspect the actual checkout, current instructions, re
 - Applicable team rules, skills/plugins and source paths; use the host's real loading conventions, not a dependency on `CLAUDE.md` alone.
 - Branch/revision, relevant dirty state, shared resources and a safe worker workspace plan.
 - Existing checks and the direct evidence that would show success.
+
+Every file inside the project checkout is project investigation, including handoff, state, brief, README or notes documents that say where earlier work stopped: have the context worker read them and return the facts. The coordinator reads only the user's message and this skill's own references.
 
 Brief each worker as if it has no prior conversation. Send the relevant decisions, constraints, task and source paths; label assumptions and omit unrelated history. Read returned evidence for coordination; delegate fresh project investigation. Never promote an unsupported assumption into a fact because multiple agents repeat it. For a large handoff, use [selective context](references/orchestration-prompts.md#selective-context).
 
@@ -63,7 +65,7 @@ A read-only investigation can return verified findings without inventing a build
 
 ### 5. Review, land and monitor
 
-Delegate code review to a worker who did not implement the change, or reuse the project's verified automated review infrastructure. Combine required status checks, change risk and AI review evidence. Focus human attention on logic, architecture and consequential risk; an AI risk label alone does not authorize landing.
+Delegate code review to a worker who did not implement the change, or reuse the project's verified automated review infrastructure. Combine required status checks, change risk and AI review evidence. A landing decision (commit, push, PR or merge) requires GATE, VERIFY (or an explicit unverified statement with its reason) and review by a non-implementer; name all three in any proposed path and in the outcome report. Existing user authorization for commit or push is honored as given: perform it without asking again, ask only when a newly discovered fact (for example branch protection) makes the authorized action impossible, and note that it removes neither VERIFY nor review and does not extend to merge or deployment. Focus human attention on logic, architecture and consequential risk; an AI risk label alone does not authorize landing.
 
 For low-risk work, use existing authorized auto-review/auto-land rules if the host/project has them. Otherwise follow the user's actual delivery authorization. Do not invent a new blanket approval gate, and do not infer merge/deploy authority merely from permission to edit or run checks.
 
@@ -94,7 +96,7 @@ Keep a small task table in the session (or existing project task notes maintaine
 
 For repeated failures, inspect the worker's evidence, narrow or change the assignment, then allow at most **two retries of the same approach by default**. A materially different recovery is a new approach with an explicit reason. Preserve partial work. If a worker stops producing useful evidence, ask for a short checkpoint and then reassign or stop that worker; do not silently start doing its job yourself.
 
-On interruption/resume, reconcile live workers and commands through available host state and worker reports before dispatching replacements. Have a worker check the current revision, dirty state and existing artifacts. Reuse valid completed results and resume the current owner when possible; do not duplicate a live or completed operation because its conversation was interrupted. If ownership or execution state is unknown, report it and resolve that uncertainty before repeating a potentially mutating operation. Keep unrelated work moving. Never claim completion while required work remains.
+On interruption/resume, reconcile live workers and commands through available host state and worker reports before dispatching replacements. Have a worker check the current revision, dirty state, existing artifacts and any state or handoff record; do not open those files yourself. Reuse valid completed results and resume the current owner when possible; do not duplicate a live or completed operation because its conversation was interrupted. If ownership or execution state is unknown, report it and resolve that uncertainty before repeating a potentially mutating operation. Keep unrelated work moving. Never claim completion while required work remains.
 
 ## Report the outcome
 

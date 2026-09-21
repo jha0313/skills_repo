@@ -37,6 +37,10 @@ A clear goal starts work immediately. Missing decisions that matter get a short 
 
 The complete workflow and compact worker brief are in [SKILL.md](SKILL.md); reusable delegation and review prompts are in [orchestration-prompts.md](references/orchestration-prompts.md). This package intentionally stays small; it does not claim the original Firstmate distro's supervision, recovery or backend guarantees.
 
+## Version 1.3.0 changes
+
+Three rules were tightened after an evaluated baseline (ten-case suite, real delegated executions): reading any file inside the checkout, including handoff or state documents, is project investigation to delegate; small self-contained changes use a minimum crew and respect the session's turn/time budget by reporting before optional steps; and every landing path names GATE, VERIFY and non-implementer review, without extending commit/push authorization to merge or deployment.
+
 ## Verified smoke scope
 
 The records below predate the version 1.2.0 prompt guidance; that guidance has not received an additional live execution test.
