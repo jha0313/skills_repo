@@ -1,7 +1,5 @@
 # 에이전트 스킬 모음
 
-**[삼성 AI 개발실 2차 세미나 자료 모음](seminars/samsung-ai-2/README.md)** — 32장 슬라이드, 대본, 발표 키워드, workflow-orchestrator 설명과 실제 데모 근거.
-
 최근 추가한 세 스킬은 한국어 사용자를 위한 지침·예시·실행 안내를 제공한다.
 
 | 스킬 | 하는 일 |
@@ -9,15 +7,6 @@
 | [workflow-orchestrator](workflow-orchestrator/README.md) | 조사·계획·구현·검증·리뷰를 작업자에게 맡기고 조율자는 의존성과 근거를 관리한다. |
 | [eval-writer](eval-writer/README.md) | 대상 스킬 계약에서 재현 가능한 평가 사례와 루브릭을 작성·검토한다. |
 | [skill-evaluator](skill-evaluator/README.md) | 격리된 실제 실행, 독립 채점, 근거 보존, 한국어 로컬 HTML/Markdown 보고서를 제공한다. |
-
-기존 스킬은 각 폴더의 SKILL.md를 그대로 사용한다.
-
-| 스킬 | 하는 일 |
-|---|---|
-| [ai-readiness-cartography](ai-readiness-cartography/SKILL.md) | 저장소를 AI-Ready 루브릭(100점·7범주)으로 감사하고 단일 HTML 대시보드와 ROI 순 액션 목록을 만든다. |
-| [ai-readiness-cartography-en](ai-readiness-cartography-en/SKILL.md) | 위 스킬의 영어판. |
-| [improve-token-efficiency](improve-token-efficiency/SKILL.md) | Claude Code 세션 로그를 분석해 토큰·컨텍스트 효율 리포트(HTML 대시보드·절감안)를 만든다. |
-| [presentation_slides](presentation_slides/SKILL.md) | 대본에서 YouTube 영상용 다크 테마 HTML 슬라이드 세트와 index 허브를 생성한다. |
 
 ## 설치
 
