@@ -11,6 +11,7 @@ import argparse
 import concurrent.futures
 import fcntl
 import json
+import shutil
 import signal
 import sys
 import uuid
@@ -294,6 +295,122 @@ def resume(args):
     return run, manifest, criteria, analysis
 
 
+def regrade(args):
+    """New run that imports another run's execution evidence and grades it with the
+    current evaluator. Executions are copied byte for byte and re-hashed; cases without
+    an execution stay pending and run normally. Provenance (source run, evaluator hash
+    at execution time) is recorded in the manifest. The target's criteria file is not
+    touched."""
+    source = Path(args.regrade).expanduser().resolve()
+    old = read_data(source / "manifest.json")
+    criteria = read_data(source / "criteria.yaml")
+    analysis = read_data(source / "analysis.json")
+    if digest(criteria) != old["criteria_hash"]:
+        raise EvalError("Source run criteria changed; cannot regrade")
+    if digest(old["options"]) != old.get("options_hash"):
+        raise EvalError("Source run options changed; cannot regrade")
+    forbidden = [
+        "basic",
+        "deep",
+        "binary",
+        "local",
+        "no_visualize",
+        "model",
+        "judge_model",
+        "timeout",
+        "judge_timeout",
+        "concurrency",
+        "judge_rounds",
+        "allow_tool",
+        "config",
+        "criteria",
+        "source",
+        "target",
+    ]
+    if any(getattr(args, k, None) for k in forbidden):
+        raise EvalError(
+            "--regrade uses the source run's options; do not pass overrides"
+        )
+    validate_criteria(criteria, old["options"]["mode"], old["options"]["binary"])
+    imported, pending = [], []
+    for c in criteria["test_cases"]:
+        cid = c["id"]
+        if (
+            old["cases"].get(cid, {}).get("state") in ("executed", "graded")
+            and (source / "cases" / cid / "execution.json").exists()
+        ):
+            imported.append(cid)
+        else:
+            pending.append(cid)
+    if (
+        pending
+        and snapshot_hash(Path(old["skill"]["installed_path"]))
+        != old["skill"]["skill_hash"]
+    ):
+        raise EvalError(
+            "Target skill changed since the source run; pending cases would mix revisions"
+        )
+    run_id = now().replace(":", "").replace(".", "-") + "-" + uuid.uuid4().hex[:8]
+    run = Path(args.output or source.parent / run_id).expanduser().resolve()
+    run.mkdir(parents=True, exist_ok=False)
+    deps = check_dependencies(run)
+    write_json(run / "criteria.yaml", criteria)
+    write_json(run / "analysis.json", analysis)
+    (run / "CRITERIA_REVIEW.md").write_text(review_table(criteria))
+    for cid in imported:
+        shutil.copytree(source / "cases" / cid, run / "cases" / cid, symlinks=False)
+        validate_artifact_files(
+            run, cid, read_data(run / "cases" / cid / "execution.json")
+        )
+    manifest = {
+        **{
+            k: v
+            for k, v in old.items()
+            if k
+            not in (
+                "cases",
+                "publications",
+                "finished_at",
+                "execution_started_at",
+                "msl_fallback_reason",
+            )
+        },
+        "run_id": run_id,
+        "created_at": now(),
+        "state": "criteria_review",
+        "dependencies": deps,
+        "author_usage": {
+            "cost_usd": 0,
+            "usage": {},
+            "source": f"regrade of {old['run_id']}; author cost is recorded in that run",
+        },
+        "evaluator_hash": snapshot_hash(ROOT),
+        "cases": {
+            cid: (
+                {"state": "executed", "evidence_hashes": evidence_hashes(run, cid)}
+                if cid in imported
+                else {"state": "pending"}
+            )
+            for cid in [c["id"] for c in criteria["test_cases"]]
+        },
+        "publications": {},
+        "regrade_of": {
+            "run_id": old["run_id"],
+            "path": str(source),
+            "evaluator_hash_at_execution": old.get("evaluator_hash"),
+            "imported_cases": imported,
+            "pending_cases": pending,
+        },
+    }
+    write_json(run / "manifest.json", manifest)
+    print(
+        f"Regrade of {old['run_id']}: imported {len(imported)} executions, {len(pending)} pending",
+        flush=True,
+    )
+    print(f"Prepared: {run}", flush=True)
+    return run, manifest, criteria, analysis
+
+
 def persist_execution(run, case, result):
     d = run / "cases" / case["id"]
     d.mkdir(parents=True, exist_ok=True)
@@ -353,21 +470,37 @@ def judge_rounds(run, batch, manifest, idx, options, judge=None):
     def checkpoint(rn):
         return run / "judges" / f"batch-{idx:03d}-round-{rn}" / "validated.json"
 
+    def reusable(rn):
+        """A validated checkpoint for this round that covers every case in the batch.
+        After a resume, graded cases drop out of a batch and batch indices can shift, so
+        the same-index file is tried first and then every batch directory for the round."""
+        candidates = [checkpoint(rn)] + sorted(
+            (run / "judges").glob(f"batch-*-round-{rn}/validated.json")
+            if (run / "judges").exists()
+            else []
+        )
+        for path in candidates:
+            if not path.exists():
+                continue
+            old = read_data(path)
+            if set(ids) <= set(old["case_ids"]):
+                return old
+        return None
+
     rounds, costs, pending = [], [], []
     for rn in range(1, options["judge_rounds"] + 1):
-        if checkpoint(rn).exists():
-            old = read_data(checkpoint(rn))
-            if old["case_ids"] == ids:
-                for c in batch:
-                    validate_judgment(
-                        old["judgments"][c["id"]],
-                        {**c, "_mode": options["mode"]},
-                        options["binary"],
-                        run,
-                    )
-                rounds.append(old["judgments"])
-                costs.append(old["usage"])
-                continue
+        old = reusable(rn)
+        if old is not None:
+            for c in batch:
+                validate_judgment(
+                    old["judgments"][c["id"]],
+                    {**c, "_mode": options["mode"]},
+                    options["binary"],
+                    run,
+                )
+            rounds.append({c["id"]: old["judgments"][c["id"]] for c in batch})
+            costs.append(old["usage"])
+            continue
         pending.append(rn)
 
     def keep(rn, judgments, usage, retried_after=None):
@@ -422,7 +555,7 @@ def judge_batch(run, cases, manifest, batch, round_no):
 Return JSON only: {{"judgments":[...]}}. Exactly one judgment per case.
 Every judgment contains case_id, dimensions ({list(dims)}), best_practice_subcriteria ({list(BP)}), business_impact_subcriteria ({list(BI)}), semantic_checks (one indexed entry for each quality_criteria semantic check).
 Every dimension/subcriterion/semantic entry is an object {{"score":NUMBER,"rubric_level":SAME_NUMBER,"reason":"bounded explanation","evidence":[{{"path":"cases/TC-001/response.txt","line_start":1,"line_end":1,"quote":"exact substring at these lines"}}]}}. Semantic entries additionally have index=0,1,... . Allowed scores {([0, 1] if binary else [1, 2, 3, 4, 5])}. All entries must cite at least one exact quote at valid lines.
-Citations may reference ONLY THIS CASE's files: response.txt (eval_target response/all), artifacts/* (eval_target artifact/all), and always the harness records tool_calls.json, metadata.json and artifacts.json (captured paths, existence, sha256). Never cite conversation.txt, skill source, criteria, prompt, other cases, or raw target instructions. Harness records support efficiency, best-practice and safety judgments; they never establish answer correctness.
+Citations may reference ONLY THIS CASE's files: response.txt (eval_target response/all), artifacts/* (eval_target artifact/all), and always the harness records tool_calls.json, metadata.json and artifacts.json (captured paths, existence, sha256). Quote short human-readable text (a response sentence, a tool name, a file path, a description, an actor value) and copy line_start/line_end from the numbered evidence exactly. Never quote opaque identifiers such as id or parent_tool_use_id values; to show attribution, cite the name and actor lines of the same entry. Never cite conversation.txt, skill source, criteria, prompt, other cases, or raw target instructions. Harness records support efficiency, best-practice and safety judgments; they never establish answer correctness.
 tool_calls.json entries carry native attribution: actor (parent = the evaluated session itself, worker = a delegated subagent, unknown = attribution unavailable), parent_tool_use_id, lineage_verified and trace_line. Any judgment about who performed work (delegation, no direct implementation by the coordinator, independent verification by a different worker) must cite those entries; the assistant's own narrative about which tools it used is a claim, not attribution evidence. Entries with actor unknown or lineage_verified false are unattributed and never establish role separation. Metadata is for efficiency/infrastructure; cannot establish output correctness. Missing behavior: cite the actual response that demonstrates the omission; never fabricate absence text. Use case-specific semantic rubric and the shared dimensions below. A skill with no business metrics can show plausible applicability; do not invent observed time saved or revenue. A simple case need not use subagents.
 {rubric}
 DATA:\n{json.dumps(packet, ensure_ascii=False)}"""
@@ -722,6 +855,7 @@ def parser():
         "source",
         "output",
         "resume",
+        "regrade",
         "config",
         "judge-model",
         "model",
@@ -784,6 +918,8 @@ def main():
         return 0
     if args.resume:
         run, manifest, criteria, analysis = resume(args)
+    elif args.regrade:
+        run, manifest, criteria, analysis = regrade(args)
     else:
         if not args.target:
             raise EvalError("Specify skill name or exact path")
@@ -792,6 +928,7 @@ def main():
         manifest["options"]["mode"] != "basic"
         and not args.accept_criteria
         and not args.resume
+        and not args.regrade
     ):
         print(
             "Criteria are ready for review. Edit the target criteria, then run with --criteria PATH --accept-criteria; or resume this unchanged run with --resume RUN_DIR after review."

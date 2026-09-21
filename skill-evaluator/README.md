@@ -60,6 +60,14 @@ uv run skill-evaluator/scripts/evaluate.py run --resume ~/skill-eval/TARGET/RUN-
 
 Resume uses persisted options, criteria and hashes; do not add new evaluation flags. Changes to the skill, evaluator, criteria or adapter configuration require a new run. Completed case execution and valid judge checkpoints are reused.
 
+To grade preserved executions with a newer evaluator (for example after a judge-contract fix), start a regrade run instead of resuming:
+
+```bash
+uv run skill-evaluator/scripts/evaluate.py run --regrade ~/skill-eval/TARGET/RUN-ID
+```
+
+It creates a new run that copies the source run's execution evidence byte for byte, re-hashes it, executes any case the source never executed (refusing if the target skill changed), grades everything with the current evaluator and records `regrade_of` (source run id, evaluator hash at execution time, imported and pending cases) in the manifest. Options and criteria come from the source run; the target's criteria file is not rewritten.
+
 ## Modes and controls
 
 | Control | Behavior |
@@ -90,7 +98,7 @@ Default run location: `~/skill-eval/<skill-name>/<run-id>/`.
 
 - `manifest.json`, `analysis.json`, `criteria.yaml`, `CRITERIA_REVIEW.md`, captured native CLI help.
 - `cases/TC-001/`: prompt, complete transcript, native trace, output-only response, actual tool calls, metadata, artifacts, normalized execution and adapter logs.
-- `judges/`: independent raw judge inputs/results (every attempt retained; an invalid round is retried once in `…-retry-N`) and per-round validated checkpoints.
+- `judges/`: independent raw judge inputs/results (every attempt retained; an invalid round is retried once in `…-retry-N`) and per-round validated checkpoints. A checkpoint is reused by any later batch it fully covers, so a resume whose batches shifted does not re-judge validated rounds.
 - `evaluations/TC-001.md` and `.json`: exact evidence citations, matched rubric levels and deterministic check results.
 - `summary.json`, `REPORT.md`, optional `REPORT.html`: totals, breakdowns, failures, recommendations and evidence links.
 

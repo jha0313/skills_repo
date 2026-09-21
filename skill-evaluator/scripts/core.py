@@ -39,6 +39,8 @@ BI = (
     "productivity_revenue_link",
 )
 WEIGHTS = dict(zip(DIMENSIONS, (0.10, 0.10, 0.15, 0.15, 0.50)))
+# Cited line ranges may be off by this many lines when the quote itself is verbatim.
+CITATION_LINE_TOLERANCE = 2
 DISTRIBUTIONS = {
     "basic": (1, 1, 1, 1, 0),
     "thorough": (2, 1, 2, 2, 3),
@@ -285,12 +287,16 @@ def verify_citation(citation, run_dir):
     ):
         raise EvalError("Evidence line range out of bounds")
     quote = citation.get("quote")
-    if (
-        not isinstance(quote, str)
-        or not quote.strip()
-        or quote not in "\n".join(lines[start - 1 : end])
-    ):
+    if not isinstance(quote, str) or not quote.strip():
         raise EvalError("Evidence quote is not present at cited lines")
+    if quote not in "\n".join(lines[start - 1 : end]):
+        # A verbatim quote one or two lines away from the cited range is a line-number
+        # slip on real evidence, not a fabrication; anything further, or a quote that is
+        # not in the file, is still rejected.
+        lo = max(1, start - CITATION_LINE_TOLERANCE)
+        hi = min(len(lines), end + CITATION_LINE_TOLERANCE)
+        if quote not in "\n".join(lines[lo - 1 : hi]):
+            raise EvalError("Evidence quote is not present at cited lines")
     return citation
 
 

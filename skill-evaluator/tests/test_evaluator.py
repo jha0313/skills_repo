@@ -5,6 +5,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import types
 import unittest
 from pathlib import Path
 
@@ -273,6 +274,182 @@ class EvaluatorTests(unittest.TestCase):
 
         rounds, _ = evaluate.judge_rounds(root2, batch, {}, 0, options, judge=fixed)
         self.assertEqual((len(rounds), again), (3, [1]))
+
+    def test_citation_tolerates_small_line_slip_but_not_fabrication(self):
+        path = self.root / "cases/TC-001/tool_calls.json"
+        lines = [f"line {i}" for i in range(1, 11)]
+        lines[6] = '      "description": "Probe functions with uncovered inputs"'
+        path.write_text("\n".join(lines) + "\n")
+        quote = "Probe functions with uncovered inputs"
+        rel = "cases/TC-001/tool_calls.json"
+        # Exact line, and one or two lines off, are all the same real evidence.
+        for start in (7, 6, 5, 8, 9):
+            core.verify_citation(
+                {"path": rel, "line_start": start, "line_end": start, "quote": quote},
+                self.root,
+            )
+        # Three lines away is no longer a slip; a mangled quote is never accepted.
+        for bad in (
+            {"path": rel, "line_start": 4, "line_end": 4, "quote": quote},
+            {"path": rel, "line_start": 10, "line_end": 10, "quote": quote},
+            {
+                "path": rel,
+                "line_start": 7,
+                "line_end": 7,
+                "quote": "Probe functions with covered inputs",
+            },
+        ):
+            with self.assertRaises(core.EvalError):
+                core.verify_citation(bad, self.root)
+
+    def test_judge_rounds_reuse_checkpoints_after_batches_shift(self):
+        """After a resume, graded cases leave their batch and indices shift; validated
+        rounds must still be reused when they cover the batch, wherever they sit."""
+        options = {
+            "judge_rounds": 3,
+            "concurrency": 1,
+            "mode": "basic",
+            "binary": False,
+        }
+        case2 = copy.deepcopy(self.case)
+        case2["id"] = "TC-002"
+        d = self.root / "cases/TC-002"
+        d.mkdir(parents=True)
+        for name in (
+            "response.txt",
+            "tool_calls.json",
+            "metadata.json",
+            "artifacts.json",
+        ):
+            src = self.root / "cases/TC-001" / name
+            (d / name).write_text(src.read_text() if src.exists() else "{}")
+
+        def judgment_for(cid):
+            return json.loads(json.dumps(self.judgment()).replace("TC-001", cid))
+
+        # Original grading: batch index 1 held both cases; rounds 2 and 3 validated.
+        for rn in (2, 3):
+            core.write_json(
+                self.root / f"judges/batch-001-round-{rn}/validated.json",
+                {
+                    "case_ids": ["TC-001", "TC-002"],
+                    "judgments": {
+                        "TC-001": judgment_for("TC-001"),
+                        "TC-002": judgment_for("TC-002"),
+                    },
+                    "usage": {"cost_usd": 1.0},
+                },
+            )
+        calls = []
+
+        def judge(run, cases, manifest, idx, rn):
+            calls.append((idx, rn, [c["id"] for c in cases]))
+            return {c["id"]: judgment_for(c["id"]) for c in cases}, {"cost_usd": 1.0}
+
+        # Resume: TC-001 already graded, so TC-002 is now alone at batch index 0.
+        rounds, costs = evaluate.judge_rounds(
+            self.root, [case2], {}, 0, options, judge=judge
+        )
+        self.assertEqual(calls, [(0, 1, ["TC-002"])])
+        self.assertEqual(len(rounds), 3)
+        self.assertTrue(all(set(r) == {"TC-002"} for r in rounds))
+        # The original checkpoints are left untouched.
+        old = core.read_data(self.root / "judges/batch-001-round-2/validated.json")
+        self.assertEqual(old["case_ids"], ["TC-001", "TC-002"])
+
+    def test_regrade_imports_executions_and_records_provenance(self):
+        """A regrade run copies execution evidence from a finished or interrupted run,
+        re-hashes it, keeps unexecuted cases pending, and never touches the target."""
+        source = self.root / "source-run"
+        (source / "cases/TC-001").mkdir(parents=True)
+        for name in (
+            "conversation.txt",
+            "response.txt",
+            "metadata.json",
+            "artifacts.json",
+            "tool_calls.json",
+            "prompt.json",
+        ):
+            (source / "cases/TC-001" / name).write_text(
+                (self.root / "cases/TC-001" / name).read_text()
+                if (self.root / "cases/TC-001" / name).exists()
+                else "{}"
+            )
+        core.write_json(source / "cases/TC-001/execution.json", self.execution)
+        criteria = core.read_data(FIXTURES / "basic.yaml")
+        criteria = core.validate_criteria(criteria, "basic", False)
+        core.write_json(source / "criteria.yaml", criteria)
+        core.write_json(
+            source / "analysis.json", {"name": "observatory-greeting", "mutates": False}
+        )
+        options = {"mode": "basic", "binary": False, "judge_rounds": 3}
+        skill_dir = FIXTURES / "observatory-greeting"
+        manifest = {
+            "run_id": "old-run",
+            "criteria_hash": core.digest(criteria),
+            "options": options,
+            "options_hash": core.digest(options),
+            "skill": {
+                "installed_path": str(skill_dir),
+                "skill_hash": "not-the-real-hash",
+            },
+            "evaluator_hash": "old-evaluator",
+            "cases": {c["id"]: {"state": "pending"} for c in criteria["test_cases"]},
+            "author_usage": {"cost_usd": 3.0},
+            "config": {},
+            "config_hash": core.digest({}),
+        }
+        manifest["cases"]["TC-001"] = {"state": "executed"}
+        core.write_json(source / "manifest.json", manifest)
+
+        args = types.SimpleNamespace(
+            regrade=str(source),
+            output=str(self.root / "regrade-run"),
+            **{
+                k: None
+                for k in (
+                    "basic",
+                    "deep",
+                    "binary",
+                    "local",
+                    "no_visualize",
+                    "model",
+                    "judge_model",
+                    "timeout",
+                    "judge_timeout",
+                    "concurrency",
+                    "judge_rounds",
+                    "allow_tool",
+                    "config",
+                    "criteria",
+                    "source",
+                    "target",
+                )
+            },
+        )
+
+        # A pending case with a changed skill would mix revisions.
+        with self.assertRaises(core.EvalError):
+            evaluate.regrade(args)
+        manifest["skill"]["skill_hash"] = evaluate.snapshot_hash(skill_dir)
+        core.write_json(source / "manifest.json", manifest)
+        run, new_manifest, new_criteria, _ = evaluate.regrade(args)
+        self.assertEqual(run, (self.root / "regrade-run").resolve())
+        self.assertEqual(new_manifest["cases"]["TC-001"]["state"], "executed")
+        self.assertIn("evidence_hashes", new_manifest["cases"]["TC-001"])
+        self.assertEqual(new_manifest["cases"]["TC-002"]["state"], "pending")
+        self.assertEqual(new_manifest["regrade_of"]["run_id"], "old-run")
+        self.assertEqual(
+            new_manifest["regrade_of"]["evaluator_hash_at_execution"], "old-evaluator"
+        )
+        self.assertEqual(new_manifest["regrade_of"]["imported_cases"], ["TC-001"])
+        self.assertNotEqual(new_manifest["run_id"], "old-run")
+        self.assertEqual(new_manifest["criteria_hash"], core.digest(new_criteria))
+        self.assertEqual(new_manifest["author_usage"]["cost_usd"], 0)
+        self.assertTrue((run / "cases/TC-001/execution.json").exists())
+        core.verify_evidence_hashes(
+            run, new_manifest["cases"]["TC-001"]["evidence_hashes"]
+        )
 
     def test_binary_thresholds_weighted_and_labels(self):
         case = core.read_data(FIXTURES / "basic-binary.yaml")["test_cases"][0]
