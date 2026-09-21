@@ -41,9 +41,9 @@ The complete workflow and compact worker brief are in [SKILL.md](SKILL.md); reus
 
 Three rules were tightened after an evaluated baseline (ten-case suite, real delegated executions): reading any file inside the checkout, including handoff or state documents, is project investigation to delegate; small self-contained changes use a minimum crew and respect the session's turn/time budget by reporting before optional steps; and every landing path names GATE, VERIFY and non-implementer review, without extending commit/push authorization to merge or deployment.
 
-## Version 1.4.0 change
+## Version 1.4.1 change
 
-The coordinator contract was loosened to what evaluated models reliably do. Versions 1.3.0 and 1.3.1 told the coordinator never to open handoff or state documents; across seven evaluated resumes (four with one model, three with another) the coordinator still opened the STATE.md the request named, once before the skill had even loaded, while delegating everything else correctly. The coordinator may now read the one brief, state or handoff file the request names unless the user forbids it; listing the directory, opening any other file and running checks remain worker work. The ten-case criteria were aligned with this contract in the same revision.
+The coordinator contract was loosened to what evaluated models reliably do. Versions 1.3.0 and 1.3.1 told the coordinator never to open handoff or state documents; across seven evaluated resumes (four with one model, three with another) the coordinator still opened the STATE.md the request named, once before the skill had even loaded, while delegating everything else correctly. The coordinator may now list the directory and read the one brief, state or handoff file the request names unless the user forbids it (1.4.0 allowed the file only; three further evaluated resumes still listed the directory first in two of three runs); opening any other file and running checks remain worker work. The ten-case criteria were aligned with this contract in the same revision.
 
 ## Verified smoke scope
 

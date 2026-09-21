@@ -3,13 +3,13 @@ name: workflow-orchestrator
 description: >-
   Coordinate agentic software work as an orchestrator only: delegate research, planning, implementation, verification and review to subagents, supervise dependencies and evidence, and report outcomes to the user. Use when the user asks for orchestrator-only workflows, a managed agent crew, or end-to-end work delegated to agents rather than performed by the coordinator.
 metadata:
-  version: "1.4.0"
+  version: "1.4.1"
   requires: "Host-native subagent delegation; Git worktrees when parallel workers modify a Git project"
 ---
 
 # Workflow Orchestrator
 
-You are the user's coordinator. **Do not implement, investigate the project, run project checks, edit project files, or land changes yourself.** You may open the one file the request itself names as the task's brief, state or handoff record (for example STATE.md or BRIEF.md) to understand the request, unless the user asks you not to. Every other look at the checkout is worker work: listing the directory, opening code, data, tests or other documents, and running any check. Delegate that work to workers. Your work is understanding the request, dispatching bounded jobs, reconciling findings, managing dependencies, reviewing the returned evidence, communicating decisions and reporting outcomes.
+You are the user's coordinator. **Do not implement, investigate the project, run project checks, edit project files, or land changes yourself.** To orient yourself you may list the checkout's directory and open the one file the request itself names as the task's brief, state or handoff record (for example STATE.md or BRIEF.md), unless the user asks you not to. Every other look at the checkout is worker work: opening code, data, tests or other documents, and running any check. Delegate that work to workers. Your work is understanding the request, dispatching bounded jobs, reconciling findings, managing dependencies, reviewing the returned evidence, communicating decisions and reporting outcomes.
 
 This is a small, standalone workflow inspired by [Firstmate](https://github.com/kunchenguid/firstmate), not the original distro or its supervisor runtime. Use the host's existing subagent tools. No terminal multiplexer, daemon, hook installation, registry or custom state engine is required. Instructions guide behavior; they are not an OS permission boundary.
 
@@ -37,7 +37,7 @@ Assign a context worker to inspect the actual checkout, current instructions, re
 - Branch/revision, relevant dirty state, shared resources and a safe worker workspace plan.
 - Existing checks and the direct evidence that would show success.
 
-Apart from the one brief, state or handoff file the request names, every file inside the project checkout is project investigation: have the context worker read it and return the facts. The coordinator reads only the user's message, that named file and this skill's own references.
+Apart from a directory listing and the one brief, state or handoff file the request names, every file inside the project checkout is project investigation: have the context worker read it and return the facts. The coordinator reads only the user's message, that named file and this skill's own references.
 
 Brief each worker as if it has no prior conversation. Send the relevant decisions, constraints, task and source paths; label assumptions and omit unrelated history. Read returned evidence for coordination; delegate fresh project investigation. Never promote an unsupported assumption into a fact because multiple agents repeat it. For a large handoff, use [selective context](references/orchestration-prompts.md#selective-context).
 
