@@ -100,7 +100,7 @@ A case's primary category is its coverage label. Judges still score every select
 
 ## A/B: demonstrate added value
 
-The orchestrator's `compare RUN_A RUN_B` compares two existing canonical runs. It does **not** run a no-skill arm automatically, and matching criteria hashes alone do not prove that the model, fixtures, tools or environment match.
+The orchestrator's `compare RUN_A RUN_B` compares two existing canonical runs; add `--output FILE.html` to render a local paired dashboard (pass/fail per case, category and dimension deltas, environment fingerprint, and evidence links for every non-passing case) with `scripts/compare_report.py`. It does **not** run a no-skill arm automatically, and matching criteria hashes alone do not prove that the model, fixtures, tools or environment match.
 
 For real with/without execution, reuse the native runner's current ablation support. Prepare a trusted native plugin eval case with a neutral task prompt, identical fixtures and domain graders. Do not force the skill name/body in the baseline; do not use only the orchestrator's nonempty-output capture grader as a quality measurement. From a directory where the named output paths are appropriate:
 

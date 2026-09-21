@@ -758,6 +758,10 @@ def main():
         mb = read_data(Path(args.other) / "manifest.json")
         if ma["criteria_hash"] != mb["criteria_hash"]:
             raise EvalError("A/B criteria differ; cannot claim lift")
+        if args.output:
+            from compare_report import build
+
+            print(build(args.target, args.other, args.output, "before", "after"))
         print(
             json.dumps(
                 {
