@@ -16,7 +16,7 @@ Export the reviewed cases as JSONL as well as the canonical YAML.
 A direct CLI equivalent from the repository root is:
 
 ```bash
-uv run skill-evaluator/scripts/evaluate.py prepare /path/to/my-skill --local
+uv run skill-evaluator/scripts/evaluate.py prepare /path/to/my-skill
 uv run skill-evaluator/scripts/evaluate.py validate /path/to/my-skill/evals/eval_criteria.yaml
 ```
 

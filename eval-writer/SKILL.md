@@ -41,7 +41,7 @@ Read [authoring-guide.md](references/authoring-guide.md) for the quality checkli
 Use the discovered evaluator path. This generates criteria, analyzes behavior, creates a timestamped backup before replacing existing target criteria, retains a manifest and emits a review table. It does **not** execute or grade the target.
 
 ```text
-uv run <evaluator>/scripts/evaluate.py prepare <target-read-path> --local [--source <target-source-path>] [--basic|--deep] [--binary]
+uv run <evaluator>/scripts/evaluate.py prepare <target-read-path> [--source <target-source-path>] [--basic|--deep] [--binary]
 ```
 
 Angle-bracket values and bracketed options above are notation, not shell text to paste. Omit size flags for default THOROUGH. Inspect the generated `analysis.json`, target `evals/eval_criteria.yaml`, and `CRITERIA_REVIEW.md` before declaring authoring complete.
@@ -64,7 +64,7 @@ uv run <evaluator>/scripts/evaluate.py validate <target-source>/evals/eval_crite
 
 Use the same mode/scale as authoring. Schema validation is necessary but does not review semantic quality or prove the target works. Present the compact ID/category/cwd/prompt/key-criteria table and permit edits. Existing authorization can cover execution after review; otherwise end with a concrete prepared result and the exact execution command, without claiming an eval pass.
 
-Preserve the immutable prepared run. After editing criteria, start a **new** evaluation using `--criteria <edited-file> --accept-criteria`; do not edit its run manifest or resume stale criteria. Reuse an unchanged prepared run only after its exact criteria are reviewed.
+Preserve the immutable prepared run. After editing criteria, start a **new** evaluation using `<target> --criteria <edited-file> --yes`; do not edit its run manifest or resume stale criteria. Reuse an unchanged prepared run only after its exact criteria are reviewed.
 
 For YAML/JSONL exchange, the canonical executable file is the evaluator's YAML (JSON is also valid YAML). If JSONL is requested, export one complete case per line, materializing inherited `working_directory`, and retain the top-level defaults/mode/source hash in a sidecar. Revalidate the canonical YAML; do not pass raw JSONL to a CLI that currently accepts YAML. This is a format export, not a second evaluation format or engine.
 
@@ -72,6 +72,6 @@ For YAML/JSONL exchange, the canonical executable file is the evaluator's YAML (
 
 Return paths to criteria, analysis/review table, timestamped backup, optional JSONL/sidecar; state mode, scale and case allocation. Summarize distinct covered contracts, gaps, mock provenance and validation performed. Explicitly state **target evaluation not run** when only authoring occurred.
 
-Give the exact next `run` command based on current CLI help and the selected target/mode. Only include `--trust-target` when trust is already within the user's authorized scope; only grant required tools. Explain eval-driven use: run new cases and confirm the intended failure → update skill → rerun unchanged criteria → inspect regressions → land. Failure caused by broken infrastructure is not the intended red phase.
+Give the exact next command based on current CLI help and the selected target/mode (`evaluate.py <target> --criteria <file> --yes`, plus `--rigorous` for a before/after comparison). `--yes` both accepts the criteria and asserts that the target's code is within the user's authorized trust scope; include it only when that is so, and grant only the tools the task needs with `--allow-tool`. Explain eval-driven use: run new cases and confirm the intended failure → update skill → rerun unchanged criteria → inspect regressions → land. Failure caused by broken infrastructure is not the intended red phase.
 
 For claimed improvement, compare the same task, model, starting state, completion threshold and mock environment with/without the skill; measure tokens and wall-clock. Repeated independent judge rounds reduce variance, not shared bias. Do not put invented result scores or business uplift into authored criteria.
