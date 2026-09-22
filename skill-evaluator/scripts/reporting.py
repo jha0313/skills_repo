@@ -170,7 +170,7 @@ def write_reports(run_dir, summary, manifest, visualize=True):
 
 
 # ---------------------------------------------------------------------------
-# Readable HTML report: what was tested → results at a glance → insights → details
+# Readable HTML report: score → insights → how it was tested (collapsed) → details (collapsed)
 # ---------------------------------------------------------------------------
 
 VERDICT_KO = {"PASS": "통과", "FAIL": "실패", "ERROR": "미판정"}
@@ -393,26 +393,59 @@ def build_html(root, summary, manifest, criteria, recommendations):
     skill = manifest["skill"]["name"]
     options = manifest.get("options", {})
     total, passed = summary["total"], summary["passed"]
-    verdict_word = (
-        "전부 통과"
-        if summary["verdict"] == "PASS"
-        else ("일부 실패" if summary["failed"] else "미판정 있음")
-    )
     tone = (
         "good"
         if summary["verdict"] == "PASS"
         else ("critical" if summary["failed"] else "warning")
     )
-    head = f"{total}문제 중 {passed}개 통과"
+    head = f"{passed}/{total} 통과"
     if summary.get("grade") and not binary:
-        head += f", 등급 {summary['grade']}"
+        head += f" · 등급 {summary['grade']}"
+    if summary["failed"]:
+        head += f" · 실패 {summary['failed']}"
+    if summary["errors"]:
+        head += f" · 미판정 {summary['errors']}"
     cost = summary.get("cost_usd")
     minutes = (summary.get("wall_clock_seconds") or 0) / 60
-    cond = f"{label(summary['mode'])} · {label(summary['grading'])} · 채점 {options.get('judge_rounds', '?')}회 · 모델 {esc(options.get('model') or 'CLI 기본')}"
-    cond += f" · 비용 약 ${cost:.2f}(추정)" if cost is not None else " · 비용 미확인"
+    rounds = options.get("judge_rounds", "?")
+    cond = f"{label(summary['mode'])} · {label(summary['grading'])} · 채점 {rounds}회 · 모델 {esc(options.get('model') or 'CLI 기본')}"
+    cond += f" · 약 ${cost:.2f}" if cost is not None else " · 비용 미확인"
     cond += f" · {minutes:.0f}분" if minutes else ""
 
-    # ---- what was tested ----
+    # ---- score: one chip per case, one bar per dimension ----
+    chips = []
+    for r in results:
+        v = r["verdict"]
+        cid = r["case_id"]
+        score = (
+            VERDICT_KO.get(v, v)
+            if binary or r.get("score") is None
+            else fmt(r.get("score"))
+        )
+        chips.append(
+            f'<a class="chip v-{esc(v)}" href="#case-{esc(cid)}" title="{esc(r["name"])}"><i class="dot"></i>{esc(cid)}<b>{esc(score)}</b></a>'
+        )
+    bars = []
+    for d, v in summary.get("dimensions", {}).items():
+        if v is None:
+            bars.append(
+                f'<div class="bar-row"><span class="bar-label">{esc(label(d))}</span><span class="bar"></span><span class="bar-val">미확인</span></div>'
+            )
+            continue
+        width = (v * 100) if binary else ((v - 1) / 4 * 100)
+        bars.append(
+            f'<div class="bar-row"><span class="bar-label">{esc(label(d))}</span><span class="bar"><i style="width:{max(0, min(100, width)):.0f}%"></i></span>'
+            f'<span class="bar-val">{fmt(v)}{"" if binary else " / 5"}</span></div>'
+        )
+    dim_title = "차원별 통과율" if binary else "다섯 관점 평균 (1~5)"
+
+    # ---- insights: one line each, body on click ----
+    insight_html = "".join(
+        f'<details class="insight {kind}"><summary>{title}</summary><div class="ibody">{body}</div></details>'
+        for kind, title, body in build_insights(summary, specs, binary)
+    )
+
+    # ---- how it was tested: one line per case, prompt on click ----
     tested = []
     for r in results:
         cid = r["case_id"]
@@ -424,64 +457,21 @@ def build_html(root, summary, manifest, criteria, recommendations):
                 prompt = json.loads(prompt_file.read_text()).get("prompt", "")
             except ValueError:
                 prompt = prompt_file.read_text()
-        short = (prompt or "").replace("\n", " ")
-        short = short[:150] + ("…" if len(short) > 150 else "")
         expected = spec.get("expected_behavior")
-        detail = (
-            f'<details><summary>프롬프트 전문과 기대한 행동</summary><p class="prompt">{esc(prompt)}</p>'
-            + (
-                f'<p class="expect"><b>기대한 행동</b> {esc(expected)}</p>'
-                if expected
-                else ""
-            )
-            + "</details>"
-            if prompt
+        body = (f'<p class="prompt">{esc(prompt)}</p>' if prompt else "") + (
+            f'<p class="expect"><b>기대한 행동</b> {esc(expected)}</p>'
+            if expected
             else ""
         )
         tested.append(
-            f'<article class="tcase"><div class="tid">{esc(cid)} <span class="cat">{esc(label(r["category"]))}</span></div>'
-            f"<h3>{esc(r['name'])}</h3>"
-            + (f'<p class="expect">{esc(short)}</p>' if short else "")
-            + detail
-            + "</article>"
+            f'<details class="tcase"><summary><span class="tid">{esc(cid)}</span><span class="cat">{esc(label(r["category"]))}</span>{esc(r["name"])}</summary>{body}</details>'
         )
-
-    # ---- results at a glance ----
-    dots = []
-    for r in results:
-        v = r["verdict"]
-        score = (
-            (r["verdict"] if binary else fmt(r.get("score")))
-            if r.get("score") is not None
-            else "-"
-        )
-        dots.append(
-            f'<a class="dot-card v-{esc(v)}" href="#case-{esc(r["case_id"])}"><span class="dot"></span>'
-            f'<span class="dot-id">{esc(r["case_id"])}</span><span class="dot-name">{esc(r["name"])}</span>'
-            f'<span class="dot-score">{esc(VERDICT_KO.get(v, v))}{"" if binary or r.get("score") is None else " · " + score}</span></a>'
-        )
-    bars = []
-    for d, v in summary.get("dimensions", {}).items():
-        if v is None:
-            bars.append(
-                f'<div class="bar-row"><span class="bar-label">{esc(label(d))}</span><span class="bar-val">미확인</span></div>'
-            )
-            continue
-        width = (v * 100) if binary else ((v - 1) / 4 * 100)
-        bars.append(
-            f'<div class="bar-row"><span class="bar-label">{esc(label(d))}</span><span class="bar"><i style="width:{max(0, min(100, width)):.0f}%"></i></span>'
-            f'<span class="bar-val">{fmt(v)}{"" if binary else " / 5"}</span></div>'
-        )
-    dim_title = "차원별 통과율" if binary else "다섯 관점의 평균 점수 (1~5)"
-
-    # ---- insights ----
-    insights = build_insights(summary, specs, binary)
-    insight_html = "".join(
-        f'<article class="insight {kind}"><h3>{title}</h3>{body}</article>'
-        for kind, title, body in insights
+    method = (
+        f"문제마다 스킬이 설치된 격리 세션에서 실행하고, 실행 기록만 보는 별도의 심판 세션 {rounds}개가 근거를 인용해 채점합니다. "
+        "필수 검사가 하나라도 실패하면 점수와 관계없이 실패입니다."
     )
 
-    # ---- per-case details ----
+    # ---- per-case details (collapsed) ----
     details = []
     for r in results:
         cid = r["case_id"]
@@ -553,10 +543,21 @@ def build_html(root, summary, manifest, criteria, recommendations):
         if v != "PASS" and r.get("status") == "graded":
             title, anchor, target, _ = case_reason(r, spec, binary)
             body += f'<p class="why"><b>실패 이유</b> {esc(title)}. {esc(anchor)}</p>'
-        if spec.get("prompt"):
-            body += f'<details><summary>시킨 것(프롬프트)</summary><p class="prompt">{esc(spec["prompt"])}</p></details>'
-        if spec.get("expected_behavior"):
-            body += f"<p><b>기대한 행동</b> {esc(spec['expected_behavior'])}</p>"
+        if spec.get("prompt") or spec.get("expected_behavior"):
+            body += (
+                "<details><summary>프롬프트와 기대한 행동</summary>"
+                + (
+                    f'<p class="prompt">{esc(spec["prompt"])}</p>'
+                    if spec.get("prompt")
+                    else ""
+                )
+                + (
+                    f'<p class="expect"><b>기대한 행동</b> {esc(spec["expected_behavior"])}</p>'
+                    if spec.get("expected_behavior")
+                    else ""
+                )
+                + "</details>"
+            )
         if dim_cells:
             body += f'<p class="dims">{dim_cells}</p>'
         if rows:
@@ -565,8 +566,8 @@ def build_html(root, summary, manifest, criteria, recommendations):
             body += f'<p class="det">결정적 검사: {esc("; ".join(det))}</p>'
         body += f'<p class="meta">{esc(meta)}</p><p class="links">{link_html}</p>'
         details.append(
-            f'<details class="case v-{esc(v)}" id="case-{esc(cid)}"{" open" if v != "PASS" else ""}>'
-            f'<summary><span class="dot"></span>{esc(cid)} {esc(r["name"])} <span class="badge">{esc(VERDICT_KO.get(v, v))}{"" if binary or r.get("score") is None else " " + fmt(r.get("score"))}</span></summary>{body}</details>'
+            f'<details class="case v-{esc(v)}" id="case-{esc(cid)}">'
+            f'<summary><i class="dot"></i>{esc(cid)} {esc(r["name"])} <span class="badge">{esc(VERDICT_KO.get(v, v))}{"" if binary or r.get("score") is None else " " + fmt(r.get("score"))}</span></summary>{body}</details>'
         )
 
     raw = esc(
@@ -576,31 +577,40 @@ def build_html(root, summary, manifest, criteria, recommendations):
     )
     style = """
 :root{color-scheme:light;--bg:#fcfcfb;--card:#fff;--ink:#0b0b0b;--ink2:#52514e;--muted:#7a7873;--line:#e4e2dc;--accent:#2a78d6;--good:#0ca30c;--warn:#fab219;--bad:#d03b3b;font-family:system-ui,-apple-system,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;color:var(--ink);background:var(--bg);line-height:1.6}
-body{max-width:1060px;margin:auto;padding:32px 20px 60px}h1{font-size:1.9rem;margin:0 0 4px;letter-spacing:-.02em}h2{font-size:1.3rem;margin:0 0 12px}h3{font-size:1.02rem;margin:0 0 6px}section{margin:34px 0}p{margin:6px 0}.sub{color:var(--ink2)}
-.hero{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px 26px;margin:18px 0}.hero .big{font-size:2rem;font-weight:800;letter-spacing:-.03em}.hero .big.good{color:var(--good)}.hero .big.critical{color:var(--bad)}.hero .big.warning{color:#8a4b00}.hero .cond{color:var(--ink2);font-size:.92rem}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}.tcase{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}.tid{font-size:.78rem;font-weight:700;color:var(--muted);letter-spacing:.04em}.cat{font-weight:600;background:#eef3fb;color:var(--accent);border-radius:999px;padding:1px 8px;margin-left:6px}.prompt{white-space:pre-wrap;color:var(--ink2);font-size:.92rem;background:#f6f5f2;border-radius:8px;padding:10px}.expect{font-size:.92rem;color:var(--ink2)}
-.dot-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}.dot-card{display:grid;grid-template-columns:16px 1fr;gap:4px 10px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;text-decoration:none;color:inherit}.dot-card:hover{box-shadow:0 4px 14px rgba(0,0,0,.08)}.dot{width:14px;height:14px;border-radius:50%;background:#ccc;display:inline-block}.v-PASS .dot{background:var(--good)}.v-FAIL .dot{background:var(--bad)}.v-ERROR .dot{background:var(--warn)}.dot-card.v-FAIL{background:#fdf5f3;border-color:#f1bcbc}.dot-card.v-ERROR{background:#fff8e6;border-color:#f3dc9a}.dot-id{font-size:.75rem;font-weight:700;color:var(--muted)}.dot-name{grid-column:2;font-size:.92rem;font-weight:600;line-height:1.35}.dot-score{grid-column:2;font-size:.82rem;color:var(--ink2)}
-.bars{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-top:14px}.bar-row{display:grid;grid-template-columns:120px 1fr 70px;align-items:center;gap:10px;margin:6px 0;font-size:.92rem}.bar{height:10px;background:#eeece7;border-radius:5px;overflow:hidden}.bar i{display:block;height:100%;background:var(--accent)}.bar-val{text-align:right;color:var(--ink2)}
-.insight{background:var(--card);border:1px solid var(--line);border-left:5px solid var(--accent);border-radius:12px;padding:14px 18px;margin:10px 0}.insight.fail{border-left-color:var(--bad)}.insight.error{border-left-color:var(--warn)}.insight.ok{border-left-color:var(--good)}.insight.weak{border-left-color:#ec835a}.insight .k{font-size:.78rem;font-weight:700;color:var(--muted);margin:8px 0 0;letter-spacing:.04em}
-details.case{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 16px;margin:10px 0}details.case>summary{cursor:pointer;font-weight:600;display:flex;align-items:center;gap:8px}details.case.v-FAIL{border-color:#f1bcbc}details.case.v-ERROR{border-color:#f3dc9a}.badge{margin-left:auto;font-size:.8rem;font-weight:600;background:#f1f0ec;border-radius:999px;padding:2px 10px}.v-FAIL .badge{background:#fbe9e9;color:var(--bad)}.v-PASS .badge{background:#e8f6e8;color:#006300}.v-ERROR .badge{background:#fff4d6;color:#6d4a00}
-.why{background:#fdf3f0;border-radius:8px;padding:8px 12px}.err{background:#fff4d6;border-radius:8px;padding:8px 12px}.dims{font-size:.88rem;color:var(--ink2)}table.qs{width:100%;border-collapse:collapse;margin:8px 0;font-size:.92rem}table.qs th,table.qs td{text-align:left;padding:8px;border-bottom:1px solid var(--line);vertical-align:top}table.qs th{white-space:nowrap;color:var(--ink2);font-size:.82rem}.score{font-weight:800;white-space:nowrap}.s-1,.s-2{color:var(--bad)}.s-3{color:#8a4b00}.q{font-weight:600}.crit{font-size:.72rem;font-weight:700;color:var(--bad);background:#fbe9e9;border-radius:999px;padding:1px 6px;margin-left:6px}.anchor{color:var(--ink2);font-size:.88rem}.det,.meta{font-size:.85rem;color:var(--ink2)}.links a{margin-right:8px}a{color:#0563a4}
-.filters button{font:inherit;font-size:.88rem;border:1px solid var(--line);background:var(--card);border-radius:999px;padding:6px 12px;cursor:pointer;margin-right:6px}.filters button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
-footer{color:var(--muted);font-size:.85rem;border-top:1px solid var(--line);padding-top:16px}pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:.78rem}
-@media(max-width:600px){body{padding:18px 12px}.bar-row{grid-template-columns:90px 1fr 60px}}
+body{max-width:900px;margin:auto;padding:32px 20px 60px}h1{font-size:1.8rem;margin:0 0 4px;letter-spacing:-.02em}h2{font-size:1.2rem;margin:0 0 10px}h3{font-size:1rem;margin:0 0 6px}section{margin:30px 0}p{margin:6px 0}.sub{color:var(--ink2);font-size:.92rem}a{color:#0563a4}
+.hero{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px 24px;margin:16px 0}.hero .big{font-size:2rem;font-weight:800;letter-spacing:-.03em}.hero .big.good{color:var(--good)}.hero .big.critical{color:var(--bad)}.hero .big.warning{color:#8a4b00}.hero .cond{color:var(--ink2);font-size:.9rem;margin:2px 0 0}
+.chips{display:flex;flex-wrap:wrap;gap:8px}.chip{display:inline-flex;align-items:center;gap:6px;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:5px 12px 5px 8px;text-decoration:none;color:inherit;font-size:.86rem;font-weight:600}.chip b{font-weight:700;color:var(--ink2)}.chip:hover{box-shadow:0 3px 10px rgba(0,0,0,.1)}.chip.v-FAIL{background:#fdf5f3;border-color:#f1bcbc}.chip.v-ERROR{background:#fff8e6;border-color:#f3dc9a}
+.dot{width:11px;height:11px;border-radius:50%;background:#ccc;display:inline-block;flex:none}.v-PASS .dot{background:var(--good)}.v-FAIL .dot{background:var(--bad)}.v-ERROR .dot{background:var(--warn)}.legend{font-size:.82rem;color:var(--muted);margin-top:8px}.legend .dot{width:9px;height:9px;margin:0 3px 0 8px}
+.bars{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 18px;margin-top:14px}.bar-row{display:grid;grid-template-columns:110px 1fr 64px;align-items:center;gap:10px;margin:5px 0;font-size:.9rem}.bar{height:9px;background:#eeece7;border-radius:5px;overflow:hidden}.bar i{display:block;height:100%;background:var(--accent)}.bar-val{text-align:right;color:var(--ink2)}
+details{border-radius:12px}summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px}summary::-webkit-details-marker{display:none}summary::before{content:"";width:7px;height:7px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(-45deg);transition:transform .15s;flex:none;margin:0 4px}details[open]>summary::before{transform:rotate(45deg)}
+.insight{background:var(--card);border:1px solid var(--line);border-left:5px solid var(--accent);padding:10px 16px;margin:8px 0}.insight>summary{font-weight:600}.insight.fail{border-left-color:var(--bad)}.insight.error{border-left-color:var(--warn)}.insight.ok{border-left-color:var(--good)}.insight.weak{border-left-color:#ec835a}.insight.info{border-left-color:#b9b6ae}.ibody{padding:6px 0 4px 19px;font-size:.93rem}.insight .k{font-size:.76rem;font-weight:700;color:var(--muted);margin:8px 0 0;letter-spacing:.04em}
+details.block{background:var(--card);border:1px solid var(--line);padding:14px 18px;margin:16px 0}details.block>summary{font-size:1.15rem;font-weight:700}details.block>summary .hint{margin-left:auto;font-size:.82rem;font-weight:500;color:var(--muted)}details.block>summary h2{margin:0;font-size:inherit}.block-body{padding-top:10px}
+.tcase{border-top:1px solid var(--line);padding:8px 0;border-radius:0}.tcase>summary{font-size:.93rem;font-weight:600}.tid{font-size:.76rem;font-weight:700;color:var(--muted);letter-spacing:.04em}.cat{font-size:.76rem;font-weight:600;background:#eef3fb;color:var(--accent);border-radius:999px;padding:1px 8px}.prompt{white-space:pre-wrap;color:var(--ink2);font-size:.9rem;background:#f6f5f2;border-radius:8px;padding:10px;margin:8px 0 4px 19px}.expect{font-size:.9rem;color:var(--ink2);margin-left:19px}
+details.case{border:1px solid var(--line);padding:10px 14px;margin:8px 0}details.case>summary{font-weight:600}details.case.v-FAIL{border-color:#f1bcbc}details.case.v-ERROR{border-color:#f3dc9a}.badge{margin-left:auto;font-size:.8rem;font-weight:600;background:#f1f0ec;border-radius:999px;padding:2px 10px}.v-FAIL .badge{background:#fbe9e9;color:var(--bad)}.v-PASS .badge{background:#e8f6e8;color:#006300}.v-ERROR .badge{background:#fff4d6;color:#6d4a00}
+.why{background:#fdf3f0;border-radius:8px;padding:8px 12px}.err{background:#fff4d6;border-radius:8px;padding:8px 12px}.dims{font-size:.88rem;color:var(--ink2)}table.qs{width:100%;border-collapse:collapse;margin:8px 0;font-size:.9rem}table.qs th,table.qs td{text-align:left;padding:8px;border-bottom:1px solid var(--line);vertical-align:top}table.qs th{white-space:nowrap;color:var(--ink2);font-size:.8rem}.score{font-weight:800;white-space:nowrap}.s-1,.s-2{color:var(--bad)}.s-3{color:#8a4b00}.q{font-weight:600}.crit{font-size:.72rem;font-weight:700;color:var(--bad);background:#fbe9e9;border-radius:999px;padding:1px 6px;margin-left:6px}.anchor{color:var(--ink2);font-size:.86rem}.det,.meta{font-size:.84rem;color:var(--ink2)}.links a{margin-right:8px}
+.filters{margin-bottom:8px}.filters button{font:inherit;font-size:.86rem;border:1px solid var(--line);background:var(--card);border-radius:999px;padding:5px 12px;cursor:pointer;margin-right:6px}.filters button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+footer{color:var(--muted);font-size:.82rem;border-top:1px solid var(--line);padding-top:14px;margin-top:30px}pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:.76rem}
+@media(max-width:600px){body{padding:18px 12px}.bar-row{grid-template-columns:86px 1fr 58px}}
+"""
+    script = """
+document.querySelectorAll(".filters button").forEach(function(b){b.addEventListener("click",function(){document.querySelectorAll(".filters button").forEach(function(x){x.classList.remove("on")});b.classList.add("on");var f=b.dataset.f;document.querySelectorAll("details.case").forEach(function(d){d.style.display=(f==="all"||d.classList.contains("v-"+f))?"":"none"})})});
+function reveal(){var t=location.hash&&document.getElementById(location.hash.slice(1));if(!t)return;for(var e=t;e;e=e.parentElement){if(e.tagName==="DETAILS")e.open=true}t.scrollIntoView()}
+window.addEventListener("hashchange",reveal);reveal();
 """
     page = (
-        f'<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>{esc(skill)} 스킬 평가</title><style>{style}</style></head><body>'
-        f'<a href="#glance">결과로 바로가기</a><main id="main">'
-        f'<header><p class="sub">스킬 평가 보고 · {esc(summary["run_id"])}</p><h1>{esc(skill)}</h1>'
-        f'<div class="hero"><div class="big {tone}">{esc(head)} — {esc(verdict_word)}</div><p class="cond">{cond}</p>'
-        f"<p>{esc(manifest['skill'].get('description', ''))}</p></div></header>"
-        f'<section id="glance"><h2>결과 한눈에</h2><p class="sub">초록 통과 · 빨강 실패 · 노랑 미판정(채점 도구 문제). 카드를 누르면 상세로 이동합니다.</p><div class="dot-grid">{"".join(dots)}</div>'
+        f'<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>{esc(skill)} 스킬 평가</title><style>{style}</style></head><body><main id="main">'
+        f'<header><p class="sub">스킬 평가 · {esc(summary["run_id"])}</p><h1>{esc(skill)}</h1>'
+        f'<div class="hero"><div class="big {tone}">{esc(head)}</div><p class="cond">{cond}</p></div></header>'
+        f'<section id="score"><h2>점수</h2><div class="chips">{"".join(chips)}</div>'
+        f'<p class="legend"><i class="dot v-PASS" style="background:var(--good)"></i>통과 <i class="dot" style="background:var(--bad)"></i>실패 <i class="dot" style="background:var(--warn)"></i>미판정(채점 도구 문제) · 누르면 상세로</p>'
         f'<div class="bars"><h3>{esc(dim_title)}</h3>{"".join(bars)}</div></section>'
-        f'<section id="insights"><h2>개선 인사이트</h2><p class="sub">채점 결과에서 자동으로 뽑은 것입니다. 실패 이유와 통과하려면 무엇이 필요한지, 통과했더라도 낮은 항목을 보여 줍니다.</p>{insight_html}</section>'
-        f'<section id="tested"><h2>무엇을 시험했나</h2><p class="sub">{esc(manifest.get("analysis", {}).get("purpose", ""))}</p><div class="grid">{"".join(tested)}</div></section>'
-        f'<section id="cases"><h2>문제별 상세</h2><div class="filters"><button class="on" data-f="all">전체</button><button data-f="FAIL">실패만</button><button data-f="ERROR">미판정만</button></div>{"".join(details)}</section>'
-        f"<footer><details><summary>원시 데이터(원문 유지)</summary><pre>{raw}</pre></details>"
-        f'<p><a href="REPORT.md">REPORT.md</a> · <a href="manifest.json">실행 명세</a> · <a href="summary.json">집계</a> · <a href="criteria.yaml">평가 기준</a> · 비용은 CLI 정가 추정치이며 청구서가 아닙니다. 업무 효과 점수는 루브릭 판단이며 인과적 효과의 증명이 아닙니다.</p></footer></main>'
-        '<script>document.querySelectorAll(".filters button").forEach(function(b){b.addEventListener("click",function(){document.querySelectorAll(".filters button").forEach(function(x){x.classList.remove("on")});b.classList.add("on");var f=b.dataset.f;document.querySelectorAll("details.case").forEach(function(d){d.style.display=(f==="all"||d.classList.contains("v-"+f))?"":"none"})})});</script></body></html>'
+        f'<section id="insights"><h2>인사이트</h2>{insight_html}</section>'
+        f'<details class="block" id="tested"><summary><h2>어떻게 시험했나</h2><span class="hint">{total}문제</span></summary><div class="block-body">'
+        f'<p class="sub">{esc(method)}</p><p class="sub">{esc(manifest.get("analysis", {}).get("purpose", ""))}</p>{"".join(tested)}</div></details>'
+        f'<details class="block" id="cases"><summary><h2>문제별 상세</h2><span class="hint">점수·심판 이유·근거 링크</span></summary><div class="block-body">'
+        f'<div class="filters"><button class="on" data-f="all">전체</button><button data-f="FAIL">실패만</button><button data-f="ERROR">미판정만</button></div>{"".join(details)}</div></details>'
+        f"<footer><details><summary>원시 데이터</summary><pre>{raw}</pre></details>"
+        f'<p><a href="REPORT.md">REPORT.md</a> · <a href="manifest.json">실행 명세</a> · <a href="summary.json">집계</a> · <a href="criteria.yaml">평가 기준</a> · 비용은 CLI 정가 추정치. 업무 효과 점수는 루브릭 판단이며 인과적 효과의 증명이 아닙니다.</p></footer></main>'
+        f"<script>{script}</script></body></html>"
     )
     return page
