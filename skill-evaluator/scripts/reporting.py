@@ -170,7 +170,7 @@ def write_reports(run_dir, summary, manifest, visualize=True):
 
 
 # ---------------------------------------------------------------------------
-# Readable HTML report: score → insights → how it was tested (collapsed) → details (collapsed)
+# Dashboard HTML report: KPI tiles → per-case scores / radar / categories / durations → insights → collapsed detail blocks
 # ---------------------------------------------------------------------------
 
 VERDICT_KO = {"PASS": "통과", "FAIL": "실패", "ERROR": "미판정"}
@@ -386,6 +386,55 @@ def build_insights(summary, specs, binary):
     return items
 
 
+def radar_svg(dims, binary):
+    """Inline SVG radar of dimension values (1–5 Likert or 0–1 binary rate)."""
+    import math
+
+    keys = [k for k in dims]
+    n = len(keys)
+    if n < 3:
+        return ""
+    cx = cy = 130
+    r = 88
+
+    def pt(i, frac):
+        a = -math.pi / 2 + 2 * math.pi * i / n
+        return cx + r * frac * math.cos(a), cy + r * frac * math.sin(a)
+
+    grid = "".join(
+        '<polygon points="'
+        + " ".join(f"{x:.1f},{y:.1f}" for x, y in (pt(i, lv) for i in range(n)))
+        + f'" fill="none" stroke="#e4e2dc" stroke-width="{1.4 if lv == 1 else 0.8}"/>'
+        for lv in (0.25, 0.5, 0.75, 1)
+    )
+    axes = "".join(
+        f'<line x1="{cx}" y1="{cy}" x2="{pt(i, 1)[0]:.1f}" y2="{pt(i, 1)[1]:.1f}" stroke="#e4e2dc" stroke-width=".8"/>'
+        for i in range(n)
+    )
+    vals = []
+    for i, k in enumerate(keys):
+        v = dims[k]
+        frac = 0 if v is None else (v if binary else (v - 1) / 4)
+        vals.append((pt(i, max(0, min(1, frac))), v))
+    poly = (
+        '<polygon points="'
+        + " ".join(f"{x:.1f},{y:.1f}" for (x, y), _ in vals)
+        + '" fill="rgba(42,120,214,.22)" stroke="#2a78d6" stroke-width="2"/>'
+    )
+    dots = "".join(
+        f'<circle cx="{x:.1f}" cy="{y:.1f}" r="3.5" fill="#2a78d6"/>'
+        for (x, y), _ in vals
+    )
+    labels = ""
+    for i, k in enumerate(keys):
+        x, y = pt(i, 1.24)
+        anchor = "middle" if abs(x - cx) < 12 else ("start" if x > cx else "end")
+        v = dims[k]
+        val = "미확인" if v is None else (f"{v:.0%}" if binary else f"{v:.2f}")
+        labels += f'<text x="{x:.1f}" y="{y:.1f}" text-anchor="{anchor}" font-size="11" fill="#52514e"><tspan font-weight="700" fill="#0b0b0b">{esc(label(k))}</tspan> {val}</text>'
+    return f'<svg viewBox="-52 -8 364 276" role="img" aria-label="차원별 점수 레이더">{grid}{axes}{poly}{dots}{labels}</svg>'
+
+
 def build_html(root, summary, manifest, criteria, recommendations):
     binary = summary["grading"] == "binary"
     specs = {c["id"]: c for c in criteria.get("test_cases", [])}
@@ -398,54 +447,129 @@ def build_html(root, summary, manifest, criteria, recommendations):
         if summary["verdict"] == "PASS"
         else ("critical" if summary["failed"] else "warning")
     )
-    head = f"{passed}/{total} 통과"
-    if summary.get("grade") and not binary:
-        head += f" · 등급 {summary['grade']}"
-    if summary["failed"]:
-        head += f" · 실패 {summary['failed']}"
-    if summary["errors"]:
-        head += f" · 미판정 {summary['errors']}"
     cost = summary.get("cost_usd")
     minutes = (summary.get("wall_clock_seconds") or 0) / 60
     rounds = options.get("judge_rounds", "?")
     cond = f"{label(summary['mode'])} · {label(summary['grading'])} · 채점 {rounds}회 · 모델 {esc(options.get('model') or 'CLI 기본')}"
-    cond += f" · 약 ${cost:.2f}" if cost is not None else " · 비용 미확인"
-    cond += f" · {minutes:.0f}분" if minutes else ""
 
-    # ---- score: one chip per case, one bar per dimension ----
-    chips = []
+    # ---- KPI tiles ----
+    fails = summary["failed"]
+    errs = summary["errors"]
+    sub_pass = (
+        " · ".join(
+            s
+            for s in (
+                f"실패 {fails}" if fails else "",
+                f"미판정 {errs}" if errs else "",
+            )
+            if s
+        )
+        or "전부 통과"
+    )
+    tiles = [
+        (tone, f"{passed}/{total}", "통과", sub_pass),
+    ]
+    if binary:
+        tiles.append(
+            (
+                tone,
+                "PASS" if summary["verdict"] == "PASS" else "FAIL",
+                "판정",
+                f"통과율 {summary['pass_rate']:.0%}"
+                if summary.get("pass_rate") is not None
+                else "",
+            )
+        )
+    else:
+        tiles.append(
+            (
+                "",
+                summary.get("grade") or "-",
+                "등급",
+                f"평균 {fmt(summary.get('score'))} / 5"
+                if summary.get("score") is not None
+                else "채점된 문제 없음",
+            )
+        )
+    tiles.append(
+        (
+            "",
+            f"${cost:.2f}" if cost is not None else "미확인",
+            "비용(추정)",
+            f"실행 {fmt(summary.get('execution_cost_usd'))} · 채점 {fmt(summary.get('judge_cost_usd'))}",
+        )
+    )
+    slowest = max(
+        (r for r in results if r["metadata"].get("duration_seconds")),
+        key=lambda r: r["metadata"]["duration_seconds"],
+        default=None,
+    )
+    tiles.append(
+        (
+            "",
+            f"{minutes:.0f}분" if minutes else "미확인",
+            "소요 시간",
+            f"가장 긴 문제 {slowest['case_id']} {slowest['metadata']['duration_seconds']:.0f}초"
+            if slowest
+            else "",
+        )
+    )
+    tile_html = "".join(
+        f'<div class="tile"><div class="v {t}">{esc(v)}</div><div class="l">{esc(name)}</div><div class="s">{esc(s)}</div></div>'
+        for t, v, name, s in tiles
+    )
+
+    # ---- per-case score bars ----
+    case_rows = []
     for r in results:
         v = r["verdict"]
         cid = r["case_id"]
-        score = (
-            VERDICT_KO.get(v, v)
-            if binary or r.get("score") is None
-            else fmt(r.get("score"))
+        score = r.get("score")
+        if score is None:
+            width, txt = 0, "미판정"
+        elif binary:
+            width, txt = score * 100, f"{score:.0%}"
+        else:
+            width, txt = (score - 1) / 4 * 100, fmt(score)
+        case_rows.append(
+            f'<a class="crow v-{esc(v)}" href="#case-{esc(cid)}" title="{esc(r["name"])}"><span class="cid"><i class="dot"></i>{esc(cid)}</span><span class="cname">{esc(r["name"])}</span>'
+            f'<span class="bar"><i style="width:{max(0, min(100, width)):.0f}%"></i></span><span class="cval">{esc(txt)}</span></a>'
         )
-        chips.append(
-            f'<a class="chip v-{esc(v)}" href="#case-{esc(cid)}" title="{esc(r["name"])}"><i class="dot"></i>{esc(cid)}<b>{esc(score)}</b></a>'
-        )
-    bars = []
-    for d, v in summary.get("dimensions", {}).items():
-        if v is None:
-            bars.append(
-                f'<div class="bar-row"><span class="bar-label">{esc(label(d))}</span><span class="bar"></span><span class="bar-val">미확인</span></div>'
-            )
-            continue
-        width = (v * 100) if binary else ((v - 1) / 4 * 100)
-        bars.append(
-            f'<div class="bar-row"><span class="bar-label">{esc(label(d))}</span><span class="bar"><i style="width:{max(0, min(100, width)):.0f}%"></i></span>'
-            f'<span class="bar-val">{fmt(v)}{"" if binary else " / 5"}</span></div>'
-        )
-    dim_title = "차원별 통과율" if binary else "다섯 관점 평균 (1~5)"
+    thr = "통과선 1.0(모든 차원)" if binary else "통과선 3.0"
 
-    # ---- insights: one line each, body on click ----
+    # ---- category + duration panels ----
+    cat_rows = []
+    for c, info in summary.get("categories", {}).items():
+        rate = info.get("pass_rate")
+        cnt = info.get("count", 0)
+        ok = round((rate or 0) * cnt)
+        cat_rows.append(
+            f'<div class="mrow"><span class="ml">{esc(label(c))}</span><span class="bar"><i style="width:{(rate or 0) * 100:.0f}%"></i></span><span class="mv">{ok}/{cnt}</span></div>'
+        )
+    durs = [
+        (
+            r["case_id"],
+            r["metadata"].get("duration_seconds") or 0,
+            r["metadata"].get("timed_out"),
+        )
+        for r in results
+    ]
+    dmax = max([d for _, d, _ in durs] + [1])
+    dur_rows = "".join(
+        f'<div class="mrow"><span class="ml">{esc(cid)}</span><span class="bar"><i class="{"to" if to else ""}" style="width:{d / dmax * 100:.0f}%"></i></span><span class="mv">{d:.0f}초{" ⚠" if to else ""}</span></div>'
+        for cid, d, to in durs
+    )
+    dur_note = (
+        "⚠ 시간 초과: 그때까지 한 일만 채점" if any(to for _, _, to in durs) else ""
+    )
+
+    # ---- insights ----
     insight_html = "".join(
         f'<details class="insight {kind}"><summary>{title}</summary><div class="ibody">{body}</div></details>'
         for kind, title, body in build_insights(summary, specs, binary)
     )
 
-    # ---- how it was tested: one line per case, prompt on click ----
+    # ---- how it was tested ----
     tested = []
     for r in results:
         cid = r["case_id"]
@@ -575,22 +699,27 @@ def build_html(root, summary, manifest, criteria, recommendations):
             {"manifest": manifest, "summary": summary}, indent=2, ensure_ascii=False
         )
     )
+    dim_title = "차원별 통과율" if binary else "다섯 관점 (1~5)"
     style = """
-:root{color-scheme:light;--bg:#fcfcfb;--card:#fff;--ink:#0b0b0b;--ink2:#52514e;--muted:#7a7873;--line:#e4e2dc;--accent:#2a78d6;--good:#0ca30c;--warn:#fab219;--bad:#d03b3b;font-family:system-ui,-apple-system,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;color:var(--ink);background:var(--bg);line-height:1.6}
-body{max-width:900px;margin:auto;padding:32px 20px 60px}h1{font-size:1.8rem;margin:0 0 4px;letter-spacing:-.02em}h2{font-size:1.2rem;margin:0 0 10px}h3{font-size:1rem;margin:0 0 6px}section{margin:30px 0}p{margin:6px 0}.sub{color:var(--ink2);font-size:.92rem}a{color:#0563a4}
-.hero{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px 24px;margin:16px 0}.hero .big{font-size:2rem;font-weight:800;letter-spacing:-.03em}.hero .big.good{color:var(--good)}.hero .big.critical{color:var(--bad)}.hero .big.warning{color:#8a4b00}.hero .cond{color:var(--ink2);font-size:.9rem;margin:2px 0 0}
-.chips{display:flex;flex-wrap:wrap;gap:8px}.chip{display:inline-flex;align-items:center;gap:6px;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:5px 12px 5px 8px;text-decoration:none;color:inherit;font-size:.86rem;font-weight:600}.chip b{font-weight:700;color:var(--ink2)}.chip:hover{box-shadow:0 3px 10px rgba(0,0,0,.1)}.chip.v-FAIL{background:#fdf5f3;border-color:#f1bcbc}.chip.v-ERROR{background:#fff8e6;border-color:#f3dc9a}
-.dot{width:11px;height:11px;border-radius:50%;background:#ccc;display:inline-block;flex:none}.v-PASS .dot{background:var(--good)}.v-FAIL .dot{background:var(--bad)}.v-ERROR .dot{background:var(--warn)}.legend{font-size:.82rem;color:var(--muted);margin-top:8px}.legend .dot{width:9px;height:9px;margin:0 3px 0 8px}
-.bars{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 18px;margin-top:14px}.bar-row{display:grid;grid-template-columns:110px 1fr 64px;align-items:center;gap:10px;margin:5px 0;font-size:.9rem}.bar{height:9px;background:#eeece7;border-radius:5px;overflow:hidden}.bar i{display:block;height:100%;background:var(--accent)}.bar-val{text-align:right;color:var(--ink2)}
+:root{color-scheme:light;--bg:#f4f4f1;--card:#fff;--ink:#0b0b0b;--ink2:#52514e;--muted:#7a7873;--line:#e4e2dc;--accent:#2a78d6;--good:#0ca30c;--warn:#e4a11b;--bad:#d03b3b;font-family:system-ui,-apple-system,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;color:var(--ink);background:var(--bg);line-height:1.5}
+body{max-width:1120px;margin:auto;padding:26px 20px 60px}h1{font-size:1.5rem;margin:0;letter-spacing:-.02em}h2{font-size:.82rem;font-weight:700;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;margin:0 0 10px}h3{font-size:1rem;margin:0 0 6px}p{margin:6px 0}.sub{color:var(--ink2);font-size:.9rem}a{color:#0563a4}
+header{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 16px;margin-bottom:16px}header .run{color:var(--muted);font-size:.8rem}header .cond{margin-left:auto;color:var(--ink2);font-size:.85rem}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:12px}.tile{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px}.tile .v{font-size:1.9rem;font-weight:800;letter-spacing:-.03em;line-height:1.1}.tile .v.good{color:var(--good)}.tile .v.critical{color:var(--bad)}.tile .v.warning{color:#8a4b00}.tile .l{font-size:.8rem;font-weight:700;color:var(--muted);margin-top:2px}.tile .s{font-size:.78rem;color:var(--ink2);margin-top:2px}
+.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:12px;align-items:start}.panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;min-width:0}.col{display:grid;gap:12px;min-width:0}.c7{grid-column:span 7}.c5{grid-column:span 5}.c12{grid-column:span 12}.note{font-size:.76rem;color:var(--muted);margin:8px 0 0}
+.crow{display:grid;grid-template-columns:78px minmax(0,150px) 1fr 52px;align-items:center;gap:8px;padding:4px 0;text-decoration:none;color:inherit;font-size:.85rem;border-radius:6px}.crow:hover{background:#f6f5f2}.cid{font-weight:700;display:flex;align-items:center;gap:6px;color:var(--ink2)}.cname{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink2)}.cval{text-align:right;font-weight:700}
+.bar{position:relative;height:9px;background:#eeece7;border-radius:5px;overflow:hidden;display:block}.bar i{display:block;height:100%;background:var(--accent);border-radius:5px}.crow .bar::after{content:"";position:absolute;left:50%;top:-2px;bottom:-2px;border-left:2px dashed #b9b6ae}.v-FAIL .bar i{background:var(--bad)}.v-ERROR .bar i{background:var(--warn)}.v-PASS .bar i{background:var(--good)}.bar i.to{background:var(--warn)}
+.dot{width:10px;height:10px;border-radius:50%;background:#ccc;display:inline-block;flex:none}.v-PASS .dot{background:var(--good)}.v-FAIL .dot{background:var(--bad)}.v-ERROR .dot{background:var(--warn)}
+.mrow{display:grid;grid-template-columns:96px 1fr 64px;align-items:center;gap:8px;font-size:.84rem;padding:3px 0}.ml{color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.mv{text-align:right;color:var(--ink2)}
+.radar{display:flex;justify-content:center}.radar svg{width:100%;max-width:340px;height:auto}
 details{border-radius:12px}summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px}summary::-webkit-details-marker{display:none}summary::before{content:"";width:7px;height:7px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(-45deg);transition:transform .15s;flex:none;margin:0 4px}details[open]>summary::before{transform:rotate(45deg)}
-.insight{background:var(--card);border:1px solid var(--line);border-left:5px solid var(--accent);padding:10px 16px;margin:8px 0}.insight>summary{font-weight:600}.insight.fail{border-left-color:var(--bad)}.insight.error{border-left-color:var(--warn)}.insight.ok{border-left-color:var(--good)}.insight.weak{border-left-color:#ec835a}.insight.info{border-left-color:#b9b6ae}.ibody{padding:6px 0 4px 19px;font-size:.93rem}.insight .k{font-size:.76rem;font-weight:700;color:var(--muted);margin:8px 0 0;letter-spacing:.04em}
-details.block{background:var(--card);border:1px solid var(--line);padding:14px 18px;margin:16px 0}details.block>summary{font-size:1.15rem;font-weight:700}details.block>summary .hint{margin-left:auto;font-size:.82rem;font-weight:500;color:var(--muted)}details.block>summary h2{margin:0;font-size:inherit}.block-body{padding-top:10px}
-.tcase{border-top:1px solid var(--line);padding:8px 0;border-radius:0}.tcase>summary{font-size:.93rem;font-weight:600}.tid{font-size:.76rem;font-weight:700;color:var(--muted);letter-spacing:.04em}.cat{font-size:.76rem;font-weight:600;background:#eef3fb;color:var(--accent);border-radius:999px;padding:1px 8px}.prompt{white-space:pre-wrap;color:var(--ink2);font-size:.9rem;background:#f6f5f2;border-radius:8px;padding:10px;margin:8px 0 4px 19px}.expect{font-size:.9rem;color:var(--ink2);margin-left:19px}
+.igrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:10px}.insight{background:#fbfaf8;border:1px solid var(--line);border-left:5px solid var(--accent);padding:10px 14px;align-self:start}.insight>summary{font-weight:600;font-size:.9rem}.insight.fail{border-left-color:var(--bad)}.insight.error{border-left-color:var(--warn)}.insight.ok{border-left-color:var(--good)}.insight.weak{border-left-color:#ec835a}.insight.info{border-left-color:#b9b6ae}.ibody{padding:6px 0 4px 19px;font-size:.88rem}.insight .k{font-size:.74rem;font-weight:700;color:var(--muted);margin:8px 0 0;letter-spacing:.04em}
+details.block{background:var(--card);border:1px solid var(--line);padding:14px 18px;margin:12px 0}details.block>summary{font-size:1.05rem;font-weight:700}details.block>summary .hint{margin-left:auto;font-size:.8rem;font-weight:500;color:var(--muted)}details.block>summary h2{margin:0;font-size:inherit;color:inherit;letter-spacing:0;text-transform:none}.block-body{padding-top:10px}
+.tcase{border-top:1px solid var(--line);padding:8px 0;border-radius:0}.tcase>summary{font-size:.9rem;font-weight:600}.tid{font-size:.76rem;font-weight:700;color:var(--muted);letter-spacing:.04em}.cat{font-size:.74rem;font-weight:600;background:#eef3fb;color:var(--accent);border-radius:999px;padding:1px 8px}.prompt{white-space:pre-wrap;color:var(--ink2);font-size:.88rem;background:#f6f5f2;border-radius:8px;padding:10px;margin:8px 0 4px 19px}.expect{font-size:.88rem;color:var(--ink2);margin-left:19px}
 details.case{border:1px solid var(--line);padding:10px 14px;margin:8px 0}details.case>summary{font-weight:600}details.case.v-FAIL{border-color:#f1bcbc}details.case.v-ERROR{border-color:#f3dc9a}.badge{margin-left:auto;font-size:.8rem;font-weight:600;background:#f1f0ec;border-radius:999px;padding:2px 10px}.v-FAIL .badge{background:#fbe9e9;color:var(--bad)}.v-PASS .badge{background:#e8f6e8;color:#006300}.v-ERROR .badge{background:#fff4d6;color:#6d4a00}
-.why{background:#fdf3f0;border-radius:8px;padding:8px 12px}.err{background:#fff4d6;border-radius:8px;padding:8px 12px}.dims{font-size:.88rem;color:var(--ink2)}table.qs{width:100%;border-collapse:collapse;margin:8px 0;font-size:.9rem}table.qs th,table.qs td{text-align:left;padding:8px;border-bottom:1px solid var(--line);vertical-align:top}table.qs th{white-space:nowrap;color:var(--ink2);font-size:.8rem}.score{font-weight:800;white-space:nowrap}.s-1,.s-2{color:var(--bad)}.s-3{color:#8a4b00}.q{font-weight:600}.crit{font-size:.72rem;font-weight:700;color:var(--bad);background:#fbe9e9;border-radius:999px;padding:1px 6px;margin-left:6px}.anchor{color:var(--ink2);font-size:.86rem}.det,.meta{font-size:.84rem;color:var(--ink2)}.links a{margin-right:8px}
-.filters{margin-bottom:8px}.filters button{font:inherit;font-size:.86rem;border:1px solid var(--line);background:var(--card);border-radius:999px;padding:5px 12px;cursor:pointer;margin-right:6px}.filters button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
-footer{color:var(--muted);font-size:.82rem;border-top:1px solid var(--line);padding-top:14px;margin-top:30px}pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:.76rem}
-@media(max-width:600px){body{padding:18px 12px}.bar-row{grid-template-columns:86px 1fr 58px}}
+.why{background:#fdf3f0;border-radius:8px;padding:8px 12px}.err{background:#fff4d6;border-radius:8px;padding:8px 12px}.dims{font-size:.86rem;color:var(--ink2)}table.qs{width:100%;border-collapse:collapse;margin:8px 0;font-size:.88rem}table.qs th,table.qs td{text-align:left;padding:8px;border-bottom:1px solid var(--line);vertical-align:top}table.qs th{white-space:nowrap;color:var(--ink2);font-size:.8rem}.score{font-weight:800;white-space:nowrap}.s-1,.s-2{color:var(--bad)}.s-3{color:#8a4b00}.q{font-weight:600}.crit{font-size:.72rem;font-weight:700;color:var(--bad);background:#fbe9e9;border-radius:999px;padding:1px 6px;margin-left:6px}.anchor{color:var(--ink2);font-size:.84rem}.det,.meta{font-size:.82rem;color:var(--ink2)}.links a{margin-right:8px}
+.filters{margin-bottom:8px}.filters button{font:inherit;font-size:.84rem;border:1px solid var(--line);background:var(--card);border-radius:999px;padding:5px 12px;cursor:pointer;margin-right:6px}.filters button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+footer{color:var(--muted);font-size:.8rem;border-top:1px solid var(--line);padding-top:14px;margin-top:24px}pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:.74rem}
+@media(max-width:760px){body{padding:16px 12px}.c7,.c5{grid-column:span 12}.crow{grid-template-columns:70px 1fr 48px}.cname{display:none}header .cond{margin-left:0}}
 """
     script = """
 document.querySelectorAll(".filters button").forEach(function(b){b.addEventListener("click",function(){document.querySelectorAll(".filters button").forEach(function(x){x.classList.remove("on")});b.classList.add("on");var f=b.dataset.f;document.querySelectorAll("details.case").forEach(function(d){d.style.display=(f==="all"||d.classList.contains("v-"+f))?"":"none"})})});
@@ -599,12 +728,15 @@ window.addEventListener("hashchange",reveal);reveal();
 """
     page = (
         f'<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>{esc(skill)} 스킬 평가</title><style>{style}</style></head><body><main id="main">'
-        f'<header><p class="sub">스킬 평가 · {esc(summary["run_id"])}</p><h1>{esc(skill)}</h1>'
-        f'<div class="hero"><div class="big {tone}">{esc(head)}</div><p class="cond">{cond}</p></div></header>'
-        f'<section id="score"><h2>점수</h2><div class="chips">{"".join(chips)}</div>'
-        f'<p class="legend"><i class="dot v-PASS" style="background:var(--good)"></i>통과 <i class="dot" style="background:var(--bad)"></i>실패 <i class="dot" style="background:var(--warn)"></i>미판정(채점 도구 문제) · 누르면 상세로</p>'
-        f'<div class="bars"><h3>{esc(dim_title)}</h3>{"".join(bars)}</div></section>'
-        f'<section id="insights"><h2>인사이트</h2>{insight_html}</section>'
+        f'<header><h1>{esc(skill)}</h1><span class="run">스킬 평가 · {esc(summary["run_id"])}</span><span class="cond">{cond}</span></header>'
+        f'<section class="tiles">{tile_html}</section>'
+        f'<section class="grid">'
+        f'<div class="col c7"><div class="panel"><h2>문제별 점수</h2>{"".join(case_rows)}<p class="note">초록 통과 · 빨강 실패 · 노랑 미판정(채점 도구 문제) · 점선은 {thr} · 누르면 상세로</p></div>'
+        f'<div class="panel"><h2>실행 시간</h2>{dur_rows}<p class="note">{esc(dur_note)}</p></div></div>'
+        f'<div class="col c5"><div class="panel"><h2>{esc(dim_title)}</h2><div class="radar">{radar_svg(summary.get("dimensions", {}), binary)}</div></div>'
+        f'<div class="panel"><h2>범주별 통과</h2>{"".join(cat_rows)}</div></div>'
+        f'<div class="panel c12"><h2>인사이트</h2><div class="igrid">{insight_html}</div></div>'
+        f"</section>"
         f'<details class="block" id="tested"><summary><h2>어떻게 시험했나</h2><span class="hint">{total}문제</span></summary><div class="block-body">'
         f'<p class="sub">{esc(method)}</p><p class="sub">{esc(manifest.get("analysis", {}).get("purpose", ""))}</p>{"".join(tested)}</div></details>'
         f'<details class="block" id="cases"><summary><h2>문제별 상세</h2><span class="hint">점수·심판 이유·근거 링크</span></summary><div class="block-body">'
