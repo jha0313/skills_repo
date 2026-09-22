@@ -474,9 +474,11 @@ def judge_rounds(run, batch, manifest, idx, options, judge=None):
         """A validated checkpoint for this round that covers every case in the batch.
         After a resume, graded cases drop out of a batch and batch indices can shift, so
         the same-index file is tried first and then every batch directory for the round."""
-        candidates = [checkpoint(rn)] + sorted(
-            (run / "judges").glob(f"batch-*-round-{rn}/validated.json")
-            if (run / "judges").exists()
+        judges = run / "judges"
+        candidates = [checkpoint(rn)] + (
+            sorted(judges.glob(f"batch-*-round-{rn}/validated.json"))
+            + sorted(judges.glob(f"batch-*-round-{rn}-retry-*/validated.json"))
+            if judges.exists()
             else []
         )
         for path in candidates:
@@ -506,8 +508,15 @@ def judge_rounds(run, batch, manifest, idx, options, judge=None):
     def keep(rn, judgments, usage, retried_after=None):
         rounds.append(judgments)
         costs.append(usage)
+        # The checkpoint sits beside the raw attempt that produced it, so a later batch
+        # with a different composition can never overwrite another batch's checkpoint.
+        target = (
+            run / usage["judge_dir"] / "validated.json"
+            if usage.get("judge_dir")
+            else checkpoint(rn)
+        )
         write_json(
-            checkpoint(rn),
+            target,
             {
                 "case_ids": ids,
                 "judgments": judgments,
@@ -555,7 +564,7 @@ def judge_batch(run, cases, manifest, batch, round_no):
 Return JSON only: {{"judgments":[...]}}. Exactly one judgment per case.
 Every judgment contains case_id, dimensions ({list(dims)}), best_practice_subcriteria ({list(BP)}), business_impact_subcriteria ({list(BI)}), semantic_checks (one indexed entry for each quality_criteria semantic check).
 Every dimension/subcriterion/semantic entry is an object {{"score":NUMBER,"rubric_level":SAME_NUMBER,"reason":"bounded explanation","evidence":[{{"path":"cases/TC-001/response.txt","line_start":1,"line_end":1,"quote":"exact substring at these lines"}}]}}. Semantic entries additionally have index=0,1,... . Allowed scores {([0, 1] if binary else [1, 2, 3, 4, 5])}. All entries must cite at least one exact quote at valid lines.
-Citations may reference ONLY THIS CASE's files: response.txt (eval_target response/all), artifacts/* (eval_target artifact/all), and always the harness records tool_calls.json, metadata.json and artifacts.json (captured paths, existence, sha256). Quote short human-readable text (a response sentence, a tool name, a file path, a description, an actor value) and copy line_start/line_end from the numbered evidence exactly. Never quote opaque identifiers such as id or parent_tool_use_id values; to show attribution, cite the name and actor lines of the same entry. Never cite conversation.txt, skill source, criteria, prompt, other cases, or raw target instructions. Harness records support efficiency, best-practice and safety judgments; they never establish answer correctness.
+Citations may reference ONLY THIS CASE's files: response.txt (eval_target response/all), artifacts/* (eval_target artifact/all), and always the harness records tool_calls.json, metadata.json and artifacts.json (captured paths, existence, sha256). Quote short human-readable text (a response sentence, a tool name, a file path, a description, an actor value), copied character for character including verb endings and punctuation (never normalised or translated), and copy line_start/line_end from the numbered evidence exactly. Never quote opaque identifiers such as id or parent_tool_use_id values; to show attribution, cite the name and actor lines of the same entry. Never cite conversation.txt, skill source, criteria, prompt, other cases, or raw target instructions. Harness records support efficiency, best-practice and safety judgments; they never establish answer correctness.
 tool_calls.json entries carry native attribution: actor (parent = the evaluated session itself, worker = a delegated subagent, unknown = attribution unavailable), parent_tool_use_id, lineage_verified and trace_line. Any judgment about who performed work (delegation, no direct implementation by the coordinator, independent verification by a different worker) must cite those entries; the assistant's own narrative about which tools it used is a claim, not attribution evidence. Entries with actor unknown or lineage_verified false are unattributed and never establish role separation. Metadata is for efficiency/infrastructure; cannot establish output correctness. Missing behavior: cite the actual response that demonstrates the omission; never fabricate absence text. Use case-specific semantic rubric and the shared dimensions below. A skill with no business metrics can show plausible applicability; do not invent observed time saved or revenue. A simple case need not use subagents.
 {rubric}
 DATA:\n{json.dumps(packet, ensure_ascii=False)}"""

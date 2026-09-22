@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import collections
+import difflib
 import hashlib
 import json
 import math
@@ -41,6 +42,9 @@ BI = (
 WEIGHTS = dict(zip(DIMENSIONS, (0.10, 0.10, 0.15, 0.15, 0.50)))
 # Cited line ranges may be off by this many lines when the quote itself is verbatim.
 CITATION_LINE_TOLERANCE = 2
+# A quote may differ from the cited text by at most this many characters (for example a
+# changed verb ending) and must still match at least 95% of its characters in order.
+CITATION_MAX_ALTERED_CHARS = 1
 DISTRIBUTIONS = {
     "basic": (1, 1, 1, 1, 0),
     "thorough": (2, 1, 2, 2, 3),
@@ -295,9 +299,29 @@ def verify_citation(citation, run_dir):
         # not in the file, is still rejected.
         lo = max(1, start - CITATION_LINE_TOLERANCE)
         hi = min(len(lines), end + CITATION_LINE_TOLERANCE)
-        if quote not in "\n".join(lines[lo - 1 : hi]):
+        window = "\n".join(lines[lo - 1 : hi])
+        if quote not in window and not near_verbatim(quote, window):
             raise EvalError("Evidence quote is not present at cited lines")
     return citation
+
+
+def near_verbatim(quote, window):
+    """True when the quote appears in the window with at most one character altered:
+    at most one quote character unmatched and at most one extra window character inside
+    the matched span, with at least 95% of the quote matched. A judge normalising a verb
+    ending passes; a dropped prefix that flips meaning ("uncovered" -> "covered"), a
+    changed verdict word, or an invented sentence stays rejected."""
+    matcher = difflib.SequenceMatcher(None, quote, window, autojunk=False)
+    blocks = [b for b in matcher.get_matching_blocks() if b.size]
+    if not blocks:
+        return False
+    matched = sum(b.size for b in blocks)
+    span = blocks[-1].b + blocks[-1].size - blocks[0].b
+    missing, extra = len(quote) - matched, span - matched
+    return (
+        max(missing, extra) <= CITATION_MAX_ALTERED_CHARS
+        and matched / len(quote) >= 0.95
+    )
 
 
 def _score_item(item, binary, run_dir, case, derived=False):

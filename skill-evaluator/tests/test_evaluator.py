@@ -301,6 +301,32 @@ class EvaluatorTests(unittest.TestCase):
         ):
             with self.assertRaises(core.EvalError):
                 core.verify_citation(bad, self.root)
+        # A judge that normalises a Korean verb ending still points at real evidence.
+        lines[3] = (
+            "`git worktree add`는 base revision을 요구하므로 **원리적으로 불가능**합니다."
+        )
+        path.write_text("\n".join(lines) + "\n")
+        core.verify_citation(
+            {
+                "path": rel,
+                "line_start": 4,
+                "line_end": 4,
+                "quote": "`git worktree add`는 base revision을 요구하므로 **원리적으로 불가능**입니다.",
+            },
+            self.root,
+        )
+        # A flipped verdict word or an invented sentence is not a slip.
+        lines[8] = "GATE result: 4 tests passed, exit 0"
+        path.write_text("\n".join(lines) + "\n")
+        for bad_quote in (
+            "GATE result: 4 tests failed, exit 0",
+            "GATE result: all tests skipped",
+        ):
+            with self.assertRaises(core.EvalError):
+                core.verify_citation(
+                    {"path": rel, "line_start": 9, "line_end": 9, "quote": bad_quote},
+                    self.root,
+                )
 
     def test_judge_rounds_reuse_checkpoints_after_batches_shift(self):
         """After a resume, graded cases leave their batch and indices shift; validated
@@ -356,6 +382,51 @@ class EvaluatorTests(unittest.TestCase):
         # The original checkpoints are left untouched.
         old = core.read_data(self.root / "judges/batch-001-round-2/validated.json")
         self.assertEqual(old["case_ids"], ["TC-001", "TC-002"])
+
+    def test_judge_checkpoint_never_overwrites_another_batch(self):
+        """The validated checkpoint is written beside the raw attempt that produced it,
+        so a re-batched resume cannot clobber a different batch's checkpoint."""
+        options = {
+            "judge_rounds": 1,
+            "concurrency": 1,
+            "mode": "basic",
+            "binary": False,
+        }
+        other = self.root / "judges/batch-000-round-1"
+        core.write_json(
+            other / "validated.json",
+            {"case_ids": ["TC-009"], "judgments": {}, "usage": {"cost_usd": 1.0}},
+        )
+
+        def judge(run, cases, manifest, idx, rn):
+            out = evaluate.judge_attempt_dir(run, idx, rn)
+            out.mkdir(parents=True)
+            return {"TC-001": self.judgment()}, {
+                "cost_usd": 1.0,
+                "judge_dir": str(out.relative_to(run)),
+            }
+
+        rounds, _ = evaluate.judge_rounds(
+            self.root, [self.case], {}, 0, options, judge=judge
+        )
+        self.assertEqual(len(rounds), 1)
+        self.assertEqual(
+            core.read_data(other / "validated.json")["case_ids"], ["TC-009"]
+        )
+        mine = self.root / "judges/batch-000-round-1-retry-1/validated.json"
+        self.assertEqual(core.read_data(mine)["case_ids"], ["TC-001"])
+        # ...and that checkpoint is found again on the next pass without a judge call.
+        rounds, _ = evaluate.judge_rounds(
+            self.root,
+            [self.case],
+            {},
+            0,
+            options,
+            judge=lambda *a: (_ for _ in ()).throw(
+                AssertionError("no judge call expected")
+            ),
+        )
+        self.assertEqual(len(rounds), 1)
 
     def test_regrade_imports_executions_and_records_provenance(self):
         """A regrade run copies execution evidence from a finished or interrupted run,
