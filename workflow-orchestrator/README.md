@@ -41,9 +41,9 @@ The complete workflow and compact worker brief are in [SKILL.md](SKILL.md); reus
 
 Three rules were tightened after an evaluated baseline (ten-case suite, real delegated executions): reading any file inside the checkout, including handoff or state documents, is project investigation to delegate; small self-contained changes use a minimum crew and respect the session's turn/time budget by reporting before optional steps; and every landing path names GATE, VERIFY and non-implementer review, without extending commit/push authorization to merge or deployment.
 
-## Version 1.4.1 change
+## Version 1.5.0 note
 
-The coordinator contract was loosened to what evaluated models reliably do. Versions 1.3.0 and 1.3.1 told the coordinator never to open handoff or state documents; across seven evaluated resumes (four with one model, three with another) the coordinator still opened the STATE.md the request named, once before the skill had even loaded, while delegating everything else correctly. The coordinator may now list the directory and read the one brief, state or handoff file the request names unless the user forbids it (1.4.0 allowed the file only; three further evaluated resumes still listed the directory first in two of three runs); opening any other file and running checks remain worker work. The ten-case criteria were aligned with this contract in the same revision.
+Versions 1.4.0 and 1.4.1 loosened the coordinator contract so that it could open the one brief or state file the request names (and list the directory). A paired evaluation under Opus 5 showed the loosening was a net loss: the coordinator then opened BRIEF.md even when the user had assigned that reading to a worker (TC-006 failed), while the strict 1.2.0 wording passed all ten cases under the same conditions. 1.5.0 restores the 1.3.0 contract unchanged; the evaluation criteria tolerate a name-only directory listing and a read of the file the user's request names, because models do that before the skill can act, but the skill keeps asking the coordinator not to.
 
 ## Verified smoke scope
 
