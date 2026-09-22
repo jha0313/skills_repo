@@ -1,11 +1,10 @@
-"""근거와 연결된 로컬 보고서 및 명시적 선택에 따른 멱등 발행 계약."""
+"""근거와 연결된 로컬 보고서(Markdown, JSON, 단일 HTML 페이지)."""
 
 import html
 import json
 from pathlib import Path
 
-from adapters import bridge_call
-from core import EvalError, digest, verify_evidence_hashes, write_json
+from core import verify_evidence_hashes, write_json
 
 # Display labels only; stored keys and verdict enums remain unchanged.
 LABELS = {
@@ -244,37 +243,3 @@ def write_reports(run_dir, summary, manifest, visualize=True):
     )
     page += """<script>function sortRows(n){var b=document.querySelector('#cases tbody');Array.from(b.rows).sort(function(a,c){return a.cells[n].textContent.localeCompare(c.cells[n].textContent,undefined,{numeric:true})}).forEach(function(r){b.appendChild(r)})}</script></body></html>"""
     (root / "REPORT.html").write_text(page)
-
-
-def publish(run_dir, summary, config, kind, create_project=False):
-    root = Path(run_dir)
-    receipt = root / f"{kind}-receipt.json"
-    key = summary["run_id"]
-    payload_hash = digest(summary)
-    if receipt.exists():
-        prior = json.loads(receipt.read_text())
-        if prior["payload_hash"] != payload_hash:
-            raise EvalError("발행한 실행의 내용이 바뀌었습니다. 새 run ID를 사용하세요")
-        return prior
-    bridge = config.get(kind)
-    if not bridge:
-        raise EvalError(
-            f"{kind}를 요청했지만 사용할 수 없습니다. 현재 스키마가 확인된 인증 bridge를 설정하세요. references/result_schema.md를 참고하세요"
-        )
-    response = bridge_call(
-        bridge,
-        "publish",
-        {
-            "run_id": key,
-            "idempotency_key": key,
-            "create_project": create_project,
-            "summary": summary,
-            "report_path": str(root / "REPORT.html"),
-        },
-        root / f"{kind}-publication",
-    )
-    if response.get("idempotency_key") != key:
-        raise EvalError("발행 시스템이 멱등성 확인을 반환하지 않았습니다")
-    receipt_data = {"payload_hash": payload_hash, **response}
-    write_json(receipt, receipt_data)
-    return receipt_data

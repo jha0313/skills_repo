@@ -41,7 +41,7 @@ metadata:
 확인한 evaluator 경로를 쓴다. 기준 생성·동작 분석을 수행하고 기존 대상 기준을 교체하기 전에 타임스탬프 백업을 만들며 manifest와 검토 표를 남긴다. 대상을 실행하거나 채점하지는 **않는다**.
 
 ```text
-uv run <evaluator>/scripts/evaluate.py prepare <target-read-path> --local [--source <target-source-path>] [--basic|--deep] [--binary]
+uv run <evaluator>/scripts/evaluate.py prepare <target-read-path> [--source <target-source-path>] [--basic|--deep] [--binary]
 ```
 
 꺾쇠 값과 대괄호 옵션은 표기법이며 그대로 셸에 붙여 넣지 않는다. 기본 THOROUGH는 크기 flag를 생략한다. 생성된 analysis.json, 대상 evals/eval_criteria.yaml, CRITERIA_REVIEW.md를 확인한 뒤 작성 완료를 보고한다.
@@ -66,7 +66,7 @@ uv run <evaluator>/scripts/evaluate.py validate <target-source>/evals/eval_crite
 
 작성 때와 같은 모드·척도를 쓴다. 스키마 검증은 필요하지만 의미 품질 검토나 대상 동작 입증은 아니다. ID/범주/cwd/정확한 프롬프트/핵심 기준의 짧은 표를 보여주고 수정할 기회를 준다. 기존 승인에 검토 후 실행이 포함되면 진행한다. 아니라면 준비된 산출물과 정확한 실행 명령을 전달하되 eval 통과를 주장하지 않는다.
 
-준비한 실행은 불변으로 보존한다. 기준을 편집했다면 `--criteria <edited-file> --accept-criteria`로 **새** 평가를 만든다. 기존 manifest를 수정하거나 오래된 기준을 재개하지 않는다. 준비된 기준 그대로 재사용하려면 그 정확한 기준을 검토해야 한다.
+준비한 실행은 불변으로 보존한다. 기준을 편집했다면 `<target> --criteria <edited-file> --yes`로 **새** 평가를 만든다. 기존 manifest를 수정하거나 오래된 기준을 재개하지 않는다. 준비된 기준 그대로 재사용하려면 그 정확한 기준을 검토해야 한다.
 
 YAML/JSONL 교환에서 정식 실행 파일은 evaluator YAML이며 JSON도 유효한 YAML이다. JSONL 요청 시 사례 하나를 완전한 한 줄로 내보내고 상속한 working_directory를 구체화하며 기본값·모드·source hash를 sidecar에 보존한다. 정식 YAML을 다시 검증하고 YAML CLI에 원시 JSONL을 넣지 않는다. 형식 내보내기일 뿐 두 번째 평가 형식·엔진이 아니다.
 
@@ -74,6 +74,6 @@ YAML/JSONL 교환에서 정식 실행 파일은 evaluator YAML이며 JSON도 유
 
 기준, 분석·검토 표, 타임스탬프 백업, 선택적 JSONL/sidecar 경로를 반환하고 모드·척도·사례 배분을 밝힌다. 서로 다른 계약, 빈틈, mock 출처, 수행한 검증을 요약한다. 작성만 했다면 **대상 평가는 실행하지 않음**을 명시한다.
 
-현재 CLI help와 선택 대상·모드에 맞는 다음 run 명령을 준다. 대상 신뢰가 사용자 승인 범위 안에 있을 때만 --trust-target을 포함하고 필요한 도구만 허용한다. Eval-driven 흐름을 설명한다: 새 사례의 의도한 실패 확인 → 스킬 수정 → 같은 기준으로 재평가 → 회귀 확인 → 반영. 환경 고장으로 난 실패는 의도한 red 단계가 아니다.
+현재 CLI help와 선택 대상·모드에 맞는 정확한 다음 명령을 준다(`evaluate.py <target> --criteria <file> --yes`, 전후 비교에는 `--rigorous` 추가). `--yes`는 기준을 승인하는 동시에 대상 코드가 사용자 승인 신뢰 범위 안에 있다고 단언하는 것이므로 그럴 때만 포함하고, 작업에 필요한 도구만 `--allow-tool`로 허용한다. Eval-driven 흐름을 설명한다: 새 사례의 의도한 실패 확인 → 스킬 수정 → 같은 기준으로 재평가 → 회귀 확인 → 반영. 환경 고장으로 난 실패는 의도한 red 단계가 아니다.
 
 개선 주장은 같은 과제·모델·시작 상태·완수 임계값·mock 환경의 스킬 사용 유무 비교와 토큰·실제 경과 시간 측정이 필요하다. 독립 채점 반복은 변동을 줄이지만 공통 편향을 없애지 않는다. 작성 기준에 지어낸 점수·업무 개선을 넣지 않는다.

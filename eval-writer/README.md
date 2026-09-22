@@ -16,7 +16,7 @@ oncall 스킬의 라우팅과 실패 처리를 deep 모음으로 점검할 기�
 저장소 루트에서 직접 CLI를 쓴다면:
 
 ```bash
-uv run skill-evaluator/scripts/evaluate.py prepare /path/to/my-skill --local
+uv run skill-evaluator/scripts/evaluate.py prepare /path/to/my-skill
 uv run skill-evaluator/scripts/evaluate.py validate /path/to/my-skill/evals/eval_criteria.yaml
 ```
 

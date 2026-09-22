@@ -5,6 +5,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import types
 import unittest
 from pathlib import Path
 
@@ -14,7 +15,7 @@ import adapters
 import core
 import evaluate
 from discovery import discover, snapshot_hash
-from reporting import publish, write_reports
+from reporting import write_reports
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -163,6 +164,424 @@ class EvaluatorTests(unittest.TestCase):
                 bad, {**self.case, "_mode": "basic"}, False, self.root
             )
 
+    def test_citation_allowlist_matches_judge_contract(self):
+        # Harness records (tool_calls.json, metadata.json, artifacts.json) are always
+        # citable; target content (response.txt, artifacts/*) stays gated by eval_target.
+        d = self.root / "cases/TC-001"
+        core.write_json(
+            d / "artifacts.json", {"files": [{"path": "notes.txt", "sha256": "ab"}]}
+        )
+        (d / "artifacts").mkdir()
+        (d / "artifacts/notes.txt").write_text("alpha: first\n")
+
+        def cite(path, quote):
+            # Every scored item cites the same file so only the allowlist is under test.
+            j = self.judgment()
+            ev = [{"path": path, "line_start": 1, "line_end": 1, "quote": quote}]
+            for group in (
+                "dimensions",
+                "best_practice_subcriteria",
+                "business_impact_subcriteria",
+            ):
+                for item in j[group].values():
+                    item["evidence"] = copy.deepcopy(ev)
+            for item in j["semantic_checks"]:
+                item["evidence"] = copy.deepcopy(ev)
+            return j
+
+        for target, path, quote, ok in (
+            ("response", "cases/TC-001/tool_calls.json", "[", True),
+            ("response", "cases/TC-001/metadata.json", "{", True),
+            ("response", "cases/TC-001/artifacts.json", "{", True),
+            ("response", "cases/TC-001/artifacts/notes.txt", "alpha", False),
+            ("all", "cases/TC-001/artifacts/notes.txt", "alpha", True),
+            ("tool_usage", "cases/TC-001/response.txt", "Welcome", False),
+            ("tool_usage", "cases/TC-001/artifacts.json", "{", True),
+        ):
+            case = {**copy.deepcopy(self.case), "eval_target": target, "_mode": "basic"}
+            case["category"] = "efficiency"
+            if ok:
+                core.validate_judgment(cite(path, quote), case, False, self.root)
+            else:
+                with self.assertRaises(core.EvalError):
+                    core.validate_judgment(cite(path, quote), case, False, self.root)
+
+    def test_judge_packet_excludes_uncitable_transcript(self):
+        d = self.root / "cases/TC-001"
+        (d / "conversation.txt").write_text("USER PROMPT\nraw trace\n")
+        core.write_json(d / "artifacts.json", {"files": []})
+        packet = evaluate.evidence_packet(self.root, self.case)
+        self.assertEqual(
+            set(packet),
+            {
+                "cases/TC-001/response.txt",
+                "cases/TC-001/tool_calls.json",
+                "cases/TC-001/metadata.json",
+                "cases/TC-001/artifacts.json",
+            },
+        )
+
+    def test_judge_rounds_checkpoint_valid_rounds_and_retry_once(self):
+        options = {
+            "judge_rounds": 3,
+            "concurrency": 1,
+            "mode": "basic",
+            "binary": False,
+        }
+        batch = [self.case]
+        calls = []
+
+        def flaky(run, cases, manifest, idx, rn):
+            calls.append(rn)
+            if rn == 2 and calls.count(2) == 1:
+                raise core.EvalError("Evidence quote is not present at cited lines")
+            return {"TC-001": self.judgment()}, {"cost_usd": 1.0}
+
+        rounds, costs = evaluate.judge_rounds(
+            self.root, batch, {}, 0, options, judge=flaky
+        )
+        self.assertEqual((len(rounds), calls.count(2)), (3, 2))
+        self.assertIn(
+            "retried_after",
+            core.read_data(self.root / "judges/batch-000-round-2/validated.json"),
+        )
+        # Raw attempts never overwrite each other.
+        (self.root / "judges/batch-000-round-2").mkdir(exist_ok=True)
+        self.assertEqual(
+            evaluate.judge_attempt_dir(self.root, 0, 2).name,
+            "batch-000-round-2-retry-1",
+        )
+        # A round invalid twice is an infrastructure error; valid rounds stay checkpointed.
+        root2 = self.root / "run2"
+        (root2 / "cases/TC-001").mkdir(parents=True)
+        (root2 / "cases/TC-001/response.txt").write_text("Welcome to Observatory.\n")
+
+        def broken(run, cases, manifest, idx, rn):
+            if rn == 1:
+                raise core.EvalError("bad citation")
+            return {"TC-001": self.judgment()}, {"cost_usd": 1.0}
+
+        with self.assertRaises(core.EvalError):
+            evaluate.judge_rounds(root2, batch, {}, 0, options, judge=broken)
+        self.assertTrue((root2 / "judges/batch-000-round-3/validated.json").exists())
+        self.assertFalse((root2 / "judges/batch-000-round-1/validated.json").exists())
+        # Resume reuses the two checkpoints and re-judges only the missing round.
+        again = []
+
+        def fixed(run, cases, manifest, idx, rn):
+            again.append(rn)
+            return {"TC-001": self.judgment()}, {"cost_usd": 1.0}
+
+        rounds, _ = evaluate.judge_rounds(root2, batch, {}, 0, options, judge=fixed)
+        self.assertEqual((len(rounds), again), (3, [1]))
+
+    def test_citation_tolerates_small_line_slip_but_not_fabrication(self):
+        path = self.root / "cases/TC-001/tool_calls.json"
+        lines = [f"line {i}" for i in range(1, 11)]
+        lines[6] = '      "description": "Probe functions with uncovered inputs"'
+        path.write_text("\n".join(lines) + "\n")
+        quote = "Probe functions with uncovered inputs"
+        rel = "cases/TC-001/tool_calls.json"
+        # Exact line, and one or two lines off, are all the same real evidence.
+        for start in (7, 6, 5, 8, 9):
+            core.verify_citation(
+                {"path": rel, "line_start": start, "line_end": start, "quote": quote},
+                self.root,
+            )
+        # Three lines away is no longer a slip; a mangled quote is never accepted.
+        for bad in (
+            {"path": rel, "line_start": 4, "line_end": 4, "quote": quote},
+            {"path": rel, "line_start": 10, "line_end": 10, "quote": quote},
+            {
+                "path": rel,
+                "line_start": 7,
+                "line_end": 7,
+                "quote": "Probe functions with covered inputs",
+            },
+        ):
+            with self.assertRaises(core.EvalError):
+                core.verify_citation(bad, self.root)
+        # A judge that normalises a Korean verb ending still points at real evidence.
+        lines[3] = (
+            "`git worktree add`는 base revision을 요구하므로 **원리적으로 불가능**합니다."
+        )
+        path.write_text("\n".join(lines) + "\n")
+        core.verify_citation(
+            {
+                "path": rel,
+                "line_start": 4,
+                "line_end": 4,
+                "quote": "`git worktree add`는 base revision을 요구하므로 **원리적으로 불가능**입니다.",
+            },
+            self.root,
+        )
+        # A flipped verdict word or an invented sentence is not a slip.
+        lines[8] = "GATE result: 4 tests passed, exit 0"
+        path.write_text("\n".join(lines) + "\n")
+        for bad_quote in (
+            "GATE result: 4 tests failed, exit 0",
+            "GATE result: all tests skipped",
+        ):
+            with self.assertRaises(core.EvalError):
+                core.verify_citation(
+                    {"path": rel, "line_start": 9, "line_end": 9, "quote": bad_quote},
+                    self.root,
+                )
+
+    def test_judge_rounds_reuse_checkpoints_after_batches_shift(self):
+        """After a resume, graded cases leave their batch and indices shift; validated
+        rounds must still be reused when they cover the batch, wherever they sit."""
+        options = {
+            "judge_rounds": 3,
+            "concurrency": 1,
+            "mode": "basic",
+            "binary": False,
+        }
+        case2 = copy.deepcopy(self.case)
+        case2["id"] = "TC-002"
+        d = self.root / "cases/TC-002"
+        d.mkdir(parents=True)
+        for name in (
+            "response.txt",
+            "tool_calls.json",
+            "metadata.json",
+            "artifacts.json",
+        ):
+            src = self.root / "cases/TC-001" / name
+            (d / name).write_text(src.read_text() if src.exists() else "{}")
+
+        def judgment_for(cid):
+            return json.loads(json.dumps(self.judgment()).replace("TC-001", cid))
+
+        # Original grading: batch index 1 held both cases; rounds 2 and 3 validated.
+        for rn in (2, 3):
+            core.write_json(
+                self.root / f"judges/batch-001-round-{rn}/validated.json",
+                {
+                    "case_ids": ["TC-001", "TC-002"],
+                    "judgments": {
+                        "TC-001": judgment_for("TC-001"),
+                        "TC-002": judgment_for("TC-002"),
+                    },
+                    "usage": {"cost_usd": 1.0},
+                },
+            )
+        calls = []
+
+        def judge(run, cases, manifest, idx, rn):
+            calls.append((idx, rn, [c["id"] for c in cases]))
+            return {c["id"]: judgment_for(c["id"]) for c in cases}, {"cost_usd": 1.0}
+
+        # Resume: TC-001 already graded, so TC-002 is now alone at batch index 0.
+        rounds, costs = evaluate.judge_rounds(
+            self.root, [case2], {}, 0, options, judge=judge
+        )
+        self.assertEqual(calls, [(0, 1, ["TC-002"])])
+        self.assertEqual(len(rounds), 3)
+        self.assertTrue(all(set(r) == {"TC-002"} for r in rounds))
+        # The original checkpoints are left untouched.
+        old = core.read_data(self.root / "judges/batch-001-round-2/validated.json")
+        self.assertEqual(old["case_ids"], ["TC-001", "TC-002"])
+
+    def test_judge_checkpoint_never_overwrites_another_batch(self):
+        """The validated checkpoint is written beside the raw attempt that produced it,
+        so a re-batched resume cannot clobber a different batch's checkpoint."""
+        options = {
+            "judge_rounds": 1,
+            "concurrency": 1,
+            "mode": "basic",
+            "binary": False,
+        }
+        other = self.root / "judges/batch-000-round-1"
+        core.write_json(
+            other / "validated.json",
+            {"case_ids": ["TC-009"], "judgments": {}, "usage": {"cost_usd": 1.0}},
+        )
+
+        def judge(run, cases, manifest, idx, rn):
+            out = evaluate.judge_attempt_dir(run, idx, rn)
+            out.mkdir(parents=True)
+            return {"TC-001": self.judgment()}, {
+                "cost_usd": 1.0,
+                "judge_dir": str(out.relative_to(run)),
+            }
+
+        rounds, _ = evaluate.judge_rounds(
+            self.root, [self.case], {}, 0, options, judge=judge
+        )
+        self.assertEqual(len(rounds), 1)
+        self.assertEqual(
+            core.read_data(other / "validated.json")["case_ids"], ["TC-009"]
+        )
+        mine = self.root / "judges/batch-000-round-1-retry-1/validated.json"
+        self.assertEqual(core.read_data(mine)["case_ids"], ["TC-001"])
+        # ...and that checkpoint is found again on the next pass without a judge call.
+        rounds, _ = evaluate.judge_rounds(
+            self.root,
+            [self.case],
+            {},
+            0,
+            options,
+            judge=lambda *a: (_ for _ in ()).throw(
+                AssertionError("no judge call expected")
+            ),
+        )
+        self.assertEqual(len(rounds), 1)
+
+    def test_cli_defaults_are_one_command_and_one_judge(self):
+        args = evaluate.parse_args(["my-skill", "--yes"])
+        self.assertEqual(
+            (args.command, args.target, args.accept_criteria, args.trust_target),
+            ("run", "my-skill", True, True),
+        )
+        opts = evaluate.resolved_options(args)
+        self.assertEqual(
+            (opts["mode"], opts["judge_rounds"], opts["concurrency"]),
+            ("thorough", 1, 3),
+        )
+        quick = evaluate.resolved_options(evaluate.parse_args(["my-skill", "--quick"]))
+        self.assertEqual(
+            (quick["mode"], quick["judge_rounds"], quick["concurrency"]),
+            ("basic", 1, 4),
+        )
+        rigorous = evaluate.resolved_options(
+            evaluate.parse_args(["my-skill", "--rigorous"])
+        )
+        self.assertEqual(rigorous["judge_rounds"], 3)
+        self.assertFalse(rigorous["sequential"])
+        self.assertTrue(
+            evaluate.resolved_options(
+                evaluate.parse_args(["my-skill", "--sequential"])
+            )["sequential"]
+        )
+        explicit = evaluate.parse_args(["compare", "run-a", "run-b"])
+        self.assertEqual(
+            (explicit.command, explicit.target, explicit.other),
+            ("compare", "run-a", "run-b"),
+        )
+        with self.assertRaises(core.EvalError):
+            evaluate.parse_args(["run", "a", "b", "c"])
+
+    def test_case_reason_names_the_first_failing_gate(self):
+        case = copy.deepcopy(self.case)
+        graded = {
+            "status": "graded",
+            "grading": "likert",
+            "score": 4.2,
+            "checks": {"artifact_hash_mismatches": ["STATE.md"]},
+            "semantic_checks": [],
+        }
+        self.assertIn("보호 파일 변경: STATE.md", evaluate.case_reason(graded, case))
+        crit = {
+            "status": "graded",
+            "grading": "likert",
+            "score": 4.2,
+            "checks": {},
+            "semantic_checks": [{"index": 0, "score": 2, "weight": 3}],
+        }
+        self.assertTrue(
+            evaluate.case_reason(crit, case).startswith("critical 검사 점수 2")
+        )
+        err = {
+            "status": "error",
+            "error": "Judge infrastructure: round 1 invalid twice",
+        }
+        self.assertTrue(evaluate.case_reason(err, case).startswith("채점하지 못함"))
+
+    def test_regrade_imports_executions_and_records_provenance(self):
+        """A regrade run copies execution evidence from a finished or interrupted run,
+        re-hashes it, keeps unexecuted cases pending, and never touches the target."""
+        source = self.root / "source-run"
+        (source / "cases/TC-001").mkdir(parents=True)
+        for name in (
+            "conversation.txt",
+            "response.txt",
+            "metadata.json",
+            "artifacts.json",
+            "tool_calls.json",
+            "prompt.json",
+        ):
+            (source / "cases/TC-001" / name).write_text(
+                (self.root / "cases/TC-001" / name).read_text()
+                if (self.root / "cases/TC-001" / name).exists()
+                else "{}"
+            )
+        core.write_json(source / "cases/TC-001/execution.json", self.execution)
+        criteria = core.read_data(FIXTURES / "basic.yaml")
+        criteria = core.validate_criteria(criteria, "basic", False)
+        core.write_json(source / "criteria.yaml", criteria)
+        core.write_json(
+            source / "analysis.json", {"name": "observatory-greeting", "mutates": False}
+        )
+        options = {"mode": "basic", "binary": False, "judge_rounds": 3}
+        skill_dir = FIXTURES / "observatory-greeting"
+        manifest = {
+            "run_id": "old-run",
+            "criteria_hash": core.digest(criteria),
+            "options": options,
+            "options_hash": core.digest(options),
+            "skill": {
+                "installed_path": str(skill_dir),
+                "skill_hash": "not-the-real-hash",
+            },
+            "evaluator_hash": "old-evaluator",
+            "cases": {c["id"]: {"state": "pending"} for c in criteria["test_cases"]},
+            "author_usage": {"cost_usd": 3.0},
+            "config": {},
+            "config_hash": core.digest({}),
+        }
+        manifest["cases"]["TC-001"] = {"state": "executed"}
+        core.write_json(source / "manifest.json", manifest)
+
+        args = types.SimpleNamespace(
+            regrade=str(source),
+            output=str(self.root / "regrade-run"),
+            **{
+                k: None
+                for k in (
+                    "basic",
+                    "deep",
+                    "binary",
+                    "local",
+                    "no_visualize",
+                    "model",
+                    "judge_model",
+                    "timeout",
+                    "judge_timeout",
+                    "concurrency",
+                    "judge_rounds",
+                    "allow_tool",
+                    "config",
+                    "criteria",
+                    "source",
+                    "target",
+                )
+            },
+        )
+
+        # A pending case with a changed skill would mix revisions.
+        with self.assertRaises(core.EvalError):
+            evaluate.regrade(args)
+        manifest["skill"]["skill_hash"] = evaluate.snapshot_hash(skill_dir)
+        core.write_json(source / "manifest.json", manifest)
+        run, new_manifest, new_criteria, _ = evaluate.regrade(args)
+        self.assertEqual(run, (self.root / "regrade-run").resolve())
+        self.assertEqual(new_manifest["cases"]["TC-001"]["state"], "executed")
+        self.assertIn("evidence_hashes", new_manifest["cases"]["TC-001"])
+        self.assertEqual(new_manifest["cases"]["TC-002"]["state"], "pending")
+        self.assertEqual(new_manifest["regrade_of"]["run_id"], "old-run")
+        self.assertEqual(
+            new_manifest["regrade_of"]["evaluator_hash_at_execution"], "old-evaluator"
+        )
+        self.assertEqual(new_manifest["regrade_of"]["imported_cases"], ["TC-001"])
+        self.assertNotEqual(new_manifest["run_id"], "old-run")
+        self.assertEqual(new_manifest["criteria_hash"], core.digest(new_criteria))
+        self.assertEqual(new_manifest["author_usage"]["cost_usd"], 0)
+        self.assertTrue((run / "cases/TC-001/execution.json").exists())
+        core.verify_evidence_hashes(
+            run, new_manifest["cases"]["TC-001"]["evidence_hashes"]
+        )
+
     def test_binary_thresholds_weighted_and_labels(self):
         case = core.read_data(FIXTURES / "basic-binary.yaml")["test_cases"][0]
         j = self.judgment(True)
@@ -206,12 +625,10 @@ class EvaluatorTests(unittest.TestCase):
             ["missing.md"],
         )
 
-    def test_adapter_normalization_matches(self):
+    def test_normalization_tags_the_adapter_and_keeps_fields(self):
         local = core.normalize_execution(self.execution, "local")
-        msl = core.normalize_execution(self.execution, "msl")
-        local["metadata"].pop("adapter")
-        msl["metadata"].pop("adapter")
-        self.assertEqual(local, msl)
+        self.assertEqual(local["metadata"]["adapter"], "local")
+        self.assertEqual(local["response"], self.execution["response"])
 
     def test_unknown_cost_and_timeout_preserved(self):
         e = copy.deepcopy(self.execution)
@@ -249,20 +666,22 @@ class EvaluatorTests(unittest.TestCase):
         native = core.read_data(stage / "skill-evaluator-cases/TC-001/case.yaml")
         self.assertNotIn("append_system_prompt", native["execution"])
 
-    def test_idempotent_publisher_and_config_required(self):
-        with self.assertRaises(core.EvalError):
-            publish(self.root, {"run_id": "test"}, {}, "skillwatch")
-        core.write_json(
-            self.root / "skillwatch-receipt.json",
-            {
-                "payload_hash": core.digest({"run_id": "test"}),
-                "idempotency_key": "test",
-            },
+    def test_scaffold_script_is_staged_beside_case_yaml(self):
+        # The native runner resolves context.scaffold_script relative to the case directory.
+        fixture = self.root / "fixture"
+        fixture.mkdir()
+        (fixture / "notes.txt").write_text("alpha: first\n")
+        analysis = discover(str(FIXTURES / "observatory-greeting"))
+        case = dict(self.case, working_directory=str(fixture))
+        stage = adapters.native_stage(
+            analysis, case, self.root / "case", {"timeout": 120}
         )
-        self.assertEqual(
-            publish(self.root, {"run_id": "test"}, {}, "skillwatch")["idempotency_key"],
-            "test",
-        )
+        case_dir = stage / "skill-evaluator-cases/TC-001"
+        native = core.read_data(case_dir / "case.yaml")
+        script = case_dir / native["context"]["scaffold_script"]
+        self.assertTrue(script.is_file())
+        self.assertIn(str(stage / "fixture"), script.read_text())
+        self.assertTrue((stage / "fixture/notes.txt").is_file())
 
     def test_native_trace_separates_loaded_skill_from_output(self):
         text = "\n".join(
@@ -280,6 +699,95 @@ class EvaluatorTests(unittest.TestCase):
             ]
         )
         self.assertEqual(adapters.parse_trace(text)[4], "actual answer")
+
+    def test_protected_artifact_requires_matching_hash(self):
+        case = copy.deepcopy(self.case)
+        case["quality_criteria"]["artifact_checks"] = [
+            {"path": "USER_NOTES.md", "sha256": "a" * 64}
+        ]
+        e = copy.deepcopy(self.execution)
+        e["artifacts"]["files"] = [
+            {"path": "USER_NOTES.md", "exists": True, "sha256": "b" * 64}
+        ]
+        checks = core.deterministic_checks(case, e)
+        self.assertEqual(checks["missing_artifacts"], [])
+        self.assertEqual(checks["artifact_hash_mismatches"], ["USER_NOTES.md"])
+        result = core.grade_case(case, e, [self.judgment()] * 3, False, "basic")
+        self.assertTrue(result["critical_failure"])
+        self.assertEqual(result["verdict"], "FAIL")
+        e["artifacts"]["files"][0]["sha256"] = "a" * 64
+        self.assertEqual(
+            core.deterministic_checks(case, e)["artifact_hash_mismatches"], []
+        )
+        case["quality_criteria"]["artifact_checks"][0]["sha256"] = "not-hex"
+        data = core.read_data(FIXTURES / "basic.yaml")
+        data["test_cases"][0] = case
+        with self.assertRaises(core.EvalError):
+            core.validate_criteria(data, "basic", False)
+
+    def test_native_trace_preserves_worker_attribution(self):
+        # Judges may only cite tool_calls.json, so actor attribution, lineage and the
+        # raw trace coordinate must survive normalization and citation verification.
+        def use(tool_id, name):
+            return {"type": "tool_use", "id": tool_id, "name": name, "input": {}}
+
+        events = [
+            {"type": "system", "subtype": "init"},
+            {
+                "type": "assistant",
+                "parent_tool_use_id": None,
+                "message": {"content": [use("toolu_parent_read", "Read")]},
+            },
+            {
+                "type": "assistant",
+                "parent_tool_use_id": None,
+                "message": {"content": [use("toolu_agent", "Agent")]},
+            },
+            {
+                "type": "assistant",
+                "parent_tool_use_id": "toolu_agent",
+                "message": {"content": [use("toolu_child_read", "Read")]},
+            },
+            {
+                "type": "assistant",
+                "parent_tool_use_id": "toolu_never_spawned",
+                "message": {"content": [use("toolu_orphan", "Grep")]},
+            },
+            {
+                "type": "assistant",
+                "message": {"content": [use("toolu_unknown", "Read")]},
+            },
+            {"type": "result", "result": "done"},
+        ]
+        calls = adapters.parse_trace("\n".join(json.dumps(e) for e in events))[3]
+        self.assertEqual(
+            [
+                (c["name"], c["actor"], c["parent_tool_use_id"], c["lineage_verified"])
+                for c in calls
+            ],
+            [
+                ("Read", "parent", None, None),
+                ("Agent", "parent", None, None),
+                ("Read", "worker", "toolu_agent", True),
+                ("Grep", "worker", "toolu_never_spawned", False),
+                ("Read", "unknown", None, None),
+            ],
+        )
+        self.assertEqual([c["trace_line"] for c in calls], [2, 3, 4, 5, 6])
+        core.write_json(self.root / "cases/TC-001/tool_calls.json", calls)
+        lines = (self.root / "cases/TC-001/tool_calls.json").read_text().splitlines()
+        worker_line = next(
+            i for i, line in enumerate(lines, 1) if '"toolu_child_read"' in line
+        )
+        core.verify_citation(
+            {
+                "path": "cases/TC-001/tool_calls.json",
+                "line_start": worker_line,
+                "line_end": worker_line + 4,
+                "quote": '"actor": "worker"',
+            },
+            self.root,
+        )
 
     def test_process_timeout_stops_children(self):
         adapters.reset_cancellation()
@@ -412,25 +920,6 @@ class EvaluatorTests(unittest.TestCase):
             ]["permissionDecision"],
             "deny",
         )
-
-    def test_publication_bridge_mock_is_explicit_and_idempotent(self):
-        bridge = self.root / "bridge.py"
-        counter = self.root / "count"
-        bridge.write_text(
-            "import json,sys\nfrom pathlib import Path\nr=json.load(sys.stdin)\np=Path("
-            + repr(str(counter))
-            + ')\np.write_text(str(int(p.read_text())+1) if p.exists() else "1")\nprint(json.dumps({"status":"ok","idempotency_key":r["idempotency_key"],"url":"https://example.invalid/mock"}))\n'
-        )
-        config = {
-            "skillwatch": {
-                "command": [sys.executable, str(bridge)],
-                "contract_provenance": "deterministic fixture, not real SkillWatch",
-            }
-        }
-        summary = {"run_id": "fixture"}
-        publish(self.root, summary, config, "skillwatch")
-        publish(self.root, summary, config, "skillwatch")
-        self.assertEqual(counter.read_text(), "1")
 
     def test_binary_report_uses_pass_rates_and_verdicts(self):
         case = core.read_data(FIXTURES / "basic-binary.yaml")["test_cases"][0]

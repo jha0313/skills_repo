@@ -1,4 +1,4 @@
-"""Native Claude evaluation, independent judging, and explicit internal bridge contracts."""
+"""Native Claude evaluation (claude plugin eval) and independent judge sessions."""
 
 from __future__ import annotations
 
@@ -16,7 +16,6 @@ import uuid
 from pathlib import Path
 
 from core import (
-    SCHEMA,
     EvalError,
     hash_bytes,
     normalize_execution,
@@ -124,9 +123,6 @@ def check_dependencies(run_dir=None):
         "discovery_helper": "bundled discovery.py + claude plugin list --json",
         "visualization_helper": "bundled reporting.py (no external publication)",
         "native_eval": True,
-        "msl": "not configured",
-        "skillwatch": "not configured",
-        "pixelcloud": "not configured",
     }
 
 
@@ -194,7 +190,8 @@ def native_stage(analysis, case, case_dir, options):
                 shutil.rmtree(config_path)
             elif config_path.exists():
                 config_path.unlink()
-        scaffold = stage / "scaffold.sh"
+        # The native runner resolves scaffold_script relative to the case directory.
+        scaffold = casepath / "scaffold.sh"
         scaffold.write_text(
             "#!/bin/sh\nset -eu\ncp -R "
             + shlex.quote(str(stage / "fixture"))
@@ -260,22 +257,34 @@ def native_stage(analysis, case, case_dir, options):
 
 
 def parse_trace(text):
-    events = []
-    for line in text.splitlines():
+    indexed = []
+    for line_no, line in enumerate(text.splitlines(), 1):
         if line.strip():
             try:
-                events.append(json.loads(line))
+                indexed.append((line_no, json.loads(line)))
             except json.JSONDecodeError as exc:
                 raise EvalError(
                     "native JSONL 실행 기록의 형식이 잘못되었습니다"
                 ) from exc
+    events = [event for _, event in indexed]
     final = next((e for e in reversed(events) if e.get("type") == "result"), {})
     init = next((e for e in events if e.get("subtype") == "init"), {})
     calls = []
     responses = []
-    for event in events:
+    agent_ids = set()
+    for line_no, event in indexed:
         if event.get("type") != "assistant":
             continue
+        # Actor attribution comes from the native event, never from assistant text:
+        # an explicit null parent_tool_use_id is the evaluated session itself, a set
+        # value is a delegated worker, and a missing key is unknown.
+        if "parent_tool_use_id" not in event:
+            actor = "unknown"
+        elif event["parent_tool_use_id"] is None:
+            actor = "parent"
+        else:
+            actor = "worker"
+        parent = event.get("parent_tool_use_id")
         for part in event.get("message", {}).get("content", []):
             if part.get("type") == "tool_use":
                 calls.append(
@@ -283,8 +292,16 @@ def parse_trace(text):
                         "name": part["name"],
                         "input": part.get("input", {}),
                         "id": part.get("id"),
+                        "actor": actor,
+                        "parent_tool_use_id": parent,
+                        "lineage_verified": (parent in agent_ids)
+                        if actor == "worker"
+                        else None,
+                        "trace_line": line_no,
                     }
                 )
+                if part["name"] == "Agent" and part.get("id"):
+                    agent_ids.add(part["id"])
             elif part.get("type") == "text":
                 responses.append(part["text"])
     response = final.get("result") or "\n".join(responses)
@@ -481,7 +498,9 @@ def native_execute(analysis, case, case_dir, options):
         if arm.get("error") or final.get("is_error")
         else "completed",
         "timed_out": result["timed_out"]
-        or "timeout" in str(arm.get("error", "")).lower(),
+        or any(
+            w in str(arm.get("error", "")).lower() for w in ("timeout", "timed out")
+        ),
         "usage": {
             k: usage.get(k)
             for k in (
@@ -499,6 +518,7 @@ def native_execute(analysis, case, case_dir, options):
             c["input"].get("skill", "") for c in calls if c["name"] == "Skill"
         ],
         "permission_denials": final.get("permission_denials", []),
+        "subagent_stats": final.get("subagent_stats"),
         "error": arm.get("error"),
         "mock_status": arm.get("mocks"),
         "mock_unmatched": any(
@@ -580,36 +600,3 @@ def agent_json(prompt, out_dir, model=None, timeout=300):
         or ",".join(outer.get("modelUsage", {}))
         or "CLI configured default",
     }
-
-
-def bridge_call(config, operation, payload, out_dir, timeout=300):
-    """No internal command/field guesses. Operator bridge translates verified internal APIs."""
-    argv = config.get("command")
-    if (
-        not isinstance(argv, list)
-        or not argv
-        or not all(isinstance(v, str) for v in argv)
-    ):
-        raise EvalError("bridge command는 셸 문자열이 아닌 argv 목록이어야 합니다")
-    proof = config.get("contract_provenance")
-    if not proof:
-        raise EvalError(
-            "bridge에는 현재 help/schema의 출처와 날짜를 담은 contract_provenance가 필요합니다"
-        )
-    out = Path(out_dir)
-    out.mkdir(parents=True, exist_ok=True)
-    request = {"schema_version": SCHEMA, "operation": operation, **payload}
-    write_json(out / "request.json", request)
-    r = run_process(argv, out, timeout, out / "bridge", json.dumps(request))
-    if r["timed_out"] or r["exit_code"]:
-        raise EvalError("bridge 실행 환경 오류입니다. bridge.stderr를 확인하세요")
-    try:
-        response = json.loads(r["stdout"])
-    except ValueError as exc:
-        raise EvalError("bridge가 잘못된 JSON을 반환했습니다") from exc
-    write_json(out / "response.json", response)
-    if response.get("status") != "ok":
-        raise EvalError(
-            "bridge를 사용할 수 없습니다: " + str(response.get("reason", "unknown"))
-        )
-    return response

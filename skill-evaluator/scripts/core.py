@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import collections
+import difflib
 import hashlib
 import json
 import math
@@ -39,6 +40,11 @@ BI = (
     "productivity_revenue_link",
 )
 WEIGHTS = dict(zip(DIMENSIONS, (0.10, 0.10, 0.15, 0.15, 0.50)))
+# Cited line ranges may be off by this many lines when the quote itself is verbatim.
+CITATION_LINE_TOLERANCE = 2
+# A quote may differ from the cited text by at most this many characters (for example a
+# changed verb ending) and must still match at least 95% of its characters in order.
+CITATION_MAX_ALTERED_CHARS = 1
 DISTRIBUTIONS = {
     "basic": (1, 1, 1, 1, 0),
     "thorough": (2, 1, 2, 2, 3),
@@ -198,6 +204,12 @@ def validate_criteria(data, mode, binary):
                 )
         for check in qc["artifact_checks"]:
             safe_relative(check["path"])
+            if "sha256" in check and not re.fullmatch(
+                r"[0-9a-f]{64}", str(check["sha256"])
+            ):
+                raise EvalError(
+                    f"{cid}: artifact sha256는 소문자 16진수 64자리여야 합니다"
+                )
         patterns = case.get("intercept_patterns", [])
         tools = case.get("intercept_mcp_tools", [])
         if (patterns or tools) and not case.get("mock_data"):
@@ -229,7 +241,7 @@ def validate_criteria(data, mode, binary):
 
 
 def normalize_execution(raw, adapter):
-    """Both adapters cross this required contract; no guessed MSL field mapping."""
+    """Every execution crosses this required contract before grading."""
     required = ("conversation", "metadata", "artifacts")
     if any(key not in raw for key in required):
         raise EvalError("어댑터는 conversation, metadata, artifacts를 반환해야 합니다")
@@ -285,13 +297,37 @@ def verify_citation(citation, run_dir):
     ):
         raise EvalError("근거의 줄 범위가 파일 범위를 벗어납니다")
     quote = citation.get("quote")
-    if (
-        not isinstance(quote, str)
-        or not quote.strip()
-        or quote not in "\n".join(lines[start - 1 : end])
-    ):
+    if not isinstance(quote, str) or not quote.strip():
         raise EvalError("인용한 줄에 해당 인용문이 없습니다")
+    if quote not in "\n".join(lines[start - 1 : end]):
+        # A verbatim quote one or two lines away from the cited range is a line-number
+        # slip on real evidence, not a fabrication; anything further, or a quote that is
+        # not in the file, is still rejected.
+        lo = max(1, start - CITATION_LINE_TOLERANCE)
+        hi = min(len(lines), end + CITATION_LINE_TOLERANCE)
+        window = "\n".join(lines[lo - 1 : hi])
+        if quote not in window and not near_verbatim(quote, window):
+            raise EvalError("인용한 줄에 해당 인용문이 없습니다")
     return citation
+
+
+def near_verbatim(quote, window):
+    """True when the quote appears in the window with at most one character altered:
+    at most one quote character unmatched and at most one extra window character inside
+    the matched span, with at least 95% of the quote matched. A judge normalising a verb
+    ending passes; a dropped prefix that flips meaning ("uncovered" -> "covered"), a
+    changed verdict word, or an invented sentence stays rejected."""
+    matcher = difflib.SequenceMatcher(None, quote, window, autojunk=False)
+    blocks = [b for b in matcher.get_matching_blocks() if b.size]
+    if not blocks:
+        return False
+    matched = sum(b.size for b in blocks)
+    span = blocks[-1].b + blocks[-1].size - blocks[0].b
+    missing, extra = len(quote) - matched, span - matched
+    return (
+        max(missing, extra) <= CITATION_MAX_ALTERED_CHARS
+        and matched / len(quote) >= 0.95
+    )
 
 
 def _score_item(item, binary, run_dir, case, derived=False):
@@ -317,11 +353,14 @@ def _score_item(item, binary, run_dir, case, derived=False):
         raise EvalError("모든 점수에는 근거가 필요합니다")
     prefix = f"cases/{case['id']}/"
     target = case["eval_target"]
-    allowed = {"metadata.json"}
+    # Harness-written records are always citable: metadata (usage/timing/subagent stats),
+    # the structured tool-call record, and the artifact capture manifest (paths, existence,
+    # sha256). Every efficiency/best-practice/safety dimension needs them regardless of
+    # the case's content target. Target-produced content (response.txt, artifacts/*)
+    # stays gated by eval_target.
+    allowed = {"metadata.json", "tool_calls.json", "artifacts.json"}
     if target in ("response", "all"):
         allowed.add("response.txt")
-    if target in ("tool_usage", "all") or case["category"] == "invocation":
-        allowed.add("tool_calls.json")
     for citation in item["evidence"]:
         path = citation.get("path", "")
         rel = path[len(prefix) :] if path.startswith(prefix) else ""
@@ -405,10 +444,14 @@ def deterministic_checks(case, execution):
     # Only response/tool evidence, never the echoed user prompt, participates in textual checks.
     files = {a["path"]: a for a in execution["artifacts"].get("files", [])}
     artifact_failures = []
+    hash_mismatches = []
     for check in qc["artifact_checks"]:
         obj = files.get(check["path"])
         if not obj or not obj.get("exists"):
             artifact_failures.append(check["path"])
+        elif check.get("sha256") and obj.get("sha256") != check["sha256"]:
+            # A protected file must match its original bytes; existence alone is not preservation.
+            hash_mismatches.append(check["path"])
     invocations = execution["metadata"].get("skill_invocations", [])
     routing_failure = False
     if case["category"] == "invocation":
@@ -421,6 +464,7 @@ def deterministic_checks(case, execution):
         "required_present_misses": misses,
         "forbidden_hits": forbidden,
         "missing_artifacts": artifact_failures,
+        "artifact_hash_mismatches": hash_mismatches,
         "routing_failure": routing_failure,
     }
 
@@ -433,6 +477,7 @@ def grade_case(case, execution, judgments, binary, mode):
             "required_present_misses",
             "forbidden_hits",
             "missing_artifacts",
+            "artifact_hash_mismatches",
             "routing_failure",
         )
     )

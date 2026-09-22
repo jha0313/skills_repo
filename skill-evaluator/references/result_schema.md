@@ -1,6 +1,6 @@
-# 정규화 결과와 bridge 계약
+# 정규화 결과
 
-정규화 실행, 사례별 평가, 실행 명세, 집계는 `schema_version: skill-evaluator/1`을 쓴다. 원시 도구·CLI 응답과 말단 metadata/artifact 파일은 자체 형식을 보존한다. 두 어댑터 모두 `normalize_execution`을 거친다. 외부 bridge는 **확인된** 내부 출력을 이 계약으로 변환해야 하며 Meta 필드를 추측하지 않는다. 이 저장소·환경에는 MSL Judge, SkillWatch 스키마, PixelCloud 업로드 계약이 없으며 설치·작동했다고 주장하지 않는다. 2026-09-19 확인한 Claude Code 2.1.275의 native CLI help/source는 로컬 격리·라우팅·mock·원시 출력을 제공했다. 실제 사용 시 현재 help를 다시 확인한다.
+정규화 실행, 사례별 평가, 실행 명세, 집계는 `schema_version: skill-evaluator/1`을 쓴다. 원시 도구·CLI 응답과 말단 metadata/artifact 파일은 자체 형식을 보존한다. 모든 실행은 채점 전에 `normalize_execution`을 거친다. 2026-09-19 확인한 Claude Code 2.1.275의 native CLI(`claude plugin eval`)는 로컬 격리·라우팅·mock·원시 출력을 제공한다.
 
 ## 실행 계약
 
@@ -8,29 +8,15 @@
 {"conversation":"전체 실행 기록", "response":"assistant 최종 출력만", "tool_calls":[{"name":"Skill","input":{"skill":"plugin:example"}}], "metadata":{"model":"실제 실행 모델","started_at":"ISO8601","finished_at":"ISO8601","duration_seconds":1.2,"exit_state":"completed","timed_out":false,"usage":{"input_tokens":100,"output_tokens":20,"cache_read_input_tokens":0,"cache_creation_input_tokens":0},"cost_usd":null,"cost_basis":"unavailable","skill_invocations":["plugin:example"]},"artifacts":{"files":[{"path":"report.md","exists":true,"sha256":"...","evidence_path":"cases/TC-001/artifacts/report.md","content":"실제 파일 내용"}],"urls":[]}}
 ```
 
-미확인 수치·비용은 null이다. 어댑터는 인용할 모든 파일을 사례 디렉터리에 생성한다. 경로 탈출과 심볼릭 링크는 거부한다. 충분한 원시 trace·산출물 근거가 없는 MSL 출력은 ERROR다. response에 사용자 프롬프트나 주입된 지침을 넣지 않는다. Native의 `out/trace.jsonl`을 복사하되 비공개 runtime 설정은 복사하지 않는다. 보존한 `sealed/home/cwd`는 데이터 확인을 위해서만 열고 다시 봉인한다. 그 안에서 git·hook·설정을 실행하지 않는다. 실행 기록에서 찾은 URL은 '언급'으로 표시하며 접근 가능하거나 발행에 성공했다고 단정하지 않는다.
+미확인 수치·비용은 null이다. 어댑터는 인용할 모든 파일을 사례 디렉터리에 생성한다. 경로 탈출과 심볼릭 링크는 거부한다. response에 사용자 프롬프트나 주입된 지침을 넣지 않는다. Native의 `out/trace.jsonl`을 복사하되 비공개 runtime 설정은 복사하지 않는다. 보존한 `sealed/home/cwd`는 데이터 확인을 위해서만 열고 다시 봉인한다. 그 안에서 git·hook·설정을 실행하지 않는다. 실행 기록에서 찾은 URL은 '언급'으로 표시하며 접근 가능하거나 발행에 성공했다고 단정하지 않는다.
 
 사례 저장: `cases/TC-ID/conversation.txt`, `trace.jsonl`(native), `prompt.json`, `response.txt`, `tool_calls.json`, `metadata.json`, `artifacts.json`, `artifacts/*`, `execution.json`, 어댑터 원시 stdout/stderr/JSON. 사례 결과: `evaluations/TC-ID.json`과 `.md`.
 
 평가 JSON은 case_id/name/category, grading, status(`graded|error`), score(환경 오류 시 null), verdict(`PASS|FAIL|ERROR`), 선택적 Likert grade, critical_failure, dimensions, Binary dimension_verdicts, 모범 사례 6항목, 업무 효과 5항목, 의미 검사·가중 점수, 결정적 문구·산출물·라우팅 검사, 원시 judge_rounds, metadata, 채점 비용·배분, 근거 링크를 포함한다. 각 채점 항목은 rubric_level, reason, `evidence:[{path,line_start,line_end,quote}]`를 갖는다. 경로는 해당 사례 출력·산출물 허용 목록으로 제한하며 채점 전 정확한 인용문·줄을 검증한다.
 
-실행 명세는 evaluator_version, run_id, created_at, state, skill(설치·소스 경로, revision, 내용 해시), 전체 analysis, criteria_hash, 타임스탬프 백업 경로, 확정 옵션, 어댑터 설정·해시·출처, CLI help/version, execution_adapter, 가격 설정, 작성자 사용량, 사례별 상태, 발행 영수증·상태를 기록한다. 상태는 criteria_review→executing→grading→reported→complete/incomplete이며 중단 시 체크포인트를 보존한다. 원자적 쓰기와 실행별 잠금이 중복 runner를 막는다. 소스·기준·evaluator·bridge 설정 변경 시 재개를 거부하고, 유효한 실행·채점 체크포인트는 재사용한다.
+실행 명세는 evaluator_version, run_id, created_at, state, skill(설치·소스 경로, revision, 내용 해시), 전체 analysis, criteria_hash, 타임스탬프 백업 경로, 확정 옵션, CLI help/version, 가격 설정, 작성자 사용량, 사례별 상태를 기록한다. 상태는 criteria_review→executing→grading→reported→complete/incomplete이며 중단 시 체크포인트를 보존한다. 원자적 쓰기와 실행별 잠금이 중복 runner를 막는다. 소스·기준·evaluator 변경 시 재개를 거부하고, 유효한 실행·채점 체크포인트는 재사용한다. 재채점 실행(`run --regrade RUN_DIR`)은 원본 실행의 실행 결과를 새 실행으로 복사해 현재 evaluator로 채점하며 `regrade_of`에 원본 run_id, path, evaluator_hash_at_execution, imported_cases, pending_cases를 기록한다.
 
 집계 `summary.json`은 전체/통과/실패/오류/통과율, 점수·분포, 범주·차원·모범 사례 세부 결과, 비용·토큰·시간, 확인된 비용 소계, 작성 비용, 실패 유형, ID별 개선안, 사례 결과를 담는다. CLI 비용은 **정가 추정치**이며 청구액이 아니다. 실행·채점 비용은 별도이며 채점 batch 비용은 사례에 균등 배분하고 원시 batch 사용량을 보존한다. 모르는 구성 요소의 합계는 null이다.
-
-## 검증된 내부 bridge(선택)
-
-설정 JSON은 `msl`, `skillwatch`, `pixelcloud`를 다음과 같이 매핑한다.
-
-```json
-{"command":["/absolute/path/to/your-verified-bridge"],"contract_provenance":"현재 내부 --help와 schema의 출처, revision/날짜"}
-```
-
-Bridge 실행 파일은 JSON 요청 하나를 stdin으로 받고 JSON 응답 하나를 stdout으로 반환하며 셸 보간은 하지 않는다. 시간 제한을 두고 stdout/stderr/request/response를 보존한다. 설치·인증은 운영자 환경에서 준비한다. **실제 서비스가 있는 환경 안에서** `fbcode//msl/judge:run_eval` help와 SkillWatch/PixelCloud 스키마를 확인한 뒤 최소 변환부를 구현한다. 가짜 bridge 설정은 테스트 fixture일 뿐이다.
-
-MSL `execute` 요청은 schema_version, operation, run_id, case, analysis, options를 포함한다. 응답은 `{"status":"ok","execution":<위 정규화 결과>}`다. 첫 사례의 환경 오류면 이유를 보존하고 native local로 한 번 전환한다. 정상 실행의 실패 판정은 테스트 실패로 유지한다. MSL bridge가 없으면 곧바로 native local을 쓴다.
-
-발행 요청은 run_id, idempotency_key=run_id, summary, report_path, create_project를 포함한다. 응답은 `{"status":"ok","idempotency_key":"같은 run id","url":"..."}`여야 한다. `--publish-skillwatch`/`--publish-pixelcloud`의 명시적 선택 때만 호출한다. 프로젝트 생성에는 `--create-project`가 필요하며 bridge가 멱등성을 보장해야 한다. 영수증은 payload hash를 캐시해 같은 실행을 다시 발행하지 않는다. 네트워크 결과가 불확실할 때도 bridge/서버가 같은 키를 보장해야 한다. 발행된 집계가 바뀌면 새 실행이 필요하다. 실패를 성공으로 기록하지 않는다. `--no-visualize`는 로컬 HTML/PixelCloud를 생략하고 Markdown/JSON과 선택한 SkillWatch는 유지한다.
 
 ## 검증 경계
 
@@ -93,7 +79,7 @@ MCP mock은 native runner가 받는 디렉터리 스키마를 쓰며 Meta interc
 - 식별: `schema_version`, `evaluator_version`, `run_id`, `created_at`, `state`.
 - 스킬: `name`, `description`, `installed_path`, `source_path`, 소스 `revision`, 내용 `skill_hash`. 해당하면 상위 plugin 스냅샷 출처도 보존한다.
 - 입력: 전체 동작 `analysis`, `criteria_hash`, `criteria_backup`, 확정 `options`, `options_hash`, `behavior_hash`, `evaluator_hash`.
-- 실행: 의존성·버전 확인, `execution_adapter`, 어댑터 `config`, `config_hash`, 선택적 `msl_fallback_reason`.
+- 실행: 의존성·버전 확인과 `execution_adapter`(항상 `local`).
 - 사용량: `pricing_configuration`과 작성자 사용량. 요청 모델과 실제 실행 모델은 별개 사실이다.
 - 체크포인트: ID별 `cases`, 상태 `pending`/`executed`/`graded`/`error`, 실패 정보. 채점 체크포인트는 검증된 사례 ID와 원시 라운드 사용량을 보존한다.
 - 발행: 요청한 각 목적지의 상태·영수증 또는 오류. 미요청 쓰기도 명시한다. 평가가 끝났어도 발행 오류가 있을 수 있으므로 발행 상태와 CLI 종료 상태를 확인한다.

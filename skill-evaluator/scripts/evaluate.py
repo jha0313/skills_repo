@@ -11,14 +11,15 @@ import argparse
 import concurrent.futures
 import fcntl
 import json
+import shutil
 import signal
+import subprocess
 import sys
 import uuid
 from pathlib import Path
 
 from adapters import (
     agent_json,
-    bridge_call,
     cancel_processes,
     check_dependencies,
     native_execute,
@@ -37,7 +38,6 @@ from core import (
     error_case,
     evidence_hashes,
     grade_case,
-    normalize_execution,
     now,
     read_data,
     validate_artifact_files,
@@ -47,28 +47,30 @@ from core import (
     write_json,
 )
 from discovery import discover, snapshot_hash
-from reporting import publish, write_reports
+from reporting import write_reports
 
 ROOT = Path(__file__).resolve().parent.parent
 
 
 def resolved_options(args):
+    quick = bool(getattr(args, "quick", False))
+    rigorous = bool(getattr(args, "rigorous", False))
+    yes = bool(getattr(args, "yes", False))
     return {
-        "mode": "basic" if args.basic else "deep" if args.deep else "thorough",
+        "mode": "basic" if args.basic or quick else "deep" if args.deep else "thorough",
         "binary": bool(args.binary),
-        "local": bool(args.local),
         "visualize": not args.no_visualize,
         "model": args.model,
         "judge_model": args.judge_model,
         "timeout": args.timeout or 300,
         "judge_timeout": args.judge_timeout or 300,
-        "concurrency": args.concurrency or 3,
-        "judge_rounds": args.judge_rounds or 3,
-        "trust_target": bool(args.trust_target),
+        "concurrency": args.concurrency or (4 if quick else 3),
+        # One independent judge session by default; --rigorous grades every case three
+        # times in separate sessions (median), which is what a before/after comparison wants.
+        "judge_rounds": args.judge_rounds or (3 if rigorous else 1),
+        "trust_target": bool(args.trust_target or yes),
         "allow_tools": args.allow_tool or [],
-        "publish_skillwatch": bool(args.publish_skillwatch),
-        "publish_pixelcloud": bool(args.publish_pixelcloud),
-        "create_project": bool(args.create_project),
+        "sequential": bool(getattr(args, "sequential", False)),
     }
 
 
@@ -189,12 +191,6 @@ def prepare(args, options):
     write_json(run / "criteria.yaml", criteria)
     write_json(run / "analysis.json", {**analysis, **behavior})
     (run / "CRITERIA_REVIEW.md").write_text(review_table(criteria))
-    config = read_data(args.config) if args.config else {}
-    adapter = (
-        "local"
-        if options["local"] or analysis["automatic_local"] or not config.get("msl")
-        else "msl"
-    )
     manifest = {
         "schema_version": SCHEMA,
         "evaluator_version": VERSION,
@@ -219,9 +215,7 @@ def prepare(args, options):
         "criteria_backup": backup,
         "options": options,
         "dependencies": deps,
-        "execution_adapter": adapter,
-        "config": config,
-        "config_hash": digest(config),
+        "execution_adapter": "local",
         "author_usage": author_usage,
         "pricing_configuration": {
             "source": "Claude CLI-reported cost/modelUsage",
@@ -232,11 +226,9 @@ def prepare(args, options):
         "behavior_hash": digest(behavior),
         "evaluator_hash": snapshot_hash(ROOT),
         "cases": {c["id"]: {"state": "pending"} for c in criteria["test_cases"]},
-        "publications": {},
         "deviations": [
             "기본 THOROUGH 정수 배분은 2/1/2/2/3입니다. 요청 비율을 정수 10개로 만족할 수 없어 완수를 30%로 둡니다.",
             "저장소에 승인된 채점 모델 설정이 없어 --judge-model을 지정하지 않으면 인증된 CLI 기본값을 따릅니다.",
-            "MSL/SkillWatch/PixelCloud는 명시적으로 선택하는 운영자 bridge이며 내부 스키마를 추측하지 않습니다.",
             "격리·라우팅·MCP mock은 native claude plugin eval을 재사용하고, 내장 발견·보고서 도우미가 없는 내부 도우미를 대신합니다.",
         ],
     }
@@ -260,8 +252,6 @@ def resume(args):
         raise EvalError("평가 도구 버전이 바뀌었습니다. 새 실행을 만드세요")
     if digest(criteria) != manifest["criteria_hash"]:
         raise EvalError("저장된 평가 기준이 바뀌었습니다. 새 실행을 만드세요")
-    if digest(manifest["config"]) != manifest["config_hash"]:
-        raise EvalError("어댑터 설정이 바뀌었습니다. 새 실행을 만드세요")
     skill = manifest["skill"]
     if snapshot_hash(Path(skill["installed_path"])) != skill["skill_hash"]:
         raise EvalError(
@@ -271,12 +261,11 @@ def resume(args):
         Path(skill.get("snapshot_path", skill["installed_path"]))
     ) != skill.get("snapshot_hash", skill["skill_hash"]):
         raise EvalError("plugin 의존성이 바뀌었습니다. 새 실행을 만드세요")
-    # Resume options are immutable; publication may be retried through the saved opt-in config.
+    # Resume options are immutable.
     forbidden = [
         "basic",
         "deep",
         "binary",
-        "local",
         "no_visualize",
         "model",
         "judge_model",
@@ -285,7 +274,6 @@ def resume(args):
         "concurrency",
         "judge_rounds",
         "allow_tool",
-        "config",
         "criteria",
     ]
     if any(getattr(args, k, None) for k in forbidden):
@@ -297,6 +285,181 @@ def resume(args):
         criteria, manifest["options"]["mode"], manifest["options"]["binary"]
     )
     return run, manifest, criteria, analysis
+
+
+def regrade(args):
+    """New run that imports another run's execution evidence and grades it with the
+    current evaluator. Executions are copied byte for byte and re-hashed; cases without
+    an execution stay pending and run normally. Provenance (source run, evaluator hash
+    at execution time) is recorded in the manifest. The target's criteria file is not
+    touched."""
+    source = Path(args.regrade).expanduser().resolve()
+    old = read_data(source / "manifest.json")
+    criteria = read_data(source / "criteria.yaml")
+    analysis = read_data(source / "analysis.json")
+    if digest(criteria) != old["criteria_hash"]:
+        raise EvalError("원본 실행의 평가 기준이 바뀌어 다시 채점할 수 없습니다")
+    if digest(old["options"]) != old.get("options_hash"):
+        raise EvalError("원본 실행의 옵션이 바뀌어 다시 채점할 수 없습니다")
+    forbidden = [
+        "basic",
+        "deep",
+        "binary",
+        "no_visualize",
+        "model",
+        "judge_model",
+        "timeout",
+        "judge_timeout",
+        "concurrency",
+        "judge_rounds",
+        "allow_tool",
+        "criteria",
+        "source",
+        "target",
+    ]
+    if any(getattr(args, k, None) for k in forbidden):
+        raise EvalError(
+            "--regrade는 원본 실행의 옵션을 사용합니다. 평가 옵션을 덮어쓰지 마세요"
+        )
+    validate_criteria(criteria, old["options"]["mode"], old["options"]["binary"])
+    imported, pending = [], []
+    for c in criteria["test_cases"]:
+        cid = c["id"]
+        if (
+            old["cases"].get(cid, {}).get("state") in ("executed", "graded")
+            and (source / "cases" / cid / "execution.json").exists()
+        ):
+            imported.append(cid)
+        else:
+            pending.append(cid)
+    if (
+        pending
+        and snapshot_hash(Path(old["skill"]["installed_path"]))
+        != old["skill"]["skill_hash"]
+    ):
+        raise EvalError(
+            "원본 실행 이후 대상 스킬이 바뀌었습니다. 남은 사례를 실행하면 revision이 섞입니다"
+        )
+    run_id = now().replace(":", "").replace(".", "-") + "-" + uuid.uuid4().hex[:8]
+    run = Path(args.output or source.parent / run_id).expanduser().resolve()
+    run.mkdir(parents=True, exist_ok=False)
+    deps = check_dependencies(run)
+    write_json(run / "criteria.yaml", criteria)
+    write_json(run / "analysis.json", analysis)
+    (run / "CRITERIA_REVIEW.md").write_text(review_table(criteria))
+    for cid in imported:
+        shutil.copytree(source / "cases" / cid, run / "cases" / cid, symlinks=False)
+        validate_artifact_files(
+            run, cid, read_data(run / "cases" / cid / "execution.json")
+        )
+    manifest = {
+        **{
+            k: v
+            for k, v in old.items()
+            if k
+            not in (
+                "cases",
+                "publications",
+                "finished_at",
+                "execution_started_at",
+                "msl_fallback_reason",
+                "config",
+                "config_hash",
+            )
+        },
+        "run_id": run_id,
+        "created_at": now(),
+        "state": "criteria_review",
+        "dependencies": deps,
+        "author_usage": {
+            "cost_usd": 0,
+            "usage": {},
+            "source": f"regrade of {old['run_id']}; author cost is recorded in that run",
+        },
+        "evaluator_hash": snapshot_hash(ROOT),
+        "cases": {
+            cid: (
+                {"state": "executed", "evidence_hashes": evidence_hashes(run, cid)}
+                if cid in imported
+                else {"state": "pending"}
+            )
+            for cid in [c["id"] for c in criteria["test_cases"]]
+        },
+        "regrade_of": {
+            "run_id": old["run_id"],
+            "path": str(source),
+            "evaluator_hash_at_execution": old.get("evaluator_hash"),
+            "imported_cases": imported,
+            "pending_cases": pending,
+        },
+    }
+    write_json(run / "manifest.json", manifest)
+    print(
+        f"{old['run_id']} 재채점: 실행 {len(imported)}개 가져옴, {len(pending)}개 대기",
+        flush=True,
+    )
+    print(f"준비 완료: {run}", flush=True)
+    return run, manifest, criteria, analysis
+
+
+def case_reason(result, case):
+    """One plain sentence for a non-passing case."""
+    if result.get("status") == "error":
+        return "채점하지 못함: " + str(result.get("error", ""))[:140]
+    checks = result.get("checks", {})
+    labels = (
+        ("required_present_misses", "필수 문구 누락"),
+        ("forbidden_hits", "금지 문구 포함"),
+        ("missing_artifacts", "필수 산출물 누락"),
+        ("artifact_hash_mismatches", "보호 파일 변경"),
+    )
+    for key, label in labels:
+        if checks.get(key):
+            return f"{label}: {', '.join(checks[key])}"
+    if checks.get("routing_failure"):
+        return "스킬이 호출되지 않아야 할 때 호출됨(또는 그 반대)"
+    specs = case["quality_criteria"]["semantic_checks"]
+    for sem in result.get("semantic_checks", []):
+        if specs[sem["index"]].get("critical") and sem["score"] < (
+            1 if result.get("grading") == "binary" else 3
+        ):
+            question = specs[sem["index"]]["question"].split("\n")[0][:110]
+            return f"critical 검사 점수 {sem['score']}: {question}"
+    return f"종합 점수 {result.get('score'):.2f}: 통과 기준 미달"
+
+
+def print_summary(run, summary, criteria):
+    cases = {c["id"]: c for c in criteria["test_cases"]}
+    cost = summary.get("cost_usd")
+    minutes = (summary.get("wall_clock_seconds") or 0) / 60
+    head = (
+        f"{summary['verdict']}: 사례 {summary['passed']}/{summary['total']}개 통과"
+        + (f", 등급 {summary['grade']}" if summary.get("grade") else "")
+        + (f", 약 ${cost:.2f} (CLI 추정치)" if cost is not None else "")
+        + f", {minutes:.0f}분"
+    )
+    print("\n" + head)
+    for r in summary["results"]:
+        score = f"{r['score']:.2f}" if r.get("score") is not None else "  -  "
+        line = f"  {r['case_id']}  {r['verdict']:<5} {score}  {r['name']}"
+        if r["verdict"] != "PASS":
+            line += "\n" + " " * 26 + case_reason(r, cases[r["case_id"]])
+        print(line)
+    html = run / "REPORT.html"
+    print(
+        f"보고서: {run / 'REPORT.md'}" + (f"  (HTML: {html})" if html.exists() else "")
+    )
+    print(f"실행 디렉터리: {run}", flush=True)
+
+
+def open_report(run):
+    html = run / "REPORT.html"
+    target = html if html.exists() else run / "REPORT.md"
+    opener = "open" if sys.platform == "darwin" else "xdg-open"
+    try:
+        subprocess.Popen([opener, str(target)])
+    except OSError as exc:
+        print(f"{target} 파일을 열 수 없습니다: {exc}", file=sys.stderr)
 
 
 def persist_execution(run, case, result):
@@ -313,8 +476,9 @@ def persist_execution(run, case, result):
 
 def evidence_packet(run, case):
     d = run / "cases" / case["id"]
+    # Only citable files travel to judges. The raw transcript (conversation.txt) stays
+    # on disk for audit; sending it dominated judge cost without being usable evidence.
     files = [
-        d / "conversation.txt",
         d / "response.txt",
         d / "tool_calls.json",
         d / "metadata.json",
@@ -336,6 +500,107 @@ def evidence_packet(run, case):
     return packet
 
 
+def judge_attempt_dir(run, batch, round_no):
+    """First unused directory for this round so every raw judge attempt is retained."""
+    base = run / "judges" / f"batch-{batch:03d}-round-{round_no}"
+    if not base.exists():
+        return base
+    n = 1
+    while (base.with_name(f"{base.name}-retry-{n}")).exists():
+        n += 1
+    return base.with_name(f"{base.name}-retry-{n}")
+
+
+def judge_rounds(run, batch, manifest, idx, options, judge=None):
+    """Independent judge rounds for one batch: reuse validated checkpoints, checkpoint
+    every valid round as soon as it validates, and retry an invalid round once in a
+    fresh session. The invalid attempt's raw output is kept in its own directory."""
+    judge = judge or judge_batch
+    ids = [c["id"] for c in batch]
+
+    def checkpoint(rn):
+        return run / "judges" / f"batch-{idx:03d}-round-{rn}" / "validated.json"
+
+    def reusable(rn):
+        """A validated checkpoint for this round that covers every case in the batch.
+        After a resume, graded cases drop out of a batch and batch indices can shift, so
+        the same-index file is tried first and then every batch directory for the round."""
+        judges = run / "judges"
+        candidates = [checkpoint(rn)] + (
+            sorted(judges.glob(f"batch-*-round-{rn}/validated.json"))
+            + sorted(judges.glob(f"batch-*-round-{rn}-retry-*/validated.json"))
+            if judges.exists()
+            else []
+        )
+        for path in candidates:
+            if not path.exists():
+                continue
+            old = read_data(path)
+            if set(ids) <= set(old["case_ids"]):
+                return old
+        return None
+
+    rounds, costs, pending = [], [], []
+    for rn in range(1, options["judge_rounds"] + 1):
+        old = reusable(rn)
+        if old is not None:
+            for c in batch:
+                validate_judgment(
+                    old["judgments"][c["id"]],
+                    {**c, "_mode": options["mode"]},
+                    options["binary"],
+                    run,
+                )
+            rounds.append({c["id"]: old["judgments"][c["id"]] for c in batch})
+            costs.append(old["usage"])
+            continue
+        pending.append(rn)
+
+    def keep(rn, judgments, usage, retried_after=None):
+        rounds.append(judgments)
+        costs.append(usage)
+        # The checkpoint sits beside the raw attempt that produced it, so a later batch
+        # with a different composition can never overwrite another batch's checkpoint.
+        target = (
+            run / usage["judge_dir"] / "validated.json"
+            if usage.get("judge_dir")
+            else checkpoint(rn)
+        )
+        write_json(
+            target,
+            {
+                "case_ids": ids,
+                "judgments": judgments,
+                "usage": usage,
+                **({"retried_after": retried_after} if retried_after else {}),
+            },
+        )
+
+    failures = {}
+    with concurrent.futures.ThreadPoolExecutor(
+        max_workers=min(options["concurrency"], options["judge_rounds"])
+    ) as pool:
+        futures = {
+            rn: pool.submit(judge, run, batch, manifest, idx, rn) for rn in pending
+        }
+        for rn, f in futures.items():
+            try:
+                judgments, usage = f.result()
+            except EvalError as exc:
+                failures[rn] = str(exc)
+                continue
+            keep(rn, judgments, usage)
+    for rn, reason in failures.items():
+        try:
+            judgments, usage = judge(run, batch, manifest, idx, rn)
+        except EvalError as exc:
+            raise EvalError(
+                f"{rn}라운드가 두 번 모두 유효하지 않습니다: 처음 {reason}; 재시도 {exc}"
+            ) from exc
+        keep(rn, judgments, usage, retried_after=reason)
+    return rounds, costs
+
+
 def judge_batch(run, cases, manifest, batch, round_no):
     options = manifest["options"]
     binary = options["binary"]
@@ -350,16 +615,16 @@ def judge_batch(run, cases, manifest, batch, round_no):
 JSON만 반환하세요: {{"judgments":[...]}}. 사례마다 정확히 한 개의 judgment가 필요합니다.
 각 judgment에는 case_id, dimensions ({list(dims)}), best_practice_subcriteria ({list(BP)}), business_impact_subcriteria ({list(BI)}), semantic_checks (quality_criteria의 각 의미 검사에 대응하는 index 포함 항목)를 넣으세요.
 각 차원·하위 기준·의미 검사 항목의 형식은 {{"score":NUMBER,"rubric_level":SAME_NUMBER,"reason":"근거 범위를 지킨 한국어 설명","evidence":[{{"path":"cases/TC-001/response.txt","line_start":1,"line_end":1,"quote":"해당 줄에 있는 정확한 부분 문자열"}}]}}입니다. 의미 검사에는 index=0,1,...도 넣으세요. 허용 점수는 {([0, 1] if binary else [1, 2, 3, 4, 5])}입니다. 모든 항목은 유효한 줄의 정확한 인용문을 한 개 이상 제시해야 합니다.
-인용은 해당 사례의 response.txt (response/all), tool_calls.json (tool_usage/all 또는 invocation), artifacts/* (artifact/all), metadata.json만 허용됩니다. conversation.txt, 스킬 소스, 평가 기준, prompt, 다른 사례, 대상의 원시 지침은 인용하지 마세요. metadata는 효율·실행 환경의 근거이며 출력의 정답 여부를 입증하지 못합니다. 누락된 동작은 그 누락이 드러나는 실제 응답을 인용하고, 없는 문장을 만들어 인용하지 마세요. 사례별 의미 루브릭과 아래 공통 차원을 사용하세요. 업무 지표가 없는 스킬은 적용 가능성을 논할 수 있지만 관측하지 않은 시간 절감이나 매출을 지어내지 마세요. 간단한 사례에 subagent가 반드시 필요한 것은 아닙니다.
+인용은 해당 사례의 파일만 허용됩니다: response.txt (eval_target response/all), artifacts/* (eval_target artifact/all), 그리고 하네스 기록인 tool_calls.json, metadata.json, artifacts.json (수집된 경로·존재 여부·sha256)은 항상 인용할 수 있습니다. 사람이 읽을 수 있는 짧은 문구(응답 문장, 도구 이름, 파일 경로, 설명, actor 값)를 인용하되 어미와 문장 부호까지 한 글자도 바꾸지 말고 그대로 옮기세요(정규화하거나 번역하지 마세요). line_start/line_end는 줄 번호가 붙은 근거에서 정확히 옮기세요. id나 parent_tool_use_id 값 같은 불투명한 식별자는 인용하지 마세요. 수행 주체를 보이려면 같은 항목의 name과 actor 줄을 인용하세요. conversation.txt, 스킬 소스, 평가 기준, prompt, 다른 사례, 대상의 원시 지침은 인용하지 마세요. 하네스 기록은 효율·모범 사례·안전 판단의 근거가 되지만 답의 정확성을 입증하지는 못합니다.
+tool_calls.json 항목에는 native 수행 주체 정보가 있습니다: actor (parent = 평가 대상 세션 자신, worker = 위임받은 subagent, unknown = 주체를 확인할 수 없음), parent_tool_use_id, lineage_verified, trace_line. 누가 작업을 수행했는지에 관한 판단(위임, 조율자의 직접 구현 없음, 다른 worker의 독립 검증)은 반드시 이 항목을 인용해야 합니다. 어떤 도구를 썼는지에 관한 assistant 자신의 서술은 주장일 뿐 수행 주체의 근거가 아닙니다. actor가 unknown이거나 lineage_verified가 false인 항목은 주체 미확인이며 역할 분리를 입증하지 못합니다. metadata는 효율·실행 환경의 근거이며 출력의 정답 여부를 입증하지 못합니다. 누락된 동작은 그 누락이 드러나는 실제 응답을 인용하고, 없는 문장을 만들어 인용하지 마세요. 사례별 의미 루브릭과 아래 공통 차원을 사용하세요. 업무 지표가 없는 스킬은 적용 가능성을 논할 수 있지만 관측하지 않은 시간 절감이나 매출을 지어내지 마세요. 간단한 사례에 subagent가 반드시 필요한 것은 아닙니다.
 reason은 한국어로 작성하되 evidence.quote는 원문 그대로 보존하세요. 스키마 키·enum·점수·경로를 번역하지 마세요.
 {rubric}
 평가 데이터:\n{json.dumps(packet, ensure_ascii=False)}"""
+    out_dir = judge_attempt_dir(run, batch, round_no)
     result, usage = agent_json(
-        judge_prompt,
-        run / "judges" / f"batch-{batch:03d}-round-{round_no}",
-        options["judge_model"],
-        options["judge_timeout"],
+        judge_prompt, out_dir, options["judge_model"], options["judge_timeout"]
     )
+    usage = {**usage, "judge_dir": str(out_dir.relative_to(run))}
     outputs = result.get("judgments", [])
     if len(outputs) != len(cases):
         raise EvalError("독립 채점자가 사례를 누락하거나 추가했습니다")
@@ -376,7 +641,6 @@ reason은 한국어로 작성하되 evidence.quote는 원문 그대로 보존하
 def execute(run, manifest, criteria, analysis):
     options = manifest["options"]
     cases = criteria["test_cases"]
-    config = manifest["config"]
     lock = (run / ".run.lock").open("w")
     try:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -409,40 +673,14 @@ def execute(run, manifest, criteria, analysis):
         def run_one(case):
             d = run / "cases" / case["id"]
             d.mkdir(parents=True, exist_ok=True)
-            if manifest["execution_adapter"] == "msl":
-                response = bridge_call(
-                    config["msl"],
-                    "execute",
-                    {
-                        "case": case,
-                        "analysis": analysis,
-                        "options": options,
-                        "run_id": manifest["run_id"],
-                    },
-                    d / "msl",
-                    options["timeout"],
-                )
-                result = normalize_execution(response["execution"], "msl")
-            else:
-                result = native_execute(analysis, case, d, options)
+            result = native_execute(analysis, case, d, options)
             persist_execution(run, case, result)
             return result
 
-        # MSL gets one small infrastructure probe; legitimate test failures never trigger fallback.
-        if pending and manifest["execution_adapter"] == "msl":
-            c = pending.pop(0)
-            try:
-                run_one(c)
-                manifest["cases"][c["id"]] = {
-                    "state": "executed",
-                    "evidence_hashes": evidence_hashes(run, c["id"]),
-                }
-            except EvalError as exc:
-                manifest["msl_fallback_reason"] = str(exc)
-                manifest["execution_adapter"] = "local"
-                pending.insert(0, c)
-            write_json(run / "manifest.json", manifest)
-        workers = 1 if analysis.get("mutates", True) else options["concurrency"]
+        # Every case runs in its own native sandbox (fresh home, cwd and fixture copy), so
+        # cases of a file-changing skill are still isolated from each other; --sequential
+        # is for skills that touch shared external resources (ports, accounts, services).
+        workers = 1 if options.get("sequential") else options["concurrency"]
         with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
             jobs = {pool.submit(run_one, c): c for c in pending}
             for future in concurrent.futures.as_completed(jobs):
@@ -504,54 +742,8 @@ def execute(run, manifest, criteria, analysis):
         batches = [to_grade[i : i + 4] for i in range(0, len(to_grade), 4)]
         # Each round is a separate clean model process. Batch size bounded to four complete cases.
         for idx, batch in enumerate(batches):
-            rounds = []
-            costs = []
             try:
-                with concurrent.futures.ThreadPoolExecutor(
-                    max_workers=min(options["concurrency"], options["judge_rounds"])
-                ) as pool:
-                    futures = []
-                    for rn in range(1, options["judge_rounds"] + 1):
-                        checkpoint = (
-                            run
-                            / "judges"
-                            / f"batch-{idx:03d}-round-{rn}"
-                            / "validated.json"
-                        )
-                        if checkpoint.exists():
-                            old = read_data(checkpoint)
-                            if old["case_ids"] == [c["id"] for c in batch]:
-                                for c in batch:
-                                    validate_judgment(
-                                        old["judgments"][c["id"]],
-                                        {**c, "_mode": options["mode"]},
-                                        options["binary"],
-                                        run,
-                                    )
-                                rounds.append(old["judgments"])
-                                costs.append(old["usage"])
-                                continue
-                        futures.append(
-                            (
-                                rn,
-                                pool.submit(judge_batch, run, batch, manifest, idx, rn),
-                            )
-                        )
-                    for rn, f in futures:
-                        judgments, usage = f.result()
-                        rounds.append(judgments)
-                        costs.append(usage)
-                        write_json(
-                            run
-                            / "judges"
-                            / f"batch-{idx:03d}-round-{rn}"
-                            / "validated.json",
-                            {
-                                "case_ids": [c["id"] for c in batch],
-                                "judgments": judgments,
-                                "usage": usage,
-                            },
-                        )
+                rounds, costs = judge_rounds(run, batch, manifest, idx, options)
                 for c in batch:
                     execution = read_data(run / "cases" / c["id"] / "execution.json")
                     graded = grade_case(
@@ -616,51 +808,10 @@ def execute(run, manifest, criteria, analysis):
         }
         manifest["state"] = "reported"
         write_reports(run, summary, manifest, options["visualize"])
-        for kind, enabled in (
-            ("skillwatch", options["publish_skillwatch"]),
-            ("pixelcloud", options["publish_pixelcloud"]),
-        ):
-            if not enabled:
-                manifest["publications"][kind] = {"status": "not_requested"}
-                continue
-            try:
-                if kind == "pixelcloud" and not options["visualize"]:
-                    raise EvalError("PixelCloud에는 시각화가 필요합니다")
-                receipt = publish(run, summary, config, kind, options["create_project"])
-                manifest["publications"][kind] = {
-                    "status": "published",
-                    "receipt": receipt,
-                }
-            except EvalError as exc:
-                manifest["publications"][kind] = {"status": "error", "reason": str(exc)}
         manifest["state"] = "complete" if not summary["errors"] else "incomplete"
         write_json(run / "manifest.json", manifest)
-        print(
-            json.dumps(
-                {
-                    k: summary[k]
-                    for k in (
-                        "run_id",
-                        "total",
-                        "passed",
-                        "failed",
-                        "errors",
-                        "pass_rate",
-                        "cost_usd",
-                    )
-                },
-                indent=2,
-            )
-        )
-        print(f"보고서: {run / 'REPORT.md'}", flush=True)
-        return (
-            2
-            if summary["errors"]
-            or any(p["status"] == "error" for p in manifest["publications"].values())
-            else 0
-            if summary["verdict"] == "PASS"
-            else 1
-        )
+        print_summary(run, summary, criteria)
+        return 2 if summary["errors"] else 0 if summary["verdict"] == "PASS" else 1
     except KeyboardInterrupt:
         manifest["state"] = "interrupted"
         write_json(run / "manifest.json", manifest)
@@ -670,26 +821,32 @@ def execute(run, manifest, criteria, analysis):
         lock.close()
 
 
+COMMANDS = ("run", "prepare", "validate", "doctor", "compare")
+
+
 def parser():
-    p = argparse.ArgumentParser(description=__doc__)
+    p = argparse.ArgumentParser(
+        description=__doc__,
+        usage="evaluate.py [COMMAND] TARGET [OTHER] [options]\n"
+        "  evaluate.py TARGET --yes            스킬을 처음부터 끝까지 평가합니다(사례 10개, 채점 1회)\n"
+        "  evaluate.py TARGET --yes --quick    사례 4개, 채점 1회, 약 5분\n"
+        "  evaluate.py TARGET --yes --rigorous 사례 10개, 사례마다 독립 채점 세션 3회\n"
+        "  evaluate.py compare RUN_A RUN_B --output compare.html",
+    )
     p._positionals.title = "위치 인자"
     p._optionals.title = "옵션"
     p._actions[0].help = "도움말을 표시하고 종료합니다"
     help_text = {
         "binary": "0/1 판정과 PASS/FAIL 보고서를 사용합니다",
-        "local": "MSL을 건너뛰고 로컬 격리 실행을 사용합니다",
         "no-visualize": "HTML 생성을 생략하고 로컬 Markdown/JSON은 보존합니다",
         "accept-criteria": "검토한 평가 기준으로 실제 실행합니다",
         "reuse-criteria": "대상에 저장된 기존 기준을 명시적으로 재사용합니다",
         "trust-target": "대상/plugin이 이미 승인된 신뢰 범위 안에 있음을 확인합니다",
-        "publish-skillwatch": "설정된 SkillWatch bridge로 결과를 발행합니다",
-        "publish-pixelcloud": "설정된 PixelCloud bridge로 HTML을 발행합니다",
-        "create-project": "발행할 때 프로젝트를 명시적으로 생성합니다",
         "criteria": "검토한 평가 기준 파일 경로",
         "source": "기준을 저장할 쓰기 가능한 스킬 소스 경로",
-        "output": "새 실행 결과 디렉터리",
+        "output": "새 실행 결과 디렉터리(compare에서는 비교 HTML 파일 경로)",
         "resume": "저장된 옵션과 근거를 보존하며 재개할 실행 디렉터리",
-        "config": "외부 어댑터 설정 파일",
+        "regrade": "실행 근거를 가져와 현재 평가 도구로 다시 채점할 원본 실행 디렉터리",
         "judge-model": "기준 작성·독립 채점에 사용할 모델",
         "model": "평가 대상 에이전트에 사용할 모델",
         "timeout": "사례별 시간 제한(초)",
@@ -698,14 +855,11 @@ def parser():
         "judge-rounds": "독립 채점 라운드 수(1/3/5)",
     }
     p.add_argument(
-        "command",
-        choices=["run", "prepare", "validate", "doctor", "compare"],
-        help="실행 / 기준 준비 / 형식 검증 / 의존성 확인 / 두 결과 비교",
+        "positional",
+        nargs="*",
+        metavar="COMMAND/TARGET",
+        help="[명령] 대상 [두 번째 대상]. 명령은 run(기본값) / prepare(기준 준비) / validate(형식 검증) / doctor(의존성 확인) / compare(두 결과 비교), 대상은 스킬 이름·경로, 기준 파일 또는 실행 디렉터리",
     )
-    p.add_argument(
-        "target", nargs="?", help="스킬 이름·경로, 기준 파일 또는 실행 디렉터리"
-    )
-    p.add_argument("other", nargs="?", help="compare에서 비교할 두 번째 실행 디렉터리")
     group = p.add_mutually_exclusive_group()
     group.add_argument(
         "--basic", action="store_true", help="표준 4개 사례로 평가합니다"
@@ -716,16 +870,33 @@ def parser():
         action="store_true",
         help="30개 사례로 확장 평가합니다",
     )
+    group.add_argument(
+        "--quick", action="store_true", help="사례 4개, 채점 1회, 동시 실행 4"
+    )
+    p.add_argument(
+        "--rigorous",
+        action="store_true",
+        help="사례마다 독립 채점 세션 3회(중앙값)",
+    )
+    p.add_argument(
+        "--yes",
+        action="store_true",
+        help="생성된 평가 기준을 수락하고 대상을 신뢰하여 바로 실행합니다",
+    )
+    p.add_argument(
+        "--open", action="store_true", help="실행이 끝나면 REPORT.html을 엽니다"
+    )
+    p.add_argument(
+        "--sequential",
+        action="store_true",
+        help="사례를 한 번에 하나씩 실행합니다(공유 외부 자원을 건드리는 스킬용)",
+    )
     for flag in (
         "binary",
-        "local",
         "no-visualize",
         "accept-criteria",
         "reuse-criteria",
         "trust-target",
-        "publish-skillwatch",
-        "publish-pixelcloud",
-        "create-project",
     ):
         p.add_argument("--" + flag, action="store_true", help=help_text[flag])
     for flag in (
@@ -733,7 +904,7 @@ def parser():
         "source",
         "output",
         "resume",
-        "config",
+        "regrade",
         "judge-model",
         "model",
     ):
@@ -748,6 +919,24 @@ def parser():
     return p
 
 
+def parse_args(argv=None):
+    """`evaluate.py TARGET` means `run TARGET`; an explicit COMMAND still works."""
+    args = parser().parse_args(argv)
+    words = list(args.positional)
+    if words and words[0] in COMMANDS:
+        args.command = words.pop(0)
+    else:
+        args.command = "run"
+    args.target = words[0] if words else None
+    args.other = words[1] if len(words) > 1 else None
+    if len(words) > 2:
+        raise EvalError("위치 인자가 너무 많습니다")
+    if args.yes:
+        args.accept_criteria = True
+        args.trust_target = True
+    return args
+
+
 def main():
     def interrupted(signum, frame):
         cancel_processes()
@@ -755,7 +944,7 @@ def main():
 
     signal.signal(signal.SIGINT, interrupted)
     signal.signal(signal.SIGTERM, interrupted)
-    args = parser().parse_args()
+    args = parse_args()
     options = resolved_options(args)
     if not 1 <= options["concurrency"] <= 8 or options["judge_rounds"] not in (1, 3, 5):
         raise EvalError("concurrency는 1~8, judge-rounds는 홀수 1/3/5여야 합니다")
@@ -773,6 +962,10 @@ def main():
         mb = read_data(Path(args.other) / "manifest.json")
         if ma["criteria_hash"] != mb["criteria_hash"]:
             raise EvalError("A/B 평가 기준이 달라 개선 효과를 주장할 수 없습니다")
+        if args.output:
+            from compare_report import build
+
+            print(build(args.target, args.other, args.output, "before", "after"))
         print(
             json.dumps(
                 {
@@ -795,6 +988,8 @@ def main():
         return 0
     if args.resume:
         run, manifest, criteria, analysis = resume(args)
+    elif args.regrade:
+        run, manifest, criteria, analysis = regrade(args)
     else:
         if not args.target:
             raise EvalError("스킬 이름이나 정확한 경로를 지정하세요")
@@ -803,12 +998,18 @@ def main():
         manifest["options"]["mode"] != "basic"
         and not args.accept_criteria
         and not args.resume
+        and not args.regrade
     ):
         print(
-            "검토할 평가 기준이 준비되었습니다. 대상 기준을 수정한 뒤 --criteria PATH --accept-criteria로 실행하세요. 기준이 그대로라면 검토 후 --resume RUN_DIR로 이어갈 수 있습니다."
+            f"검토할 평가 기준이 준비되었습니다(위 표, 파일: {analysis['criteria_path']}). "
+            "그대로 실행하려면 --yes로 다시 실행하고, 파일을 먼저 수정했다면 "
+            "--criteria PATH --yes를 넘기세요. 이 실행을 이어가려면 --resume RUN_DIR을 사용하세요."
         )
         return 0
-    return execute(run, manifest, criteria, analysis)
+    code = execute(run, manifest, criteria, analysis)
+    if args.open:
+        open_report(run)
+    return code
 
 
 if __name__ == "__main__":

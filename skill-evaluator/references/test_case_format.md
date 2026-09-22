@@ -87,6 +87,7 @@ test_cases 옆 선택적 `analysis`는 재사용 기준에 대한 검토된 동�
 | `semantic_checks[].rubric` | map | Likert는 정확히 정수 키 1~5, Binary는 0/1. 각 값은 관찰 가능한 동작 수준. |
 | `semantic_checks[].critical` | boolean, 기본 `false` | 실패하면 차원 종합 점수와 무관하게 사례 FAIL. |
 | `artifact_checks[].path` | 상대 string | 필수 수집 파일, 경로 탈출 금지. 추가 도메인 검사는 의미 루브릭이나 검증된 렌더러에 둔다. |
+| `artifact_checks[].sha256` | 선택적 64자리 hex string | 수집 파일의 기대 SHA-256. 불일치는 결정적 critical 실패다. 바이트 단위로 그대로 유지돼야 하는 보호 파일에 쓴다. 존재만으로는 보존이 아니다. |
 | `intercept_patterns` | 선택적 regex string list | 전체 일치 Bash 가로채기. mock_data에 대응 항목 필요. |
 | `intercept_mcp_tools` | 선택적 런타임 이름 list | 실제 목록으로 확인된 정확한 `mcp__server__tool`. |
 | `mock_data` | 선택적 mapping | 가로채기가 있으면 필수. 비밀·실제 자격 증명을 넣지 않는다. |
