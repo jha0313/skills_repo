@@ -59,7 +59,7 @@ A case fails on any critical check (a required file missing, a protected file ch
 | `--criteria FILE` | run reviewed or hand-written criteria |
 | `--allow-tool T` | extra tool for the evaluated session (repeatable) |
 | `--model`, `--judge-model` | pin the evaluated and judge models; otherwise the CLI default is used and recorded |
-| `--concurrency N` | parallel read-only cases (1–8, default 3); skills that change files run one case at a time |
+| `--concurrency N` | parallel cases (1–8, default 3); each case has its own sandbox. `--sequential` runs one at a time for skills that touch shared external resources |
 | `--timeout`, `--judge-timeout` | seconds per evaluated session / judge session |
 | `--open` | open `REPORT.html` when done |
 | `--resume RUN_DIR` | continue an interrupted run with its saved options |

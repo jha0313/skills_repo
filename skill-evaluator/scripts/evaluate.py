@@ -70,6 +70,7 @@ def resolved_options(args):
         "judge_rounds": args.judge_rounds or (3 if rigorous else 1),
         "trust_target": bool(args.trust_target or yes),
         "allow_tools": args.allow_tool or [],
+        "sequential": bool(getattr(args, "sequential", False)),
     }
 
 
@@ -670,7 +671,10 @@ def execute(run, manifest, criteria, analysis):
             persist_execution(run, case, result)
             return result
 
-        workers = 1 if analysis.get("mutates", True) else options["concurrency"]
+        # Every case runs in its own native sandbox (fresh home, cwd and fixture copy), so
+        # cases of a file-changing skill are still isolated from each other; --sequential
+        # is for skills that touch shared external resources (ports, accounts, services).
+        workers = 1 if options.get("sequential") else options["concurrency"]
         with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
             jobs = {pool.submit(run_one, c): c for c in pending}
             for future in concurrent.futures.as_completed(jobs):
@@ -846,6 +850,11 @@ def parser():
     )
     p.add_argument(
         "--open", action="store_true", help="open REPORT.html when the run finishes"
+    )
+    p.add_argument(
+        "--sequential",
+        action="store_true",
+        help="run cases one at a time (skills that touch shared external resources)",
     )
     for flag in (
         "binary",

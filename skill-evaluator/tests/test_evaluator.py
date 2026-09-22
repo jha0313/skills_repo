@@ -448,6 +448,12 @@ class EvaluatorTests(unittest.TestCase):
             evaluate.parse_args(["my-skill", "--rigorous"])
         )
         self.assertEqual(rigorous["judge_rounds"], 3)
+        self.assertFalse(rigorous["sequential"])
+        self.assertTrue(
+            evaluate.resolved_options(
+                evaluate.parse_args(["my-skill", "--sequential"])
+            )["sequential"]
+        )
         explicit = evaluate.parse_args(["compare", "run-a", "run-b"])
         self.assertEqual(
             (explicit.command, explicit.target, explicit.other),
