@@ -82,8 +82,7 @@ A judge entry has `{score, rubric_level, reason, evidence}`; semantic entries ad
 - Execution: dependency/version discovery and `execution_adapter` (always `local`).
 - Accounting: `pricing_configuration` and author usage. Requested model and resolved execution model are separate facts.
 - Checkpoints: `cases` indexed by ID, with `pending`, `executed`, `graded`, or `error`, plus recorded failure information. Judge checkpoints retain validated case IDs and raw round usage.
-- Publication: each requested destination's status/receipt or error; unrequested writes are explicit. A completed evaluation can still have a publication error—read publication status and CLI exit status.
-- Deviations: explicit changes from the requested contract, including integer allocation and unavailable internal integrations.
+- Deviations: explicit changes from the requested contract, such as the integer case allocation.
 
 CLI options are resolved once. Resume validates immutable hashes and refuses to combine revisions. A successful execution can be regraded after an interrupted judge without rerunning the evaluated skill. Changing criteria requires a new run rather than editing a manifest to defeat the checks.
 
