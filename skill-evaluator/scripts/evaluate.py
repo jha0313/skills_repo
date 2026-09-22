@@ -638,6 +638,14 @@ reason은 한국어로 작성하되 evidence.quote는 원문 그대로 보존하
     return indexed, usage
 
 
+def session_error(metadata):
+    """Infrastructure reason when the evaluated session itself failed (API/auth error),
+    as opposed to a timeout, whose partial work is still graded."""
+    if metadata.get("exit_state") == "error" and not metadata.get("timed_out"):
+        return "실행 세션 오류(채점 불가): " + str(metadata.get("error") or "unknown")
+    return None
+
+
 def execute(run, manifest, criteria, analysis):
     options = manifest["options"]
     cases = criteria["test_cases"]
@@ -687,10 +695,18 @@ def execute(run, manifest, criteria, analysis):
                 c = jobs[future]
                 try:
                     execution = future.result()
-                    manifest["cases"][c["id"]] = {
-                        "state": "executed",
-                        "evidence_hashes": evidence_hashes(run, c["id"]),
-                    }
+                    failure = session_error(execution["metadata"])
+                    if failure:
+                        results[c["id"]] = error_case(c, failure, execution["metadata"])
+                        manifest["cases"][c["id"]] = {
+                            "state": "error",
+                            "error": failure,
+                        }
+                    else:
+                        manifest["cases"][c["id"]] = {
+                            "state": "executed",
+                            "evidence_hashes": evidence_hashes(run, c["id"]),
+                        }
                     print(
                         f"실행 완료 {c['id']}: {execution['metadata']['exit_state']}",
                         flush=True,
@@ -713,6 +729,12 @@ def execute(run, manifest, criteria, analysis):
                 continue
             result = read_data(run / "cases" / case["id"] / "execution.json")
             validate_artifact_files(run, case["id"], result)
+            failure = session_error(result["metadata"])
+            if failure:
+                results[case["id"]] = error_case(case, failure, result["metadata"])
+                manifest["cases"][case["id"]] = {"state": "error", "error": failure}
+                write_json(run / "manifest.json", manifest)
+                continue
             if (
                 not result.get("response", "").strip()
                 and not result.get("tool_calls")

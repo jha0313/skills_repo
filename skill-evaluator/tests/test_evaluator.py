@@ -1140,3 +1140,17 @@ class AgentTimeoutMessage(unittest.TestCase):
                     adapters.agent_json("prompt", tmp, None, 300)
         self.assertIn("300초", str(ctx.exception))
         self.assertIn("--judge-timeout", str(ctx.exception))
+
+
+class SessionErrorGate(unittest.TestCase):
+    def test_api_failure_is_an_error_but_timeout_is_still_graded(self):
+        failed = {
+            "exit_state": "error",
+            "timed_out": False,
+            "error": "exit 1: Failed to authenticate. API Error: 401",
+        }
+        self.assertIn("401", evaluate.session_error(failed))
+        self.assertIsNone(
+            evaluate.session_error({"exit_state": "error", "timed_out": True})
+        )
+        self.assertIsNone(evaluate.session_error({"exit_state": "completed"}))
