@@ -727,6 +727,37 @@ class EvaluatorTests(unittest.TestCase):
         with self.assertRaises(core.EvalError):
             core.validate_criteria(data, "basic", False)
 
+    def test_native_trace_tolerates_unicode_line_separator_inside_json(self):
+        """A U+2028 inside a model's text must not split a JSONL record in two."""
+        text = "\n".join(
+            [
+                json.dumps({"type": "system", "session_id": "s"}),
+                json.dumps(
+                    {
+                        "type": "assistant",
+                        "parent_tool_use_id": None,
+                        "message": {
+                            "content": [
+                                {"type": "text", "text": "first\u2028second"},
+                                {
+                                    "type": "tool_use",
+                                    "id": "t1",
+                                    "name": "Read",
+                                    "input": {"file_path": "a"},
+                                },
+                            ]
+                        },
+                    },
+                    ensure_ascii=False,
+                ),
+                json.dumps({"type": "result", "result": "done"}),
+            ]
+        )
+        events, final, _init, calls, _response = adapters.parse_trace(text)
+        self.assertEqual(len(events), 3)
+        self.assertEqual(final.get("result"), "done")
+        self.assertEqual([c["name"] for c in calls], ["Read"])
+
     def test_native_trace_preserves_worker_attribution(self):
         # Judges may only cite tool_calls.json, so actor attribution, lineage and the
         # raw trace coordinate must survive normalization and citation verification.

@@ -258,7 +258,9 @@ def native_stage(analysis, case, case_dir, options):
 
 def parse_trace(text):
     indexed = []
-    for line_no, line in enumerate(text.splitlines(), 1):
+    # JSONL is newline-delimited only; str.splitlines() would also break on U+2028 and
+    # similar separators that legitimately appear inside JSON strings.
+    for line_no, line in enumerate(text.split("\n"), 1):
         if line.strip():
             try:
                 indexed.append((line_no, json.loads(line)))
