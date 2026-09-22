@@ -1120,3 +1120,23 @@ class EvaluatorTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class AgentTimeoutMessage(unittest.TestCase):
+    def test_author_timeout_names_the_limit_and_flag(self):
+        import tempfile
+        from unittest.mock import patch
+
+        timed_out = {
+            "timed_out": True,
+            "exit_code": None,
+            "stdout": "",
+            "stderr": "",
+            "duration_seconds": 300,
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.object(adapters, "run_process", return_value=timed_out):
+                with self.assertRaises(adapters.EvalError) as ctx:
+                    adapters.agent_json("prompt", tmp, None, 300)
+        self.assertIn("300초", str(ctx.exception))
+        self.assertIn("--judge-timeout", str(ctx.exception))

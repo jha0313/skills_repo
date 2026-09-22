@@ -580,7 +580,11 @@ def agent_json(prompt, out_dir, model=None, timeout=300):
         argv += ["--model", model]
     (out_dir / "prompt.txt").write_text(prompt)
     result = run_process(argv, out_dir, timeout, out_dir / "agent", prompt)
-    if result["timed_out"] or result["exit_code"]:
+    if result["timed_out"]:
+        raise EvalError(
+            f"독립 에이전트가 {timeout}초 안에 끝나지 않았습니다. 큰 스킬은 --judge-timeout으로 늘리세요"
+        )
+    if result["exit_code"]:
         raise EvalError("독립 에이전트 실행에 실패했습니다: " + result["stderr"][-800:])
     try:
         outer = json.loads(result["stdout"])
