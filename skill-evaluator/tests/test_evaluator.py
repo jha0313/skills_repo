@@ -428,6 +428,62 @@ class EvaluatorTests(unittest.TestCase):
         )
         self.assertEqual(len(rounds), 1)
 
+    def test_cli_defaults_are_one_command_and_one_judge(self):
+        args = evaluate.parse_args(["my-skill", "--yes"])
+        self.assertEqual(
+            (args.command, args.target, args.accept_criteria, args.trust_target),
+            ("run", "my-skill", True, True),
+        )
+        opts = evaluate.resolved_options(args)
+        self.assertEqual(
+            (opts["mode"], opts["judge_rounds"], opts["concurrency"]),
+            ("thorough", 1, 3),
+        )
+        quick = evaluate.resolved_options(evaluate.parse_args(["my-skill", "--quick"]))
+        self.assertEqual(
+            (quick["mode"], quick["judge_rounds"], quick["concurrency"]),
+            ("basic", 1, 4),
+        )
+        rigorous = evaluate.resolved_options(
+            evaluate.parse_args(["my-skill", "--rigorous"])
+        )
+        self.assertEqual(rigorous["judge_rounds"], 3)
+        explicit = evaluate.parse_args(["compare", "run-a", "run-b"])
+        self.assertEqual(
+            (explicit.command, explicit.target, explicit.other),
+            ("compare", "run-a", "run-b"),
+        )
+        with self.assertRaises(core.EvalError):
+            evaluate.parse_args(["run", "a", "b", "c"])
+
+    def test_case_reason_names_the_first_failing_gate(self):
+        case = copy.deepcopy(self.case)
+        graded = {
+            "status": "graded",
+            "grading": "likert",
+            "score": 4.2,
+            "checks": {"artifact_hash_mismatches": ["STATE.md"]},
+            "semantic_checks": [],
+        }
+        self.assertIn(
+            "protected file changed: STATE.md", evaluate.case_reason(graded, case)
+        )
+        crit = {
+            "status": "graded",
+            "grading": "likert",
+            "score": 4.2,
+            "checks": {},
+            "semantic_checks": [{"index": 0, "score": 2, "weight": 3}],
+        }
+        self.assertTrue(
+            evaluate.case_reason(crit, case).startswith("critical check scored 2")
+        )
+        err = {
+            "status": "error",
+            "error": "Judge infrastructure: round 1 invalid twice",
+        }
+        self.assertTrue(evaluate.case_reason(err, case).startswith("not graded"))
+
     def test_regrade_imports_executions_and_records_provenance(self):
         """A regrade run copies execution evidence from a finished or interrupted run,
         re-hashes it, keeps unexecuted cases pending, and never touches the target."""

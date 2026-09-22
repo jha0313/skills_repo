@@ -13,6 +13,7 @@ import fcntl
 import json
 import shutil
 import signal
+import subprocess
 import sys
 import uuid
 from pathlib import Path
@@ -54,8 +55,11 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 def resolved_options(args):
+    quick = bool(getattr(args, "quick", False))
+    rigorous = bool(getattr(args, "rigorous", False))
+    yes = bool(getattr(args, "yes", False))
     return {
-        "mode": "basic" if args.basic else "deep" if args.deep else "thorough",
+        "mode": "basic" if args.basic or quick else "deep" if args.deep else "thorough",
         "binary": bool(args.binary),
         "local": bool(args.local),
         "visualize": not args.no_visualize,
@@ -63,9 +67,11 @@ def resolved_options(args):
         "judge_model": args.judge_model,
         "timeout": args.timeout or 300,
         "judge_timeout": args.judge_timeout or 300,
-        "concurrency": args.concurrency or 3,
-        "judge_rounds": args.judge_rounds or 3,
-        "trust_target": bool(args.trust_target),
+        "concurrency": args.concurrency or (4 if quick else 3),
+        # One independent judge session by default; --rigorous grades every case three
+        # times in separate sessions (median), which is what a before/after comparison wants.
+        "judge_rounds": args.judge_rounds or (3 if rigorous else 1),
+        "trust_target": bool(args.trust_target or yes),
         "allow_tools": args.allow_tool or [],
         "publish_skillwatch": bool(args.publish_skillwatch),
         "publish_pixelcloud": bool(args.publish_pixelcloud),
@@ -409,6 +415,66 @@ def regrade(args):
     )
     print(f"Prepared: {run}", flush=True)
     return run, manifest, criteria, analysis
+
+
+def case_reason(result, case):
+    """One plain sentence for a non-passing case."""
+    if result.get("status") == "error":
+        return "not graded: " + str(result.get("error", ""))[:140]
+    checks = result.get("checks", {})
+    labels = (
+        ("required_present_misses", "missing required text"),
+        ("forbidden_hits", "forbidden text present"),
+        ("missing_artifacts", "required artifact missing"),
+        ("artifact_hash_mismatches", "protected file changed"),
+    )
+    for key, label in labels:
+        if checks.get(key):
+            return f"{label}: {', '.join(checks[key])}"
+    if checks.get("routing_failure"):
+        return "skill invoked when it should not have been (or vice versa)"
+    specs = case["quality_criteria"]["semantic_checks"]
+    for sem in result.get("semantic_checks", []):
+        if specs[sem["index"]].get("critical") and sem["score"] < (
+            1 if result.get("grading") == "binary" else 3
+        ):
+            question = specs[sem["index"]]["question"].split("\n")[0][:110]
+            return f"critical check scored {sem['score']}: {question}"
+    return f"composite {result.get('score'):.2f} below the pass threshold"
+
+
+def print_summary(run, summary, criteria):
+    cases = {c["id"]: c for c in criteria["test_cases"]}
+    cost = summary.get("cost_usd")
+    minutes = (summary.get("wall_clock_seconds") or 0) / 60
+    head = (
+        f"{summary['verdict']}: {summary['passed']}/{summary['total']} cases passed"
+        + (f", grade {summary['grade']}" if summary.get("grade") else "")
+        + (f", ~${cost:.2f} (CLI estimate)" if cost is not None else "")
+        + f", {minutes:.0f} min"
+    )
+    print("\n" + head)
+    for r in summary["results"]:
+        score = f"{r['score']:.2f}" if r.get("score") is not None else "  -  "
+        line = f"  {r['case_id']}  {r['verdict']:<5} {score}  {r['name']}"
+        if r["verdict"] != "PASS":
+            line += "\n" + " " * 26 + case_reason(r, cases[r["case_id"]])
+        print(line)
+    html = run / "REPORT.html"
+    print(
+        f"Report: {run / 'REPORT.md'}" + (f"  (HTML: {html})" if html.exists() else "")
+    )
+    print(f"Run directory: {run}", flush=True)
+
+
+def open_report(run):
+    html = run / "REPORT.html"
+    target = html if html.exists() else run / "REPORT.md"
+    opener = "open" if sys.platform == "darwin" else "xdg-open"
+    try:
+        subprocess.Popen([opener, str(target)])
+    except OSError as exc:
+        print(f"Could not open {target}: {exc}", file=sys.stderr)
 
 
 def persist_execution(run, case, result):
@@ -802,24 +868,9 @@ def execute(run, manifest, criteria, analysis):
                 manifest["publications"][kind] = {"status": "error", "reason": str(exc)}
         manifest["state"] = "complete" if not summary["errors"] else "incomplete"
         write_json(run / "manifest.json", manifest)
-        print(
-            json.dumps(
-                {
-                    k: summary[k]
-                    for k in (
-                        "run_id",
-                        "total",
-                        "passed",
-                        "failed",
-                        "errors",
-                        "pass_rate",
-                        "cost_usd",
-                    )
-                },
-                indent=2,
-            )
-        )
-        print(f"Report: {run / 'REPORT.md'}", flush=True)
+        print_summary(run, summary, criteria)
+        if options.get("open"):
+            open_report(run)
         return (
             2
             if summary["errors"]
@@ -837,16 +888,40 @@ def execute(run, manifest, criteria, analysis):
         lock.close()
 
 
+COMMANDS = ("run", "prepare", "validate", "doctor", "compare")
+
+
 def parser():
-    p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument(
-        "command", choices=["run", "prepare", "validate", "doctor", "compare"]
+    p = argparse.ArgumentParser(
+        description=__doc__,
+        usage="evaluate.py [COMMAND] TARGET [OTHER] [options]\n"
+        "  evaluate.py TARGET --yes            evaluate a skill end to end (10 cases, 1 judge)\n"
+        "  evaluate.py TARGET --yes --quick    4 cases, 1 judge, about five minutes\n"
+        "  evaluate.py TARGET --yes --rigorous 10 cases, 3 judge sessions per case\n"
+        "  evaluate.py compare RUN_A RUN_B --output compare.html",
     )
-    p.add_argument("target", nargs="?")
-    p.add_argument("other", nargs="?")
+    p.add_argument("positional", nargs="*", metavar="COMMAND/TARGET")
     group = p.add_mutually_exclusive_group()
-    group.add_argument("--basic", action="store_true")
-    group.add_argument("--deep", "--comprehensive", action="store_true")
+    group.add_argument("--basic", action="store_true", help="4 standardized cases")
+    group.add_argument(
+        "--deep", "--comprehensive", action="store_true", help="30 cases"
+    )
+    group.add_argument(
+        "--quick", action="store_true", help="4 cases, 1 judge, concurrency 4"
+    )
+    p.add_argument(
+        "--rigorous",
+        action="store_true",
+        help="3 independent judge sessions per case (median)",
+    )
+    p.add_argument(
+        "--yes",
+        action="store_true",
+        help="accept the generated criteria and trust the target; run immediately",
+    )
+    p.add_argument(
+        "--open", action="store_true", help="open REPORT.html when the run finishes"
+    )
     for flag in (
         "binary",
         "local",
@@ -870,10 +945,32 @@ def parser():
         "model",
     ):
         p.add_argument("--" + flag)
-    p.add_argument("--allow-tool", action="append")
+    p.add_argument(
+        "--allow-tool",
+        action="append",
+        help="extra tool the evaluated session may use (repeatable)",
+    )
     for flag in ("timeout", "judge-timeout", "concurrency", "judge-rounds"):
         p.add_argument("--" + flag, type=int)
     return p
+
+
+def parse_args(argv=None):
+    """`evaluate.py TARGET` means `run TARGET`; an explicit COMMAND still works."""
+    args = parser().parse_args(argv)
+    words = list(args.positional)
+    if words and words[0] in COMMANDS:
+        args.command = words.pop(0)
+    else:
+        args.command = "run"
+    args.target = words[0] if words else None
+    args.other = words[1] if len(words) > 1 else None
+    if len(words) > 2:
+        raise EvalError("Too many positional arguments")
+    if args.yes:
+        args.accept_criteria = True
+        args.trust_target = True
+    return args
 
 
 def main():
@@ -883,8 +980,8 @@ def main():
 
     signal.signal(signal.SIGINT, interrupted)
     signal.signal(signal.SIGTERM, interrupted)
-    args = parser().parse_args()
-    options = resolved_options(args)
+    args = parse_args()
+    options = {**resolved_options(args), "open": bool(args.open)}
     if not 1 <= options["concurrency"] <= 8 or options["judge_rounds"] not in (1, 3, 5):
         raise EvalError("Concurrency 1..8 and odd judge rounds 1/3/5 required")
     if not 1 <= options["timeout"] <= 3600 or not 1 <= options["judge_timeout"] <= 3600:
@@ -940,7 +1037,9 @@ def main():
         and not args.regrade
     ):
         print(
-            "Criteria are ready for review. Edit the target criteria, then run with --criteria PATH --accept-criteria; or resume this unchanged run with --resume RUN_DIR after review."
+            f"Criteria are ready for review (table above; file: {analysis['criteria_path']}). "
+            "Re-run with --yes to execute them as they are, edit the file first and pass "
+            "--criteria PATH --yes, or continue this run with --resume RUN_DIR."
         )
         return 0
     return execute(run, manifest, criteria, analysis)
