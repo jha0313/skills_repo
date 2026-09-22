@@ -805,8 +805,6 @@ def execute(run, manifest, criteria, analysis):
         manifest["state"] = "complete" if not summary["errors"] else "incomplete"
         write_json(run / "manifest.json", manifest)
         print_summary(run, summary, criteria)
-        if options.get("open"):
-            open_report(run)
         return 2 if summary["errors"] else 0 if summary["verdict"] == "PASS" else 1
     except KeyboardInterrupt:
         manifest["state"] = "interrupted"
@@ -910,7 +908,7 @@ def main():
     signal.signal(signal.SIGINT, interrupted)
     signal.signal(signal.SIGTERM, interrupted)
     args = parse_args()
-    options = {**resolved_options(args), "open": bool(args.open)}
+    options = resolved_options(args)
     if not 1 <= options["concurrency"] <= 8 or options["judge_rounds"] not in (1, 3, 5):
         raise EvalError("Concurrency 1..8 and odd judge rounds 1/3/5 required")
     if not 1 <= options["timeout"] <= 3600 or not 1 <= options["judge_timeout"] <= 3600:
@@ -971,7 +969,10 @@ def main():
             "--criteria PATH --yes, or continue this run with --resume RUN_DIR."
         )
         return 0
-    return execute(run, manifest, criteria, analysis)
+    code = execute(run, manifest, criteria, analysis)
+    if args.open:
+        open_report(run)
+    return code
 
 
 if __name__ == "__main__":
