@@ -1,48 +1,37 @@
 ---
 name: skill-evaluator
-description: Evaluate, benchmark, stress-test, or measure an installed Claude Code skill using isolated executions, independent evidence-backed judges, reproducible criteria, and auditable reports. Use for skill quality, invocation, efficiency, completion, regression, or with/without-skill comparisons.
+description: Evaluate an installed Claude Code skill end to end: generate test cases from its own contract, run them in isolated sessions, grade the recorded evidence with independent judges, and report pass/fail per case with cited proof. Use for skill quality, invocation, regression, or before/after comparison of a skill change.
 argument-hint: "[skill-name]"
 allowed-tools: Read Write Edit Glob Grep Bash Skill AskUserQuestion Agent
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
   dependencies:
-    discovery: "bundled scripts/discovery.py + current claude plugin list --json"
-    visualization: "bundled scripts/reporting.py"
-    runtime: "Python >=3.11, uv, Claude Code with native plugin eval"
+    runtime: "Python >=3.11, uv, authenticated Claude Code with native plugin eval"
 ---
 
 # Skill Evaluator
 
-Evaluate the named installed skill end to end. Reuse Claude Code's **native `claude plugin eval`** for isolated sessions, genuine skill routing, MCP mocks, and raw traces. The bundled orchestrator adds portable criteria, independent judge rounds, evidence validation, resumability, and publication adapters. Run `uv run <this-skill>/scripts/evaluate.py doctor` first; its captured current help is the command contract. Missing Python dependency is installed by uv's pinned script metadata. For an absent CLI, use the official [installation instructions](https://code.claude.com/docs/en/setup); `claude install` cannot run when the CLI itself is missing. Authenticate with `claude auth login`, or update an existing CLI with `claude update`. Missing bundled helper: `git clone https://github.com/jha0313/skills_repo.git` into a new directory, then reinstall the whole skill directory (do not copy SKILL.md alone).
+Evaluate the named installed skill. Everything runs locally: real Claude sessions in the native `claude plugin eval` sandbox, then separate judge sessions that must cite the recorded evidence line by line. Costs are real model usage (roughly $3 for a quick run, $10–30 for a full run of a skill that spawns agents).
 
-## Route the request
+## Three steps
 
-Resolve the target name/path. Ask only when absent or genuinely ambiguous. Resolve the installed read path and writable source separately (`--source` for cache installs). Parse `--basic` (exactly four), default THOROUGH (ten), deep/comprehensive/thorough wording requesting depth (`--deep`, thirty), `--binary`, `--local`, `--no-visualize`, and `--judge-model`. Inherit the CLI's configured high-quality model when the repository has no approved override; record the actual execution model. Do not silently claim a model was approved. Additional execution and publication flags are in `--help`.
+1. **Check the environment once:** `uv run <this-skill>/scripts/evaluate.py doctor`. It reports the CLI version and whether native eval is available; follow its message if something is missing.
+2. **Run it:** `uv run <this-skill>/scripts/evaluate.py TARGET --yes`. TARGET is the skill name or the directory containing its `SKILL.md`. Without `--yes` the command stops after generating the test cases so the user can review the table it prints and edit `<skill>/evals/eval_criteria.yaml`; `--yes` accepts them as generated and trusts the target skill's code to run in the sandbox. Add `--allow-tool Write` (and `Edit`, `Bash`, `Agent`) only when the skill's real work needs those tools.
+3. **Read the result:** the terminal prints PASS/FAIL per case with a one-line reason, then the report path. `--open` opens `REPORT.html`. Everything the judges cited is under `~/skill-eval/<skill>/<run-id>/`.
 
-## Ordered phases
+## Choosing the size
 
-1. **Discover/analyze.** Read all target source and relevant references/assets/scripts/evals. Retain purpose, audience, triggers/arguments, capabilities, workflow, tools actually used, external systems, outputs, type, mutation behavior with evidence, edge cases/failure modes. Discover parent plugin dependencies; unsupported dependencies are actionable errors. Decide parallelism from behavior: read-only parallel, mutation sequential in native clean sandboxes. Three strong environment signals automatically select local. For one/two infer safely from capabilities; ask only if unresolved. Never reset/clean the user's repository.
-2. **Generate.** Read [test_case_format.md](references/test_case_format.md). `prepare TARGET` analyzes and generates criteria; BASIC always derives four standardized cases. THOROUGH uses ten or thirty distinct cases. `--reuse-criteria` explicitly reuses existing target criteria; replacement creates timestamped backup first. Existing criteria from `--criteria FILE` still undergo schema/distribution validation. Artifact tasks need actual artifact checks, not response-only assertions.
-3. **Review/persist.** Show `CRITERIA_REVIEW.md` (ID/category/cwd/prompt/key checks), permit edits, then run with reviewed criteria and `--accept-criteria`. If the user already authorized the exact criteria, continue without reasking. `prepare` is a reviewable stop, not an execution claim. Criteria go in the **target source** `evals/eval_criteria.yaml`; copy/hash them into `~/skill-eval/<name>/<run-id>/`. `--trust-target` is a separate assertion that the target/plugin is already within the host's authorized trust scope; never infer trust from a test passing. No unrelated state is touched.
-4. **Execute.** Read [result_schema.md](references/result_schema.md). Prefer an available, verified MSL bridge unless local selected; first-case infrastructure failure falls back to native local. Legitimate test failure never triggers fallback. Invocation cases use natural routing, never forced skill instructions; other cases can explicitly load the skill. Capture prompts, complete raw trace, output-only response, actual calls, usage, timing, artifacts and URLs. Resume with `run --resume RUN_DIR`; immutable hashes/options prevent mixing revisions. Native sandboxes are retained/sealed; inspect data only, never execute their configuration.
-5. **Grade.** Read [grading_rubric.md](references/grading_rubric.md) or [grading_rubric_binary.md](references/grading_rubric_binary.md). By default, three independent clean model sessions grade the **same** executed evidence, in batches of at most four cases; record an explicit one- or five-round override. Native `--runs 3` would repeat the evaluated agent and is not three independent judges. Every score has checked exact quotes/lines from that case's outputs/artifacts; prompt/skill instructions cannot count as performance. Critical failures cannot be averaged away. Unreadable/empty evidence becomes ERROR, never a fabricated grade. Partial timed-out work can be graded with timeout separately recorded. Binary artifacts need a domain renderer before scoring.
-6. **Aggregate/report.** Read [report_template.md](references/report_template.md). Persist `evaluations/`, `summary.json`, `REPORT.md`, optional `REPORT.html`. Unknown metrics remain null. Do not infer causal business lift. SkillWatch/PixelCloud writes require explicit opt-in and verified bridge contracts; default local only. Report publication as not requested, unavailable, mocked, or actually exercised. Compare identical real tasks/model/environment with and without skill; compare tokens + wall-clock, not just judge means. The CLI `compare` only compares existing canonical runs; use the [native ablation recipe](README.md) for a genuine no-skill arm and retain its distinct native schema.
+- `--quick`: 4 standardized cases, one judge session, about five minutes. Use it while iterating on a skill.
+- default: 10 cases across invocation, efficiency, best practices, business impact and task completion, one judge session per case.
+- `--rigorous`: the same 10 cases graded by three independent judge sessions (median). Use it for a before/after comparison of a skill change.
+- `--deep`: 30 cases.
 
-## Commands
+Invocation cases use natural requests without naming the skill, so real routing is tested. Task-completion cases check real files and their hashes, not claims. A case fails on any critical check regardless of its score; the suite passes only when every case passes.
 
-From the repository root (safe deterministic greeting fixture, **real Claude executions and judges**, authentication required):
+## Comparing before and after
 
-```bash
-uv run skill-evaluator/scripts/evaluate.py run skill-evaluator/tests/fixtures/observatory-greeting --basic --local --criteria skill-evaluator/tests/fixtures/basic.yaml --trust-target --no-visualize
-uv run skill-evaluator/scripts/evaluate.py run skill-evaluator/tests/fixtures/observatory-greeting --local --criteria skill-evaluator/tests/fixtures/thorough.yaml --accept-criteria --trust-target
-```
+Run the same criteria twice with `--rigorous` (edit the skill in between; pass `--criteria <file>` to reuse the reviewed cases), then `evaluate.py compare RUN_A RUN_B --output compare.html`. The comparison refuses runs whose criteria or evaluator differ. `--resume RUN_DIR` continues an interrupted run; `--regrade RUN_DIR` grades an old run's preserved executions with the current evaluator.
 
-For a real installed skill:
+## What to tell the user
 
-```bash
-uv run <this-skill>/scripts/evaluate.py prepare TARGET --local
-uv run <this-skill>/scripts/evaluate.py run TARGET --criteria <target-source>/evals/eval_criteria.yaml --accept-criteria --trust-target --local
-uv run <this-skill>/scripts/evaluate.py run --resume ~/skill-eval/TARGET/RUN-ID
-```
-
-Only grant required write/shell tools via repeatable `--allow-tool` after the host authorizes that execution. External publication, live MCP access, and source-control changes are not implied by evaluating a skill. Keep run artifacts local unless publication was requested.
+Lead with the verdict and the failing cases' reasons, link the report, and separate skill weaknesses from environment errors (a case marked ERROR was not graded). Do not present a judge score as a business result. Details of the case schema, grading rubric and result files are in [references/](references/).

@@ -235,7 +235,7 @@ def validate_criteria(data, mode, binary):
 
 
 def normalize_execution(raw, adapter):
-    """Both adapters cross this required contract; no guessed MSL field mapping."""
+    """Every execution crosses this required contract before grading."""
     required = ("conversation", "metadata", "artifacts")
     if any(key not in raw for key in required):
         raise EvalError("Adapter must emit conversation, metadata, artifacts")

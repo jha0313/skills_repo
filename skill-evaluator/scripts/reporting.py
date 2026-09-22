@@ -1,11 +1,10 @@
-"""Evidence-linked local reports and opt-in idempotent publisher contracts."""
+"""Evidence-linked local reports (Markdown, JSON and a self-contained HTML page)."""
 
 import html
 import json
 from pathlib import Path
 
-from adapters import bridge_call
-from core import EvalError, digest, verify_evidence_hashes, write_json
+from core import verify_evidence_hashes, write_json
 
 
 def display(value):
@@ -206,37 +205,3 @@ def write_reports(run_dir, summary, manifest, visualize=True):
     )
     page += """<script>function sortRows(n){var b=document.querySelector('#cases tbody');Array.from(b.rows).sort(function(a,c){return a.cells[n].textContent.localeCompare(c.cells[n].textContent,undefined,{numeric:true})}).forEach(function(r){b.appendChild(r)})}</script></body></html>"""
     (root / "REPORT.html").write_text(page)
-
-
-def publish(run_dir, summary, config, kind, create_project=False):
-    root = Path(run_dir)
-    receipt = root / f"{kind}-receipt.json"
-    key = summary["run_id"]
-    payload_hash = digest(summary)
-    if receipt.exists():
-        prior = json.loads(receipt.read_text())
-        if prior["payload_hash"] != payload_hash:
-            raise EvalError("Published run changed; use a new run ID")
-        return prior
-    bridge = config.get(kind)
-    if not bridge:
-        raise EvalError(
-            f"{kind} requested but unavailable. Configure an authenticated bridge with verified current schema; see references/result_schema.md"
-        )
-    response = bridge_call(
-        bridge,
-        "publish",
-        {
-            "run_id": key,
-            "idempotency_key": key,
-            "create_project": create_project,
-            "summary": summary,
-            "report_path": str(root / "REPORT.html"),
-        },
-        root / f"{kind}-publication",
-    )
-    if response.get("idempotency_key") != key:
-        raise EvalError("Publisher failed idempotency acknowledgment")
-    receipt_data = {"payload_hash": payload_hash, **response}
-    write_json(receipt, receipt_data)
-    return receipt_data

@@ -15,7 +15,7 @@ import adapters
 import core
 import evaluate
 from discovery import discover, snapshot_hash
-from reporting import publish, write_reports
+from reporting import write_reports
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -621,12 +621,10 @@ class EvaluatorTests(unittest.TestCase):
             ["missing.md"],
         )
 
-    def test_adapter_normalization_matches(self):
+    def test_normalization_tags_the_adapter_and_keeps_fields(self):
         local = core.normalize_execution(self.execution, "local")
-        msl = core.normalize_execution(self.execution, "msl")
-        local["metadata"].pop("adapter")
-        msl["metadata"].pop("adapter")
-        self.assertEqual(local, msl)
+        self.assertEqual(local["metadata"]["adapter"], "local")
+        self.assertEqual(local["response"], self.execution["response"])
 
     def test_unknown_cost_and_timeout_preserved(self):
         e = copy.deepcopy(self.execution)
@@ -680,21 +678,6 @@ class EvaluatorTests(unittest.TestCase):
         self.assertTrue(script.is_file())
         self.assertIn(str(stage / "fixture"), script.read_text())
         self.assertTrue((stage / "fixture/notes.txt").is_file())
-
-    def test_idempotent_publisher_and_config_required(self):
-        with self.assertRaises(core.EvalError):
-            publish(self.root, {"run_id": "test"}, {}, "skillwatch")
-        core.write_json(
-            self.root / "skillwatch-receipt.json",
-            {
-                "payload_hash": core.digest({"run_id": "test"}),
-                "idempotency_key": "test",
-            },
-        )
-        self.assertEqual(
-            publish(self.root, {"run_id": "test"}, {}, "skillwatch")["idempotency_key"],
-            "test",
-        )
 
     def test_native_trace_separates_loaded_skill_from_output(self):
         text = "\n".join(
@@ -933,25 +916,6 @@ class EvaluatorTests(unittest.TestCase):
             ]["permissionDecision"],
             "deny",
         )
-
-    def test_publication_bridge_mock_is_explicit_and_idempotent(self):
-        bridge = self.root / "bridge.py"
-        counter = self.root / "count"
-        bridge.write_text(
-            "import json,sys\nfrom pathlib import Path\nr=json.load(sys.stdin)\np=Path("
-            + repr(str(counter))
-            + ')\np.write_text(str(int(p.read_text())+1) if p.exists() else "1")\nprint(json.dumps({"status":"ok","idempotency_key":r["idempotency_key"],"url":"https://example.invalid/mock"}))\n'
-        )
-        config = {
-            "skillwatch": {
-                "command": [sys.executable, str(bridge)],
-                "contract_provenance": "deterministic fixture, not real SkillWatch",
-            }
-        }
-        summary = {"run_id": "fixture"}
-        publish(self.root, summary, config, "skillwatch")
-        publish(self.root, summary, config, "skillwatch")
-        self.assertEqual(counter.read_text(), "1")
 
     def test_binary_report_uses_pass_rates_and_verdicts(self):
         case = core.read_data(FIXTURES / "basic-binary.yaml")["test_cases"][0]

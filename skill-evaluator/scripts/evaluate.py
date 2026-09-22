@@ -20,7 +20,6 @@ from pathlib import Path
 
 from adapters import (
     agent_json,
-    bridge_call,
     cancel_processes,
     check_dependencies,
     native_execute,
@@ -39,7 +38,6 @@ from core import (
     error_case,
     evidence_hashes,
     grade_case,
-    normalize_execution,
     now,
     read_data,
     validate_artifact_files,
@@ -49,7 +47,7 @@ from core import (
     write_json,
 )
 from discovery import discover, snapshot_hash
-from reporting import publish, write_reports
+from reporting import write_reports
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -61,7 +59,6 @@ def resolved_options(args):
     return {
         "mode": "basic" if args.basic or quick else "deep" if args.deep else "thorough",
         "binary": bool(args.binary),
-        "local": bool(args.local),
         "visualize": not args.no_visualize,
         "model": args.model,
         "judge_model": args.judge_model,
@@ -73,9 +70,6 @@ def resolved_options(args):
         "judge_rounds": args.judge_rounds or (3 if rigorous else 1),
         "trust_target": bool(args.trust_target or yes),
         "allow_tools": args.allow_tool or [],
-        "publish_skillwatch": bool(args.publish_skillwatch),
-        "publish_pixelcloud": bool(args.publish_pixelcloud),
-        "create_project": bool(args.create_project),
     }
 
 
@@ -193,12 +187,6 @@ def prepare(args, options):
     write_json(run / "criteria.yaml", criteria)
     write_json(run / "analysis.json", {**analysis, **behavior})
     (run / "CRITERIA_REVIEW.md").write_text(review_table(criteria))
-    config = read_data(args.config) if args.config else {}
-    adapter = (
-        "local"
-        if options["local"] or analysis["automatic_local"] or not config.get("msl")
-        else "msl"
-    )
     manifest = {
         "schema_version": SCHEMA,
         "evaluator_version": VERSION,
@@ -223,9 +211,7 @@ def prepare(args, options):
         "criteria_backup": backup,
         "options": options,
         "dependencies": deps,
-        "execution_adapter": adapter,
-        "config": config,
-        "config_hash": digest(config),
+        "execution_adapter": "local",
         "author_usage": author_usage,
         "pricing_configuration": {
             "source": "Claude CLI-reported cost/modelUsage",
@@ -236,11 +222,9 @@ def prepare(args, options):
         "behavior_hash": digest(behavior),
         "evaluator_hash": snapshot_hash(ROOT),
         "cases": {c["id"]: {"state": "pending"} for c in criteria["test_cases"]},
-        "publications": {},
         "deviations": [
             "Default THOROUGH integer allocation is 2/1/2/2/3; task completion is 30%, because the stated ranges cannot total ten cases.",
             "No repository-approved judge model configured: inherit authenticated CLI default unless --judge-model supplied.",
-            "MSL/SkillWatch/PixelCloud are opt-in operator bridges; no internal schema guessed.",
             "Reuse native claude plugin eval for isolation/routing/MCP mocks; bundled portable discovery/report helpers replace unavailable internal helpers.",
         ],
     }
@@ -264,8 +248,6 @@ def resume(args):
         raise EvalError("Evaluator version changed; create a new run")
     if digest(criteria) != manifest["criteria_hash"]:
         raise EvalError("Persisted criteria changed; create a new run")
-    if digest(manifest["config"]) != manifest["config_hash"]:
-        raise EvalError("Adapter configuration changed; create a new run")
     skill = manifest["skill"]
     if snapshot_hash(Path(skill["installed_path"])) != skill["skill_hash"]:
         raise EvalError(
@@ -275,12 +257,11 @@ def resume(args):
         Path(skill.get("snapshot_path", skill["installed_path"]))
     ) != skill.get("snapshot_hash", skill["skill_hash"]):
         raise EvalError("Plugin dependencies changed; create a new run")
-    # Resume options are immutable; publication may be retried through the saved opt-in config.
+    # Resume options are immutable.
     forbidden = [
         "basic",
         "deep",
         "binary",
-        "local",
         "no_visualize",
         "model",
         "judge_model",
@@ -289,7 +270,6 @@ def resume(args):
         "concurrency",
         "judge_rounds",
         "allow_tool",
-        "config",
         "criteria",
     ]
     if any(getattr(args, k, None) for k in forbidden):
@@ -319,7 +299,6 @@ def regrade(args):
         "basic",
         "deep",
         "binary",
-        "local",
         "no_visualize",
         "model",
         "judge_model",
@@ -328,7 +307,6 @@ def regrade(args):
         "concurrency",
         "judge_rounds",
         "allow_tool",
-        "config",
         "criteria",
         "source",
         "target",
@@ -379,6 +357,8 @@ def regrade(args):
                 "finished_at",
                 "execution_started_at",
                 "msl_fallback_reason",
+                "config",
+                "config_hash",
             )
         },
         "run_id": run_id,
@@ -399,7 +379,6 @@ def regrade(args):
             )
             for cid in [c["id"] for c in criteria["test_cases"]]
         },
-        "publications": {},
         "regrade_of": {
             "run_id": old["run_id"],
             "path": str(source),
@@ -655,7 +634,6 @@ DATA:\n{json.dumps(packet, ensure_ascii=False)}"""
 def execute(run, manifest, criteria, analysis):
     options = manifest["options"]
     cases = criteria["test_cases"]
-    config = manifest["config"]
     lock = (run / ".run.lock").open("w")
     try:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -688,39 +666,10 @@ def execute(run, manifest, criteria, analysis):
         def run_one(case):
             d = run / "cases" / case["id"]
             d.mkdir(parents=True, exist_ok=True)
-            if manifest["execution_adapter"] == "msl":
-                response = bridge_call(
-                    config["msl"],
-                    "execute",
-                    {
-                        "case": case,
-                        "analysis": analysis,
-                        "options": options,
-                        "run_id": manifest["run_id"],
-                    },
-                    d / "msl",
-                    options["timeout"],
-                )
-                result = normalize_execution(response["execution"], "msl")
-            else:
-                result = native_execute(analysis, case, d, options)
+            result = native_execute(analysis, case, d, options)
             persist_execution(run, case, result)
             return result
 
-        # MSL gets one small infrastructure probe; legitimate test failures never trigger fallback.
-        if pending and manifest["execution_adapter"] == "msl":
-            c = pending.pop(0)
-            try:
-                run_one(c)
-                manifest["cases"][c["id"]] = {
-                    "state": "executed",
-                    "evidence_hashes": evidence_hashes(run, c["id"]),
-                }
-            except EvalError as exc:
-                manifest["msl_fallback_reason"] = str(exc)
-                manifest["execution_adapter"] = "local"
-                pending.insert(0, c)
-            write_json(run / "manifest.json", manifest)
         workers = 1 if analysis.get("mutates", True) else options["concurrency"]
         with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
             jobs = {pool.submit(run_one, c): c for c in pending}
@@ -849,36 +798,12 @@ def execute(run, manifest, criteria, analysis):
         }
         manifest["state"] = "reported"
         write_reports(run, summary, manifest, options["visualize"])
-        for kind, enabled in (
-            ("skillwatch", options["publish_skillwatch"]),
-            ("pixelcloud", options["publish_pixelcloud"]),
-        ):
-            if not enabled:
-                manifest["publications"][kind] = {"status": "not_requested"}
-                continue
-            try:
-                if kind == "pixelcloud" and not options["visualize"]:
-                    raise EvalError("PixelCloud requires visualization")
-                receipt = publish(run, summary, config, kind, options["create_project"])
-                manifest["publications"][kind] = {
-                    "status": "published",
-                    "receipt": receipt,
-                }
-            except EvalError as exc:
-                manifest["publications"][kind] = {"status": "error", "reason": str(exc)}
         manifest["state"] = "complete" if not summary["errors"] else "incomplete"
         write_json(run / "manifest.json", manifest)
         print_summary(run, summary, criteria)
         if options.get("open"):
             open_report(run)
-        return (
-            2
-            if summary["errors"]
-            or any(p["status"] == "error" for p in manifest["publications"].values())
-            else 0
-            if summary["verdict"] == "PASS"
-            else 1
-        )
+        return 2 if summary["errors"] else 0 if summary["verdict"] == "PASS" else 1
     except KeyboardInterrupt:
         manifest["state"] = "interrupted"
         write_json(run / "manifest.json", manifest)
@@ -924,14 +849,10 @@ def parser():
     )
     for flag in (
         "binary",
-        "local",
         "no-visualize",
         "accept-criteria",
         "reuse-criteria",
         "trust-target",
-        "publish-skillwatch",
-        "publish-pixelcloud",
-        "create-project",
     ):
         p.add_argument("--" + flag, action="store_true")
     for flag in (
@@ -940,7 +861,6 @@ def parser():
         "output",
         "resume",
         "regrade",
-        "config",
         "judge-model",
         "model",
     ):

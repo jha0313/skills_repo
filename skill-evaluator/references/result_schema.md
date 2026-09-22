@@ -1,6 +1,6 @@
-# Canonical results and bridge contracts
+# Canonical results
 
-Normalized execution, per-case evaluations, manifests and aggregates use `schema_version: skill-evaluator/1`. Raw tool/CLI responses and leaf metadata/artifact files retain their own shapes. Both adapters cross `normalize_execution`; external bridges must translate their **verified** internal output to this contract, never guess Meta field names. This repository/environment provides no MSL Judge, SkillWatch schema or PixelCloud upload contract. They are not installed or claimed to work here. Current native CLI help/source (Claude Code 2.1.275, inspected 2026-09-19) provides reusable local isolation, routing, mocks and raw output.
+Normalized execution, per-case evaluations, manifests and aggregates use `schema_version: skill-evaluator/1`. Raw tool/CLI responses and leaf metadata/artifact files retain their own shapes. Every execution crosses `normalize_execution` before grading. The native CLI (`claude plugin eval`, Claude Code 2.1.275 inspected 2026-09-19) provides local isolation, routing, mocks and raw output.
 
 ## Execution contract
 
@@ -8,29 +8,15 @@ Normalized execution, per-case evaluations, manifests and aggregates use `schema
 {"conversation":"complete transcript", "response":"assistant final output only", "tool_calls":[{"name":"Skill","input":{"skill":"plugin:example"}}], "metadata":{"model":"actual model","started_at":"ISO8601","finished_at":"ISO8601","duration_seconds":1.2,"exit_state":"completed","timed_out":false,"usage":{"input_tokens":100,"output_tokens":20,"cache_read_input_tokens":0,"cache_creation_input_tokens":0},"cost_usd":null,"cost_basis":"unavailable","skill_invocations":["plugin:example"]},"artifacts":{"files":[{"path":"report.md","exists":true,"sha256":"...","evidence_path":"cases/TC-001/artifacts/report.md","content":"actual file text"}],"urls":[]}}
 ```
 
-Unknown counters/costs are null. An adapter creates every cited file in the run case directory; path traversal/symlinks are rejected. MSL output without sufficient raw trace/artifact evidence is ERROR. `response` never includes user prompts or synthetic instructions. Native transcript source `out/trace.jsonl` is copied, not private runtime config. Kept native `sealed/home/cwd` is opened only for data inspection and resealed; never execute git, hooks or config there. URLs recovered from transcript are labeled mentions, not verified reachable publications.
+Unknown counters/costs are null. An adapter creates every cited file in the run case directory; path traversal/symlinks are rejected. `response` never includes user prompts or synthetic instructions. Native transcript source `out/trace.jsonl` is copied, not private runtime config. Kept native `sealed/home/cwd` is opened only for data inspection and resealed; never execute git, hooks or config there. URLs recovered from transcript are labeled mentions, not verified reachable publications.
 
 Case storage: `cases/TC-ID/conversation.txt`, `trace.jsonl` (native), `prompt.json`, `response.txt`, `tool_calls.json`, `metadata.json`, `artifacts.json`, `artifacts/*`, `execution.json`, raw adapter stdout/stderr/JSON. Per-case result: `evaluations/TC-ID.json` and `.md`.
 
 Evaluation JSON: case_id/name/category, grading, status (`graded|error`), score (null on infrastructure error), verdict (`PASS|FAIL|ERROR`), optional Likert grade, critical_failure, dimensions, binary dimension_verdicts, six best_practice_subcriteria, five business_impact_subcriteria, semantic checks/weighted score, deterministic hits/misses/forbidden/artifact/routing checks, raw judge_rounds, metadata, judge cost/allocation, evidence links. Every judgment score has rubric_level, reason, and `evidence:[{path,line_start,line_end,quote}]`. Paths are case-local output/artifact allowlists; exact quote/line validation runs before scoring.
 
-Manifest: evaluator_version, run_id, created_at, state, skill (installed/source paths, revision, content hash), complete analysis, criteria_hash, timestamped backup path, resolved options, adapter config/hash/provenance, CLI help/version, execution_adapter, pricing configuration, author usage, per-case state and publication receipt/status. States: criteria_review→executing→grading→reported→complete/incomplete; interruption preserves checkpoints. Atomic writes and per-run lock prevent duplicate runners. Resume rejects changed source, criteria, evaluator or bridge config and reuses successful execution/judge checkpoints. A regrade run (`run --regrade RUN_DIR`) copies a source run's executions into a new run graded by the current evaluator and records `regrade_of`: source run_id, path, evaluator_hash_at_execution, imported_cases, pending_cases.
+Manifest: evaluator_version, run_id, created_at, state, skill (installed/source paths, revision, content hash), complete analysis, criteria_hash, timestamped backup path, resolved options, CLI help/version, pricing configuration, author usage and per-case state. States: criteria_review→executing→grading→reported→complete/incomplete; interruption preserves checkpoints. Atomic writes and per-run lock prevent duplicate runners. Resume rejects changed source, criteria or evaluator and reuses successful execution/judge checkpoints. A regrade run (`run --regrade RUN_DIR`) copies a source run's executions into a new run graded by the current evaluator and records `regrade_of`: source run_id, path, evaluator_hash_at_execution, imported_cases, pending_cases.
 
 Aggregate `summary.json`: total/passed/failed/errors/pass_rate, score/distribution, category and dimension breakdowns, best-practice breakdown, cost/token/duration totals, known-cost subtotal, author cost, failure clusters, recommendations tied to IDs, per-case results. CLI cost is a **list-price estimate**, not a bill. Execution and judge costs are separate; shared judge batch costs are allocated equally and raw batch usage retained. Null component totals remain null.
-
-## Verified internal bridges (optional)
-
-Config JSON maps `msl`, `skillwatch`, `pixelcloud` to:
-
-```json
-{"command":["/absolute/path/to/your-verified-bridge"],"contract_provenance":"current internal --help and schema source, revision/date"}
-```
-
-A bridge executable receives one JSON stdin request and returns one JSON stdout response, no shell interpolation. Timeouts are bounded, stdout/stderr/request/response retained. Host installation/auth is operator-owned. Validate the real `fbcode//msl/judge:run_eval` help and SkillWatch/PixelCloud accepted schemas **inside the environment that has them**; then implement the small translation. A configured fake bridge is only a test fixture.
-
-MSL operation `execute`: request includes schema_version, operation, run_id, case, analysis, options; response `{"status":"ok","execution":<canonical above>}`. A first-case infrastructure error falls back once to native local, retaining reason. A legitimate failed result remains a failed test. No MSL bridge configured means native local immediately.
-
-Publish operation: request includes run_id, idempotency_key=run_id, summary, report_path, create_project flag. Response requires `{"status":"ok","idempotency_key":"same run id","url":"..."}`. Only opt-in `--publish-skillwatch`/`--publish-pixelcloud` calls it. Project creation needs `--create-project` and must be idempotent in the bridge. Receipt caches payload hash; repeated identical run does not republish. Bridge/server must enforce the key for uncertain network outcomes as well. Changed published summary requires a new run. Failures remain visible, never logged as success. `--no-visualize` skips local HTML/PixelCloud, retains local Markdown/JSON and optional SkillWatch.
 
 ## Verification boundaries
 
@@ -93,7 +79,7 @@ A judge entry has `{score, rubric_level, reason, evidence}`; semantic entries ad
 - Identity: `schema_version`, `evaluator_version`, `run_id`, `created_at`, `state`.
 - Skill: `name`, `description`, `installed_path`, `source_path`, source `revision`, content `skill_hash`; retain parent-plugin snapshot provenance when applicable.
 - Inputs: complete behavior `analysis`, `criteria_hash`, `criteria_backup`, resolved `options`, `options_hash`, `behavior_hash`, `evaluator_hash`.
-- Execution: dependency/version discovery, `execution_adapter`, adapter `config`, `config_hash`, optional `msl_fallback_reason`.
+- Execution: dependency/version discovery and `execution_adapter` (always `local`).
 - Accounting: `pricing_configuration` and author usage. Requested model and resolved execution model are separate facts.
 - Checkpoints: `cases` indexed by ID, with `pending`, `executed`, `graded`, or `error`, plus recorded failure information. Judge checkpoints retain validated case IDs and raw round usage.
 - Publication: each requested destination's status/receipt or error; unrequested writes are explicit. A completed evaluation can still have a publication error—read publication status and CLI exit status.

@@ -1,4 +1,4 @@
-"""Native Claude evaluation, independent judging, and explicit internal bridge contracts."""
+"""Native Claude evaluation (claude plugin eval) and independent judge sessions."""
 
 from __future__ import annotations
 
@@ -16,7 +16,6 @@ import uuid
 from pathlib import Path
 
 from core import (
-    SCHEMA,
     EvalError,
     hash_bytes,
     normalize_execution,
@@ -124,9 +123,6 @@ def check_dependencies(run_dir=None):
         "discovery_helper": "bundled discovery.py + claude plugin list --json",
         "visualization_helper": "bundled reporting.py (no external publication)",
         "native_eval": True,
-        "msl": "not configured",
-        "skillwatch": "not configured",
-        "pixelcloud": "not configured",
     }
 
 
@@ -600,34 +596,3 @@ def agent_json(prompt, out_dir, model=None, timeout=300):
         or ",".join(outer.get("modelUsage", {}))
         or "CLI configured default",
     }
-
-
-def bridge_call(config, operation, payload, out_dir, timeout=300):
-    """No internal command/field guesses. Operator bridge translates verified internal APIs."""
-    argv = config.get("command")
-    if (
-        not isinstance(argv, list)
-        or not argv
-        or not all(isinstance(v, str) for v in argv)
-    ):
-        raise EvalError("Bridge command must be argv list, never shell text")
-    proof = config.get("contract_provenance")
-    if not proof:
-        raise EvalError(
-            "Bridge requires contract_provenance: current help/schema source and date"
-        )
-    out = Path(out_dir)
-    out.mkdir(parents=True, exist_ok=True)
-    request = {"schema_version": SCHEMA, "operation": operation, **payload}
-    write_json(out / "request.json", request)
-    r = run_process(argv, out, timeout, out / "bridge", json.dumps(request))
-    if r["timed_out"] or r["exit_code"]:
-        raise EvalError("Bridge infrastructure failure; inspect bridge.stderr")
-    try:
-        response = json.loads(r["stdout"])
-    except ValueError as exc:
-        raise EvalError("Bridge returned malformed JSON") from exc
-    write_json(out / "response.json", response)
-    if response.get("status") != "ok":
-        raise EvalError("Bridge unavailable: " + str(response.get("reason", "unknown")))
-    return response
