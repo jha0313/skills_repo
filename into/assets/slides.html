@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{주제}} — 슬라이드</title>
+<!-- into slides 모드 템플릿. section.slide를 복사해 채운다. 키: ←/→/Space/Home/End, N = 발표자 노트. 장 안에 맞추려고 CSS는 고쳐도 된다. 외부 요청을 추가하지 않는다. -->
+<style>
+:root{--bg:#fafaf8;--fg:#1d1d1f;--muted:#5d6168;--line:#c8cbd0;--card:#fff;--accent:#2563c9;--accent-bg:#e7effc;
+  font-family:"Pretendard","Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",system-ui,sans-serif}
+@media (prefers-color-scheme:dark){:root{--bg:#131416;--fg:#ececec;--muted:#a3a7ae;--line:#43474e;--card:#1c1e21;--accent:#7ea7ff;--accent-bg:#1d2840}}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--fg)}
+.deck{height:100vh;display:grid;place-items:center;overflow:hidden}
+.slide{display:none;width:min(100vw,177.78vh);aspect-ratio:16/9;padding:5% 7%;flex-direction:column;gap:2.4%;container-type:inline-size;line-height:1.45;word-break:keep-all;overflow-wrap:anywhere}
+.slide.on{display:flex}
+.slide .kicker{margin:0;font-size:1.7cqw;font-weight:700;letter-spacing:.04em;color:var(--accent)}
+.slide h1{margin:0;font-size:4.6cqw;line-height:1.25}
+.slide h2{margin:0;font-size:3.4cqw;line-height:1.3}
+.slide p,.slide li{font-size:2.3cqw;margin:0}
+.slide ul,.slide ol{margin:0;padding-left:1.4em;display:grid;gap:.6em}
+.muted{color:var(--muted)}
+a{color:var(--accent)}
+.slide .notice{align-self:flex-start;font-size:1.5cqw;color:var(--muted);border:1px solid var(--line);border-radius:.3em;padding:.1em .5em}
+.slide .next-q{margin-top:auto;color:var(--accent);font-size:2cqw}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--accent-bg);padding:0 .3em;border-radius:.2em}
+.slide pre{margin:0;font-size:1.7cqw;line-height:1.4;background:var(--accent-bg);padding:.6em .8em;border-radius:.3em;white-space:pre-wrap}
+.slide pre code{background:none;padding:0}
+.slide .fail{color:var(--muted)}
+.slide table{border-collapse:collapse;width:100%;font-size:2cqw}
+.slide th,.slide td{border-bottom:1px solid var(--line);padding:.3em .5em;text-align:left;vertical-align:top}
+.slide svg{width:100%;max-height:62%;color:var(--muted)}
+svg text{fill:var(--fg);font-size:15px;font-family:inherit}
+svg .box{fill:var(--card);stroke:var(--line);stroke-width:1.5}
+svg .key{stroke:var(--accent);stroke-width:2.5}
+svg .edge{stroke:var(--muted);stroke-width:1.5;fill:none}
+svg .edge.key-edge{stroke:var(--accent);stroke-width:2.5}
+svg .edge.guess{stroke-dasharray:6 4}
+svg .arrkey{fill:var(--accent)}
+svg .lbl{fill:var(--muted);font-size:14px}
+svg .lbl-bg{fill:var(--bg)}
+.notes{display:none}
+body.show-notes .slide.on .notes{display:block;position:fixed;left:0;right:0;bottom:0;max-height:32vh;overflow:auto;background:var(--card);border-top:1px solid var(--line);padding:12px 16px;font-size:15px}
+.bar{position:fixed;left:0;bottom:0;height:4px;background:var(--accent);width:0}
+.count{position:fixed;right:16px;bottom:10px;font-size:14px;color:var(--muted)}
+@media print{.deck{height:auto;display:block}.slide{display:flex!important;width:100%;height:100vh;break-after:page}.bar,.count,.notes{display:none!important}}
+</style>
+</head>
+<body>
+<div class="deck">
+
+  <section class="slide">
+    <p class="notice">{{비공개 원문일 때만: 비공개 원문 기반 — 공유 전 이름·경로 확인 / 공개 원문이면 이 줄을 지운다}}</p>
+    <p class="kicker">{{유형}} · into slides</p>
+    <h1>{{주제}}</h1>
+    <p class="muted">{{TL;DR 첫 줄}}</p>
+    <p class="muted">원문: {{링크·경로}}</p>
+    <p class="next-q">다음 질문 → {{질문}}</p>
+    <aside class="notes">{{말할 내용 2~4문장}} · 근거: {{위치}}</aside>
+  </section>
+
+  <section class="slide">
+    <p class="kicker">3. High-level design</p>
+    <h2>{{주장하는 제목}}</h2>
+    <!-- SVG가 여러 장이면 marker id를 장마다 다르게(arr1·arrk1, arr2·arrk2 …). 핵심 경로는 .key-edge + #arrk1, (추정) 간선은 .edge.guess(점선). -->
+    <svg viewBox="0 0 720 260" role="img" aria-label="{{HLD 한 줄 설명}}">
+      <defs><marker id="arr1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker><marker id="arrk1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="arrkey" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+      <rect class="box" x="30" y="100" width="170" height="56" rx="8"/><text x="115" y="133" text-anchor="middle">{{노드 A}}</text>
+      <rect class="box key" x="420" y="100" width="170" height="56" rx="8"/><text x="505" y="133" text-anchor="middle">{{노드 B}}</text>
+      <path class="edge key-edge" d="M200,128 L418,128" marker-end="url(#arrk1)"/><text class="lbl" x="309" y="118" text-anchor="middle">{{오가는 것}}</text>
+    </svg>
+    <p class="next-q">다음 질문 → {{질문}}</p>
+    <aside class="notes">{{말할 내용}} · 근거: {{위치}}</aside>
+  </section>
+
+  <section class="slide">
+    <p class="kicker">4. Low-level design — {{확대한 화살표}}</p>
+    <h2>{{주장하는 제목}}</h2>
+    <!-- 번호 단계는 한 장에 6개까지. 실패 경로는 그 단계 li 안의 div.fail(단계 수에 넣지 않는다). 단계마다 쉬운 동사구 먼저, 식별자는 1~2개. 시그니처·인자 목록은 노트로. -->
+    <ol>
+      <li>{{하는 일}} <code>{{식별자}}</code></li>
+      <li>{{진입 조건이 있으면 먼저}} {{하는 일}} <code>{{식별자}}</code><div class="fail">✗ {{실패하면: 끝나는지, 어디로 이어지는지}}</div></li>
+    </ol>
+    <p class="next-q">다음 질문 → {{질문}}</p>
+    <aside class="notes">{{말할 내용}} · 식별자 전체: {{시그니처·인자}} · 근거: {{위치}}</aside>
+  </section>
+
+  <section class="slide">
+    <p class="kicker">정리</p>
+    <h2>{{한 문장 정리}}</h2>
+    <ul>
+      <li>빠진 디테일: {{한 줄}}</li>
+      <li>확인 질문: {{질문 하나}}</li>
+    </ul>
+    <p class="muted">출처: {{원문과 읽은 범위}}</p>
+    <aside class="notes">{{말할 내용}} · 확인 질문의 답: {{답}} · 근거: {{위치}}</aside>
+  </section>
+
+</div>
+<div class="bar"></div><div class="count"></div>
+<script>
+(function(){
+  var slides=[].slice.call(document.querySelectorAll('.slide')), i=0;
+  var bar=document.querySelector('.bar'), count=document.querySelector('.count');
+  function show(n){
+    i=Math.max(0,Math.min(slides.length-1,n));
+    slides.forEach(function(s,k){s.classList.toggle('on',k===i)});
+    bar.style.width=((i+1)/slides.length*100)+'%';
+    count.textContent=(i+1)+' / '+slides.length;
+    try{history.replaceState(null,'','#'+(i+1))}catch(e){}
+  }
+  document.addEventListener('keydown',function(e){
+    var k=e.key;
+    if(k==='ArrowRight'||k==='PageDown'||k===' '){e.preventDefault();show(i+1)}
+    else if(k==='ArrowLeft'||k==='PageUp'){e.preventDefault();show(i-1)}
+    else if(k==='Home'){show(0)}
+    else if(k==='End'){show(slides.length-1)}
+    else if(k==='n'||k==='N'){document.body.classList.toggle('show-notes')}
+  });
+  document.querySelector('.deck').addEventListener('click',function(e){
+    if(e.target.closest('a,button,input,textarea'))return;
+    show(e.clientX>innerWidth/2?i+1:i-1);
+  });
+  show((parseInt(location.hash.slice(1),10)||1)-1);
+})();
+</script>
+</body>
+</html>
