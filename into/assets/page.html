@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{주제}} — 한 장 요약</title>
+<!-- into html 모드 템플릿. {{...}} 자리를 채운다. 한 화면에 맞추려고 레이아웃 CSS는 고쳐도 된다. 색 변수·a·.src·.fail·.notice 규칙은 지우지 않는다. 외부 요청(CDN·웹폰트·원격 이미지)을 추가하지 않는다. -->
+<style>
+:root{--bg:#fafaf8;--fg:#1d1d1f;--muted:#5d6168;--line:#c8cbd0;--card:#fff;--accent:#2563c9;--accent-bg:#e7effc;
+  font-family:"Pretendard","Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",system-ui,sans-serif}
+@media (prefers-color-scheme:dark){:root{--bg:#131416;--fg:#ececec;--muted:#a3a7ae;--line:#43474e;--card:#1c1e21;--accent:#7ea7ff;--accent-bg:#1d2840}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);line-height:1.5;word-break:keep-all;overflow-wrap:anywhere}
+main{max-width:1240px;margin:0 auto;padding:20px 16px;display:grid;gap:14px;
+  grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);grid-template-areas:"tldr tldr" "hld lld" "ins ins" "foot foot"}
+@media (max-width:860px){main{grid-template-columns:minmax(0,1fr);grid-template-areas:"tldr" "hld" "lld" "ins" "foot"}}
+.kicker{margin:0;font-size:13px;font-weight:700;letter-spacing:.04em;color:var(--accent)}
+h1{margin:2px 0 4px;font-size:clamp(22px,3vw,32px);line-height:1.3}
+h2{margin:0 0 8px;font-size:15px;color:var(--muted)}
+p{margin:0}
+a{color:var(--accent)}
+.notice{display:inline-block;margin:0 0 6px;padding:2px 8px;font-size:13px;color:var(--muted);border:1px solid var(--line);border-radius:6px}
+.sub{color:var(--muted)}
+.why{margin-top:8px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;min-width:0}
+.steps{margin:0;padding-left:20px}
+.steps li{margin:4px 0}
+.steps .fail{color:var(--muted)}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.92em;background:var(--accent-bg);padding:0 4px;border-radius:4px;overflow-wrap:anywhere}
+.src{display:block;margin-top:6px;font-size:13px;color:var(--muted)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{border-bottom:1px solid var(--line);padding:4px 6px;text-align:left;vertical-align:top}
+.ins{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+footer{font-size:14px;color:var(--muted)}
+@media (max-width:860px){.fig{overflow-x:auto}.fig svg{min-width:720px}}
+svg{width:100%;height:auto;color:var(--muted)}
+svg text{fill:var(--fg);font-size:16px;font-family:inherit}
+svg .box{fill:var(--card);stroke:var(--line);stroke-width:1.5}
+svg .key{stroke:var(--accent);stroke-width:2.5}
+svg .edge{stroke:var(--muted);stroke-width:1.5;fill:none}
+svg .edge.key-edge{stroke:var(--accent);stroke-width:2.5}
+svg .edge.guess{stroke-dasharray:6 4}
+svg .arrkey{fill:var(--accent)}
+svg .lbl{fill:var(--muted);font-size:15px}
+svg .lbl-bg{fill:var(--card)}
+</style>
+</head>
+<body>
+<main>
+  <header style="grid-area:tldr">
+    <p class="notice">{{비공개 원문일 때만: 비공개 원문 기반 — 공유 전 이름·경로 확인 / 공개 원문이면 이 줄을 지운다}}</p>
+    <p class="kicker">1. TL;DR</p>
+    <h1>{{핵심 한 줄}}</h1>
+    <p class="sub">{{보조 1~2줄}}</p>
+    <p class="why"><b>2. 왜 중요한가</b> — {{한 줄}}</p>
+    <small class="src">근거: {{위치}}</small>
+  </header>
+
+  <section class="card" style="grid-area:hld">
+    <h2>3. High-level design</h2>
+    <!-- 노드 7개 이하. 노드 = rect.box(+핵심 경로는 .key) + text. 화살표 = path.edge + text.lbl(모든 화살표에 라벨). 핵심 경로 화살표는 .key-edge + marker #arrk, 나머지는 #arr. (추정) 간선은 .edge.guess(점선). 대각선 라벨 뒤에는 rect.lbl-bg. viewBox 폭은 720 안팎. 글자 크기는 그려진 크기(font-size × SVG 실제 폭 ÷ viewBox 폭)로 14px 이상. -->
+    <div class="fig">
+    <svg viewBox="0 0 720 300" role="img" aria-label="{{HLD 한 줄 설명 — 순서·주체는 LLD와 같게}}">
+      <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker><marker id="arrk" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="arrkey" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+      <rect class="box" x="30" y="120" width="170" height="56" rx="8"/><text x="115" y="153" text-anchor="middle">{{노드 A}}</text>
+      <rect class="box key" x="420" y="120" width="170" height="56" rx="8"/><text x="505" y="153" text-anchor="middle">{{노드 B}}</text>
+      <path class="edge key-edge" d="M200,148 L418,148" marker-end="url(#arrk)"/><text class="lbl" x="309" y="138" text-anchor="middle">{{오가는 것}}</text>
+    </svg>
+    </div>
+    <small class="src">근거: {{위치}}</small>
+  </section>
+
+  <section class="card" style="grid-area:lld">
+    <h2>4. Low-level design — {{확대한 화살표}}</h2>
+    <!-- 핵심 경로 6단계 이하. 실패 경로는 그 단계 li 안의 div.fail(번호를 먹지 않고 단계 수에 넣지 않는다). 유형의 LLD가 표이면 ol 대신 3열 이하 table. -->
+    <ol class="steps">
+      <li><code>{{식별자}}</code> {{하는 일}}</li>
+      <li><code>{{식별자}}</code> {{하는 일}}<div class="fail">✗ {{실패하면: 끝나는지, 어디로 이어지는지}}</div></li>
+    </ol>
+    <small class="src">근거: {{위치}}</small>
+  </section>
+
+  <section style="grid-area:ins">
+    <h2>5. Insights</h2>
+    <div class="ins">
+      <div class="card">{{인사이트 1}}<small class="src">근거: {{위치}}</small></div>
+      <div class="card">{{인사이트 2}}<small class="src">근거: {{위치}}</small></div>
+      <div class="card">{{인사이트 3}}<small class="src">근거: {{위치}}</small></div>
+    </div>
+  </section>
+
+  <footer style="grid-area:foot">
+    <p>빠진 디테일: {{한 줄}}</p>
+    <p>출처: {{원문과 읽은 범위}}</p>
+  </footer>
+</main>
+</body>
+</html>
