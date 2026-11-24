@@ -1,6 +1,6 @@
 # into
 
-에이전트 아웃풋을 **내가 이해하기 쉬운, 내가 정한 포맷**으로 바꾸는 스킬이다. 에이전트 답, PR, 디자인 문서, 논문·개념, 영상, X·스레드 글, 커뮤니티 글, 로컬 파일(프롬프트·코드·설정)을 매번 같은 칸(스캐폴드)에 채운다. 그리고 그 칸을 쉬운 말, STE 방식 문장, 문서, 한 장 HTML, 슬라이드, 테스트, 쇼츠, 영상으로 다시 만든다.
+에이전트 아웃풋을 **내가 이해하기 쉬운, 내가 정한 포맷**으로 바꾸는 스킬이다. 에이전트 답, PR, 디자인 문서, 논문·개념, 영상, X·스레드 글, 커뮤니티 글, 로컬 파일(프롬프트·코드·설정), 코드 저장소 전체나 하위 시스템을 매번 같은 칸(스캐폴드)에 채운다. 그리고 그 칸을 쉬운 말, STE 방식 문장, 문서, 한 장 HTML, 눌러 보는 HTML, 슬라이드, 테스트, 쇼츠, 영상으로 다시 만든다. 분야 하나를 조사해 전문가 과정으로도 만든다.
 
 ## 그냥 말로 시키면 되지 않나?
 
@@ -32,10 +32,12 @@ HLD는 "무엇과 무엇이 무엇을 주고받나", LLD는 "그 안에서 정�
 | `into ste`, STE 방식으로 | 짧고 모호하지 않은 문장, 숫자·한정어 보존 | 대화 | 디테일을 살린 정독, 남에게 넘길 글 |
 | `into doc`, 문서로 만들어줘 | Mermaid 다이어그램이 든 이해 문서 | `into-out/<slug>-doc.md` | 공유, 다시 보기 |
 | `into html`, visualize, 시각화해줘 | 한 화면 구조도 | `into-out/<slug>-html.html` | 큰 그림 한 장 |
+| `into interactive`, 눌러 보는 HTML | 그림을 누르고 상황·갈림길을 골라 따라가기 | `into-out/<slug>-interactive.html` | 조건에 따라 길이 어떻게 바뀌는지 보기 |
 | `into slides`, 슬라이드로 | 질문 사슬 + 발표자 노트 슬라이드 | `into-out/<slug>-slides.html` | 발표 |
 | `into test`, 테스트 만들어줘 | 먼저 예측 → 답 → 피드백 퀴즈 | `into-out/<slug>-test.html` | 정말 이해했는지 확인 |
 | `into shorts`, 쇼츠로 | 60초 세로 대본 + 스토리보드 (렌더 도구가 있으면 MP4) | `into-out/<slug>-shorts.md` | 쇼츠 업로드 |
 | `into video`, 영상으로 | 긴 영상 대본 + 스토리보드 (렌더 도구가 있으면 MP4) | `into-out/<slug>-video.md` | 영상 업로드 |
+| `into domain-expert <도메인>` | 조사 장부 → 비전·전략·목표·지표 → Easy·Medium·Hard·심화 섹션(결과물·채점표·게이트 퀴즈) 허브 | `into-out/<slug>-domain-expert/` | 한 분야의 전문가 과정 |
 
 HTML 결과물은 외부 요청이 없는 단일 파일이다. 사용자가 경로를 주면 그곳에 쓴다.
 
@@ -60,9 +62,28 @@ into는 매번 **같은 원본**에서 다시 만든다. 앞 결과를 다시 �
 into doc https://github.com/<owner>/<repo>/pull/123
 이 논문 슬라이드로 만들어줘 https://arxiv.org/abs/<id>
 into test ./prompts/system.md
+into html ./my-repo                      ← 저장소 지도
+into doc ./my-repo 구역: 샌드박스          ← 구역 하나 확대
 이 스레드 쉽게 설명해줘 https://x.com/<user>/status/<id>
 이 토론 시각화해줘 https://news.ycombinator.com/item?id=<id>
 ```
+
+## 도메인 전문가 과정
+
+`into domain-expert`는 원문 하나가 아니라 **분야 하나**를 받는다. 저장소면 코드를 지도와 구역으로 읽고, 업무·기술 분야면 논문·벤치마크, 대기업·중소기업·스타트업의 성공과 실패, 통계, 만드는 법, 사용자 언어권 자료를 조사해 등급(A~D)이 달린 장부를 만든다.
+
+```text
+into domain-expert ./my-repo
+into domain-expert AI 에이전트 전환
+into domain-expert 프롬프트 캐싱, 커리큘럼만
+```
+
+- 비전 하나 → 전략 하나 → 목표 하나 → 지표 3~6개. 섹션마다 비전·전략·목표·결과물·채점표·올리는 지표가 하나씩 있다.
+- 레슨은 이 스킬의 다른 모드로 만든다. 처음 감은 eli5·shorts, 조건은 interactive, 근거는 doc, 긴 흐름은 video, 가르치기는 slides처럼 막히는 이유에 맞춰 고른다.
+- 진단과 졸업 시험은 같은 설계, 다른 문제다. 퀴즈를 허브에서 풀면 점수와 지표가 저절로 찬다(브라우저에만 저장).
+- 졸업 조건은 넷이다: 모든 섹션 통과(게이트 + 결과물), 졸업 시험, 졸업 과제, 직접 잰 지표(시작값과 지금 값). 졸업 과제에는 다른 사람이나 실제 사용으로만 채울 수 있는 필수 항목이 있다. 비전의 행동마다 남는 증거(`proof`)를 첫 화면에 보인다.
+- 졸업 시험은 정답이 모두 낸 뒤에 보이고 첫 점수만 센다. 필수 증거가 모의면 졸업이 아니라 `연습 완료`다.
+- 다 읽는다고 전문가가 되지는 않는다. 결과물과 졸업 과제를 통과해야 한다. 목표 값은 근거가 없으면 `(제안)`이라고 적힌다.
 
 ## 내 칸으로 바꾸기
 
@@ -93,7 +114,9 @@ SKILL.md만 복사하지 말고 폴더 전체(references, assets 포함)를 설�
 - **형식만 바꾸면 다시 읽기:** 바뀐 형식을 읽기만 하면 이해했다는 느낌만 남기 쉽다. `into test`로 먼저 예측해 보거나, eli5 뒤에 "내가 설명해 볼게"라고 하고 내 설명을 점검받는다.
 - **읽을 수 없는 원문:** 로그인 벽이 있는 글, 자막이 없는 영상은 본문이나 자막을 붙여 넣어야 한다. 제목만으로 내용을 만들지 않는다.
 - **쉬운 설명의 위험 2 — 짧은 한 줄:** 실행 평가에서 가장 많이 나온 문제는 틀린 사실이 아니라 제목·라벨·자막처럼 짧은 자리에서 조건과 한정어가 빠지는 것이었다. 규칙만으로는 줄지 않았다. 0.3부터는 쓰기 전에 사실마다 조건·한정어를 적은 "사실 카드"를 만들고, 쓴 뒤에 핵심어로 결과 전체를 검색해 모든 자리를 대조한다([references/fact-card.md](references/fact-card.md)).
-- **버전 0.4:** 1~3차 실행 평가(원문 50개 × 모드 8개 두 번, 점수가 낮은 20개 한 번)를 반영했다. 0.4는 사실 카드에 주체·기본값·진입 조건을 더했고, 무음 렌더(쇼츠·영상)의 자막·안전 영역 규칙을 넣었다. 이 README는 아직 평가 결과 수치를 싣지 않는다.
+- **저장소는 조건이 많다:** 코드에서는 설정 하나로 결과가 반대가 된다. codebase 스캐폴드는 경로 하나 옆에 분기 표를 두고, 구역마다 읽음·훑음·목록만을 적는다. `scripts/check_citations.py`가 근거의 파일·줄·이름을 저장소와 대조한다(조건·순서는 사람이 대조한다).
+- **버전 0.7:** domain-expert 모드, domain 스캐폴드, 허브 템플릿과 빌드 스크립트를 더했다.
+- **버전 0.6:** 큰 저장소 두 곳을 통째로 돌린 결과를 반영해 codebase 스캐폴드, interactive 모드, 근거·조건 대조 스크립트, 카드 반박 절차를 더했다. 0.4까지는 원문 50개 × 모드 8개 실행 평가를 반영했다.
 
 ## 폴더 구성
 
@@ -101,7 +124,8 @@ SKILL.md만 복사하지 말고 폴더 전체(references, assets 포함)를 설�
 into/
 ├── SKILL.md                  # 판별 → 칸 → 모드 → 출처 규칙 → 출력 위치
 ├── references/fact-card.md   # 사실 카드 · 짧은 자리 대조 · 금지 변형 예
-├── references/scaffolds/     # general + 유형별 칸 7개
-├── references/modes/         # eli5 · ste · doc · html · slides · test · shorts · video
-└── assets/                   # page.html · slides.html · test.html 템플릿
+├── references/scaffolds/     # general + 유형별 칸 9개
+├── references/modes/         # eli5 · ste · doc · html · interactive · slides · test · shorts · video · domain-expert
+├── scripts/                  # check_citations.py · check_facts.py (근거·조건 대조) · build_domain.py (과정 허브)
+└── assets/                   # page.html · interactive.html · slides.html · test.html · domain-expert.html 템플릿
 ```

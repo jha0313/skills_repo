@@ -7,7 +7,7 @@
 | [workflow-orchestrator](workflow-orchestrator/README.md) | 조사·계획·구현·검증·리뷰를 작업자에게 맡기고 조율자는 의존성과 근거를 관리한다. |
 | [eval-writer](eval-writer/README.md) | 대상 스킬 계약에서 재현 가능한 평가 사례와 루브릭을 작성·검토한다. |
 | [skill-evaluator](skill-evaluator/README.md) | 격리된 실제 실행, 독립 채점, 근거 보존, 한국어 로컬 HTML/Markdown 보고서를 제공한다. |
-| [into](into/README.md) | 에이전트 답·PR·문서·논문·영상·글을 같은 다섯 칸(TL;DR → 왜 중요한가 → HLD → LLD → Insights)으로 바꾸고, eli5·ste·doc·html·slides·test·shorts·video로 다시 만든다. |
+| [into](into/README.md) | 에이전트 답·PR·문서·논문·영상·글을 같은 다섯 칸(TL;DR → 왜 중요한가 → HLD → LLD → Insights)으로 바꾸고, eli5·ste·doc·html·interactive·slides·test·shorts·video로 다시 만든다. `into domain-expert`는 한 분야를 조사해 전문가 과정(Easy → 심화)을 만든다. |
 
 ## 설치
 

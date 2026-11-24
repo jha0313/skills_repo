@@ -1,9 +1,9 @@
 ---
 name: into
-description: 에이전트 답·PR·디자인 문서·논문·개념·영상·X/스레드 글·커뮤니티 글·로컬 파일(프롬프트·코드·설정)을 매번 같은 이해용 스캐폴드(TL;DR → 왜 중요한가 → High-level design → Low-level design → Insights)로 바꾸고, 같은 내용을 여러 형식으로 다시 렌더한다. 'into', 'into eli5', 'into ste', 'into doc', 'into html', 'into slides', 'into test', 'into shorts', 'into video', '쉽게 설명해줘', 'ELI5로', 'STE로', 'STE 방식으로', 'visualize', '시각화해줘', '한 장으로 그려줘', '문서로 만들어줘', '슬라이드로 만들어줘', '테스트 만들어줘', '퀴즈로 만들어줘', '쇼츠로 만들어줘', '영상으로 만들어줘'처럼 이미 받은 결과물이나 자료를 이해하기 쉬운 형식으로 바꿔 달라는 요청에 사용한다. 새 질문에 처음 답하는 '설명해줘' 자체에는 쓰지 않는다. 원문에 없는 사실을 더하지 않고 빠진 디테일을 밝힌다.
-argument-hint: "[eli5|ste|doc|html|slides|test|shorts|video] [입력: 직전 답 | 경로 | URL]"
+description: 에이전트 답·PR·디자인 문서·논문·개념·영상·X/스레드 글·커뮤니티 글·로컬 파일(프롬프트·코드·설정)·코드 저장소 전체나 하위 시스템을 매번 같은 이해용 스캐폴드(TL;DR → 왜 중요한가 → High-level design → Low-level design → Insights)로 바꾸고, 같은 내용을 여러 형식으로 다시 렌더한다. 도메인 하나(저장소·기술·업무 분야)를 조사해 비전·전략·목표·지표와 섹션별 결과물이 있는 전문가 과정(Easy → Medium → Hard → 심화)도 만든다. 'into', 'into eli5', 'into ste', 'into doc', 'into html', 'into interactive', 'into slides', 'into test', 'into shorts', 'into video', 'into domain-expert', 'into domain expert', 'into domain knowledge', '도메인 전문가가 되고 싶다', '이 분야 전문가가 되는 커리큘럼', '쉽게 설명해줘', 'ELI5로', 'STE로', 'STE 방식으로', 'visualize', '시각화해줘', '한 장으로 그려줘', '눌러 보는 HTML로', '인터랙티브 HTML로', '문서로 만들어줘', '슬라이드로 만들어줘', '테스트 만들어줘', '퀴즈로 만들어줘', '쇼츠로 만들어줘', '영상으로 만들어줘'처럼 이미 받은 결과물이나 자료를 이해하기 쉬운 형식으로 바꿔 달라는 요청에 사용한다. 새 질문에 처음 답하는 '설명해줘' 자체에는 쓰지 않는다(경로·저장소와 모드를 함께 주면 쓴다). 원문에 없는 사실을 더하지 않고 빠진 디테일을 밝힌다.
+argument-hint: "[eli5|ste|doc|html|interactive|slides|test|shorts|video|domain-expert] [입력: 직전 답 | 경로 | URL | 저장소 | 도메인 이름] [구역: <이름>]"
 metadata:
-  version: "0.4"
+  version: "0.7"
 ---
 
 # into — 에이전트 아웃풋을 내 포맷으로
@@ -18,7 +18,7 @@ metadata:
 
 **입력 확정** (위에서부터 처음 맞는 것):
 
-1. 사용자가 준 경로·URL·붙여 넣은 글.
+1. 사용자가 준 경로·URL·붙여 넣은 글. 경로와 모드를 함께 주면 앞 답이 없어도 그 경로를 입력으로 쓴다. 질문을 함께 주면("A가 B를 어떻게 하나") TL;DR 둘째 줄과 LLD 경로는 그 질문에 답하는 것을 고른다.
 2. 직전 에이전트 답이 into 결과이면 **그 into가 쓴 원본**(이어서 부르기). into 결과를 다시 렌더하지 않는다. 손실이 쌓이기 때문이다. 사용자가 "방금 결과를"처럼 직전 결과를 명시하면 그 결과를 쓴다.
 3. 그렇지 않으면 이 대화의 직전 에이전트 답.
 4. 아무것도 없으면 무엇을 바꿀지 묻는다.
@@ -40,7 +40,9 @@ metadata:
 | YouTube 등 영상 링크, 영상 자막·대본 | video | [video.md](references/scaffolds/video.md) |
 | X·Threads·Bluesky 글, 여러 개로 이어진 글타래 | social-post | [social-post.md](references/scaffolds/social-post.md) |
 | Reddit·Hacker News·포럼·Discussions·커뮤니티 게시판 글과 댓글 | community-post | [community-post.md](references/scaffolds/community-post.md) |
-| 로컬 프롬프트·코드·설정 파일, 저장된 보고서, 대화의 에이전트 답 | local-file | [local-file.md](references/scaffolds/local-file.md) |
+| 코드 저장소 전체, 저장소의 하위 시스템(소스 파일 20개 초과, 또는 "저장소·아키텍처·하네스·전체 구조·서브시스템"). 소스 트리를 읽을 수 있을 때만. 발췌 모음·설명 글이면 paper-concept | codebase | [codebase.md](references/scaffolds/codebase.md) |
+| 로컬 프롬프트·코드·설정 파일 몇 개, 저장된 보고서, 대화의 에이전트 답 | local-file | [local-file.md](references/scaffolds/local-file.md) |
+| domain-expert 모드(입력이 원문 하나가 아니라 도메인) | domain | [domain.md](references/scaffolds/domain.md) |
 | 위에 없음, 또는 사용자가 general을 요청 | general | [general.md](references/scaffolds/general.md) |
 
 - 사용자가 유형을 말하면 그 유형을 쓴다.
@@ -57,15 +59,17 @@ metadata:
 | `into ste`, STE로, STE 방식으로, 문장을 명확하게 | ste | [ste.md](references/modes/ste.md) | 대화 |
 | `into doc`, 문서로 만들어줘 | doc | [doc.md](references/modes/doc.md) | `.md` 파일 |
 | `into html`, visualize, 시각화해줘, 한 장으로 그려줘 | html | [html.md](references/modes/html.md) | `.html` 파일 |
+| `into interactive`, 눌러 보는 HTML, 인터랙티브로, 상황별로 따라가게 | interactive | [interactive.md](references/modes/interactive.md) | `.html` 파일 |
 | `into slides`, 슬라이드로, 발표 자료로 | slides | [slides.md](references/modes/slides.md) | `.html` 파일 |
 | `into test`, 테스트·퀴즈 만들어줘 | test | [test.md](references/modes/test.md) | `.html` 파일 |
 | `into shorts`, 쇼츠로 만들어줘 | shorts | [shorts.md](references/modes/shorts.md) | `.md` (+ 렌더 도구가 있으면 MP4) |
 | `into video`, 영상으로, 긴 영상으로 | video | [video.md](references/modes/video.md) | `.md` (+ 렌더 도구가 있으면 MP4) |
+| `into domain-expert`, 도메인 전문가가 되고 싶다, 전문가 과정 짜 줘 | domain-expert | [domain-expert.md](references/modes/domain-expert.md) | 폴더(허브 `.html` + 레슨) |
 
 - 해당 모드 파일을 읽고 그 형식을 따른다. 모드는 **보여 주는 방법**만 바꾼다. 칸의 내용과 순서는 스캐폴드가 정한다.
-- 유형 스캐폴드가 칸 안의 형식·한도·다이어그램 규칙을 정하면 그것이 모드의 기본 배치보다 먼저다. 예: social-post의 LLD 근거 점검표는 html·slides에서도 표로 쓰고, video 스캐폴드의 `[mm:ss]`는 모든 모드에서 단다. 단 개수는 모드의 화면 한도(html 한 화면, slides 한 장, shorts 60초)를 넘지 않게 합치고, 합친 것을 `빠진 디테일`에 적는다.
-- "슬라이드로 시각화해줘"처럼 형식을 함께 말하면 그 형식(slides)을 고른다. 그냥 visualize는 html이다.
-- 한 요청에 모드가 여럿이면 말한 순서대로 하나씩 만든다. 요청하지 않은 다음 모드는 실행하지 않는다.
+- 유형 스캐폴드가 칸 안의 형식·한도·다이어그램 규칙을 정하면 그것이 모드의 기본 배치보다 먼저다. 예: social-post의 LLD 근거 점검표는 html·slides에서도 표로 쓰고, video 스캐폴드의 `[mm:ss]`는 모든 모드에서 단다. 단 개수는 모드의 화면 한도(html 한 화면, slides 한 장, interactive 노드·단계 수, shorts 60초)를 넘지 않게 합치고, 합친 것을 `빠진 디테일`에 적는다.
+- "슬라이드로 시각화해줘"처럼 형식을 함께 말하면 그 형식(slides)을 고른다. 그냥 visualize는 html이다. "눌러 본다·따라간다·상황을 바꾼다"는 interactive, "문제·점수·시험"은 test다.
+- 한 요청에 모드가 여럿이면 말한 순서대로 하나씩 만든다. 요청하지 않은 다음 모드는 실행하지 않는다. 예외는 domain-expert 하나다. 레슨을 만들려고 다른 모드를 스스로 부른다.
 
 ## 3. 출처에 충실하기 (모든 모드 공통)
 
@@ -77,7 +81,7 @@ metadata:
 - 표시: 원문에서 끌어낸 판단은 `(추정)`(원문 두 문장을 이은 한 단계 추론도), 원문끼리 엇갈리거나 확인하지 못한 것은 `(불확실)`, 원문이 근거를 대지 않은 주장은 `(근거 미제시)`(틀렸다는 뜻이 아니다). 표시는 그 사실과 함께 모든 모드와 짧은 자리로 옮긴다.
 - **보충:** 원문만으로 칸을 채울 수 없을 때(호출자, 바꾼 이유, 이전 동작) 원문 밖 1차 자료(코드·명세·공식 문서)를 **직접 읽어** 보충할 수 있다. `(보충: 근거 위치)`로 표시하고 읽은 범위(커밋·경로·줄)를 `출처:`에 적는다. 원문에 없는 정의를 더하거나 통상 정의로 원문을 평가할 때도 같다. 기억만으로 보충하지 않는다.
 - 쉬운 말로 바꾸거나 줄이면 마지막에 `빠진 디테일:` 한 줄을 쓴다. 무엇을 뺐거나 뭉갰는지 적는다. 뺀 것이 없으면 `빠진 디테일: 없음`.
-- 칸마다 근거 위치를 하나 이상 단다: `path:line`, `URL#절`, `[mm:ss]`, 글타래 `n/N`. 줄 번호의 기준 파일이 둘 이상이면(원문 사본과 저장소 파일 등) 처음에 한 번 밝힌다.
+- 칸마다 근거 위치를 하나 이상 단다: `path:line`(같은 파일의 여러 구간은 `path:1-3, 45-60`), `URL#절`, `[mm:ss]`, 글타래 `n/N`. 긴 공통 경로는 첫머리에 `경로 기준: <폴더>/` 한 줄로 빼고 그 아래 상대 경로를 쓴다. 줄 번호의 기준 파일이 둘 이상이면(원문 사본과 저장소 파일 등) 처음에 한 번 밝힌다.
 - 마지막 줄은 `출처:` — 읽은 원문과 읽은 범위(예: "댓글 312개 중 상위 30개"). URL이나 작업 디렉터리 기준 상대 경로로 쓰고 홈 디렉터리 절대 경로는 쓰지 않는다. 줄 수·개수는 실제로 센 값을 쓴다(줄 수는 `wc -l` 값).
 
 ## 4. 출력 위치
@@ -86,13 +90,14 @@ metadata:
 |---|---|
 | 모드 없음, eli5, ste | 대화 |
 | doc | `into-out/<slug>-doc.md` |
-| html, slides, test | `into-out/<slug>-<mode>.html` |
+| html, interactive, slides, test | `into-out/<slug>-<mode>.html` |
 | shorts, video | `into-out/<slug>-<mode>.md` (렌더하면 `into-out/<slug>-<mode>/` 프로젝트와 `into-out/<slug>-<mode>.mp4`) |
+| domain-expert | `into-out/<slug>-domain-expert/` (허브 `index.html`, `curriculum.json`, `research/`, `lessons/`) |
 
 - `into-out/`은 현재 작업 디렉터리 기준이다. 사용자가 경로를 주면 그곳에 쓴다.
 - `<slug>`는 주제를 영문 소문자와 하이픈 2~4단어로 줄인 이름이다(예: `codex-harness`). 사용자가 정하면 그 이름을 쓴다.
 - 같은 이름 파일이 이미 있으면 덮어쓰지 않고 `-2`, `-3`을 붙인다.
-- 사용자가 eli5·ste를 파일로 원하면 `into-out/<slug>-<mode>.md`에 대화와 같은 형식으로 쓴다.
+- 사용자가 eli5·ste를 파일로 원하면 `into-out/<slug>-<mode>.md`에 대화와 같은 형식으로 쓴다. 비공개 원문이면 이때는 안내 한 줄도 단다(순서: 안내 → `유형:` → `용어:`).
 - 원문이 공개 출처(URL, `public: true` 같은 표시)가 없는 로컬 파일이면 파일 모드 결과 맨 위(템플릿의 안내 자리)에 `비공개 원문 기반 — 공유 전 이름·경로 확인` 한 줄을 둔다. 공개 자료를 저장한 사본이면 이 줄 대신 `출처:`에 원 URL을 쓴다.
 - 파일 모드를 마치면 대화에는 경로, 3줄 이내 요약, `빠진 디테일:` 한 줄만 쓴다.
 
@@ -109,9 +114,26 @@ into doc     → TL;DR · HLD · LLD · Insights 문서.
 into shorts  → 60초 세로 대본 + 스토리보드.
 ```
 
+저장소는 지도를 먼저 만들고 구역으로 들어간다.
+
+```text
+into html ./repo                     → 저장소 지도 한 장(구역 이름이 나온다)
+into interactive ./repo 구역: 샌드박스  → 그 구역만, 상황별로 눌러 보기
+```
+
+원문 하나가 아니라 분야 하나를 잡고 싶으면 과정을 만든다.
+
+```text
+into domain-expert ./repo            → 그 저장소의 전문가 과정
+into domain-expert AI 에이전트 전환     → 웹을 조사해 만든 전문가 과정
+into domain-expert <도메인>, 커리큘럼만  → 레슨 대신 레슨을 만드는 명령까지
+```
+
 - 매 단계는 **같은 원본**에서 다시 렌더한다(1절 2번).
 - 첫 into에서 쓰기 전에 **사실 카드**(사실 · 조건·범위·예외 · 한정어 · 종류 · 근거)를 만든다(fact-card.md 1절). 다음 모드는 그 카드의 사실과 표시(`(추정)` 등)를 그대로 쓴다. 그래서 모드가 달라도 숫자·이름·다이어그램 노드가 일치한다.
+- 모드를 쓰기 전에 **카드 반박**을 한 번 한다(fact-card.md 1-1절). 저장소이거나 카드가 20행을 넘으면 `핵심` 행마다, 짧은 원문이면 동작을 말하는 행만 카드를 쓰면서 함께 본다.
 - 앞 모드의 사실을 다시 쓸 때도 카드의 줄을 원문 줄과 한 번 더 대조한다. `원문에 없음` 판정도 다시 대조한다. 한 번 틀린 사실이 모든 모드로 퍼지지 않게 하기 위해서다. 모드가 칸을 더 자세히 쓸 때만 원본에서 사실을 더 가져온다.
+- 모드마다 노드 한도가 다르면 공통 노드의 이름과 간선 라벨만 같게 쓴다. 모드 사이에 지킬 것은 주체·행동·조건·확실성이다. 짧은 모드에서는 이해에 필요 없는 `(추정)` 간선을 뺀다. 더 큰 모드(doc·interactive)의 추가 노드는 불일치가 아니다.
 - 모드마다 끝내기 전에 카드의 조건·한정어가 있는 사실을 핵심어로 결과 전체에서 검색해, 나오는 모든 자리에 조건이 있는지 본다(fact-card.md 2절). 모드마다 같은 사실을 새로 줄이다가 조건이 다시 빠지기 때문이다.
 - 다음 모드는 사용자가 부를 때만 실행한다.
 
@@ -131,7 +153,10 @@ into shorts  → 60초 세로 대본 + 스토리보드.
 - [ ] `원문에 없음`·"없다" 판정은 원문 전체를 검색해 확인했다.
 - [ ] 짧은 원문이면 다섯 칸 본문 글자 수를 세었다. general "짧은 원문"의 상한 이하다.
 - [ ] 제목·`aria-label`·나레이션이 말하는 순서와 주체가 LLD 번호 목록과 같다.
-- [ ] HLD에는 함수·필드 이름과 수식 기호가 없고, LLD에는 원문의 실제 식별자와 호출 순서가 있다(없으면 `원문에 없음`).
+- [ ] HLD에는 함수·필드 이름과 수식 기호가 없고, LLD에는 원문의 실제 식별자와 호출 순서가 있다(코드 경로를 설명할 때. 원문에 없으면 `원문에 없음`).
+- [ ] 카드 반박을 했다(저장소이거나 카드가 20행을 넘으면 고친 행을 셌다).
+- [ ] 원문이 저장소이거나 줄 번호로 근거를 단 로컬 사본이고 셸이 있으면 `scripts/check_citations.py`의 `파일`·`줄`·`이름`이 0이다(codebase.md 3절).
 - [ ] 칸마다 근거 위치가 있고, `빠진 디테일:`과 `출처:` 줄이 있다.
-- [ ] html·slides·test는 외부 요청이 없는 단일 HTML이다(CDN·웹폰트·원격 이미지 없음).
+- [ ] html·interactive·slides·test는 외부 요청이 없는 단일 HTML이다(CDN·웹폰트·원격 이미지 없음).
+- [ ] domain-expert는 `scripts/build_domain.py`가 `FAIL 0`이고 domain-expert.md의 점검을 마쳤다.
 - [ ] 파일 모드는 경로를 보고했다. 파일을 여는 것은 사용자와 호스트 규칙을 따른다.
