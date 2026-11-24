@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>눌러 보는 구조</title>
+<!-- into interactive 모드 템플릿. 아래 INTO 데이터만 채운다(페이지 제목도 INTO.title로 정해진다). 동작 코드는 고치지 않는다. 외부 요청을 추가하지 않는다. -->
+<style>
+:root{--bg:#fafaf8;--fg:#1d1d1f;--muted:#5d6168;--line:#c8cbd0;--card:#fff;--accent:#2563c9;--accent-bg:#e7effc;--ng:#b3261e;--ng-bg:#fbe7e5;
+  font-family:"Pretendard","Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",system-ui,sans-serif}
+@media (prefers-color-scheme:dark){:root{--bg:#131416;--fg:#ececec;--muted:#a3a7ae;--line:#43474e;--card:#1c1e21;--accent:#7ea7ff;--accent-bg:#1d2840;--ng:#ff8a80;--ng-bg:#3a1a18}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);line-height:1.55;word-break:keep-all;overflow-wrap:anywhere}
+main{max-width:1240px;margin:0 auto;padding:20px 16px 40px;display:grid;gap:16px}
+.two{display:grid;gap:16px;grid-template-columns:minmax(0,2.2fr) minmax(0,1fr);align-items:start}
+.two>.fig-card{position:sticky;top:12px}
+@media (max-width:900px){.two{grid-template-columns:minmax(0,1fr)}.two>.fig-card{position:static}}
+.kicker{margin:0;font-size:13px;font-weight:700;letter-spacing:.04em;color:var(--accent)}
+h1{margin:2px 0 4px;font-size:clamp(20px,2.2vw,26px);line-height:1.3}
+h2{margin:0 0 8px;font-size:15px;color:var(--muted)}
+h3{margin:0 0 6px;font-size:18px;line-height:1.4}
+p{margin:6px 0}
+a{color:var(--accent)}
+.notice{display:inline-block;margin:0 0 6px;padding:2px 8px;font-size:13px;color:var(--muted);border:1px solid var(--line);border-radius:6px}
+.notice[hidden]{display:none}
+.muted{color:var(--muted);font-size:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;min-width:0}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.92em;background:var(--accent-bg);padding:0 4px;border-radius:4px}
+.src{display:block;margin-top:6px;font-size:13px;color:var(--muted)}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 0}
+button{font:inherit;padding:7px 14px;border-radius:8px;border:1px solid var(--accent);background:transparent;color:var(--accent);cursor:pointer;text-align:left}
+button[aria-pressed=true],button.main{background:var(--accent);color:#fff}
+@media (prefers-color-scheme:dark){button[aria-pressed=true],button.main{color:#101114}}
+button[aria-pressed=true] code,button.main code{background:transparent;color:inherit}
+button:disabled{opacity:.4;cursor:not-allowed}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.fail{color:var(--ng);background:var(--ng-bg);border-radius:8px;padding:6px 10px;font-size:15px}
+.fig{overflow-x:auto}
+@media (max-width:900px){.fig svg{min-width:680px}}
+svg{width:100%;height:auto;display:block}
+@media (min-width:901px){.fig svg{max-height:64vh}}
+svg text{fill:var(--fg);font-family:inherit;font-size:17px}
+svg .node{cursor:pointer}
+svg .node rect{fill:var(--card);stroke:var(--line);stroke-width:1.5}
+svg .node.key rect{stroke:var(--accent)}
+svg .node.on rect{fill:var(--accent-bg);stroke:var(--accent);stroke-width:3}
+svg .edge{stroke:var(--muted);stroke-width:1.5;fill:none}
+svg .edge.key{stroke:var(--accent)}
+svg .edge.guess{stroke-dasharray:6 4}
+svg .edge.on{stroke:var(--accent);stroke-width:4}
+svg .lbl{font-size:15px;fill:var(--muted)}
+svg .lbl.on{fill:var(--accent);font-weight:700}
+svg .lbl-bg{fill:var(--card);opacity:.92}
+svg .dim{opacity:.5}
+.trail{display:flex;gap:4px;flex-wrap:wrap;margin:10px 0 0;padding:0;list-style:none}
+.trail li{width:22px;height:6px;border-radius:3px;background:var(--line)}
+.trail li.on{background:var(--accent)}
+dl{margin:0;display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 12px;font-size:15px}
+dt{color:var(--muted)}dd{margin:0}
+.ins{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+.ins details{align-self:start}
+summary{cursor:pointer;font-weight:700}
+footer{font-size:14px;color:var(--muted)}
+@media print{.two>.fig-card{position:static}details{break-inside:avoid}}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <p class="notice" id="notice" hidden></p>
+    <p class="kicker">1. TL;DR</p>
+    <h1 id="h1"></h1>
+    <p id="sub"></p>
+    <p id="why"></p>
+    <small class="src" id="topsrc"></small>
+  </header>
+  <div class="two">
+    <section class="card fig-card">
+      <h2>3. High-level design — 상자를 눌러 본다</h2>
+      <div class="fig" id="fig"></div>
+      <p class="muted" id="read"></p>
+      <div id="node" aria-live="polite"></div>
+      <small class="src" id="hldsrc"></small>
+    </section>
+    <section class="card">
+      <h2 id="lldh"></h2>
+      <p class="muted">상황을 고르고 한 단계씩 넘긴다. 갈림길이 나오면 먼저 고른다. (←/→)</p>
+      <div class="row" id="scs" role="group" aria-label="상황"></div>
+      <ol class="trail" id="trail" aria-hidden="true"></ol>
+      <div id="step" aria-live="polite"></div>
+      <div class="row"><button id="prev">이전</button><button id="next" class="main">다음</button></div>
+    </section>
+  </div>
+  <section>
+    <h2>5. Insights — 먼저 예상하고 펼친다</h2>
+    <div class="ins" id="ins"></div>
+  </section>
+  <footer>
+    <p id="missing"></p>
+    <p id="source"></p>
+  </footer>
+</main>
+<script>
+// ===== 여기만 채운다 =====
+const INTO = {
+  title: "{{주제}} — 눌러 보는 구조",
+  notice: "",   // 비공개 원문이면 "비공개 원문 기반 — 공유 전 이름·경로 확인". 공개 원문이면 빈 문자열
+  tldr: { h: "{{핵심 한 줄}}", sub: "{{보조 1~2줄}}", src: "{{근거}}" },
+  why: { text: "{{한두 줄}}", src: "{{근거}}" },
+  hld: {
+    // c = 열(0~2), r = 행(0부터). 노드 9개 이하. 핵심 경로 노드·간선에 key:true, 추정 간선에 guess:true, 선이 다른 상자를 지나면 bend(px, +아래/오른쪽, -위/왼쪽). 라벨 자리가 모자라면 hld.gx(열 사이 150)·hld.gy(행 사이 78)를 늘린다
+    nodes: [
+      { id: "a", c: 0, r: 0, label: "{{노드 A}}", key: true, role: "{{하는 일}}", in: "{{받는 것}}", out: "{{내보내는 것}}", fail: "{{실패하면}}", src: "{{근거}}" },
+      { id: "b", c: 1, r: 0, label: "{{노드 B}}", key: true, role: "{{하는 일}}", in: "", out: "", fail: "", src: "{{근거}}" }
+    ],
+    edges: [ { from: "a", to: "b", label: "{{오가는 것}}", key: true } ],
+    read: "{{그림을 글로 읽는 한두 줄}}",
+    aria: "{{그림 한 줄 설명}}",
+    src: "{{근거}}"
+  },
+  lld: {
+    zoom: "{{확대한 화살표 라벨 그대로}}",
+    scenarios: [
+      { name: "{{상황 1}}", cond: "{{진입 조건}}", steps: [
+        // edge: ["a","b"] 또는 nodes: ["a"] 로 그림에서 켤 곳을 정한다. branches가 있으면 고르기 전에는 다음으로 못 간다. to = 다음 단계 번호(0부터), -1 = 여기서 끝(통과·성공으로 끝나면 ok:true)
+        // 앞에서 고른 것이 뒤의 선택을 막거나 끝 문구를 바꾸면: 갈래에 set:"거절"(골랐음을 기억), if:"거절"(그때만 고를 수 있음), not:"거절"(그때는 못 고름). 여러 개면 배열. 되돌아가는 갈래는 max:4(고를 수 있는 횟수)
+        { t: "{{단계 제목}}", code: "{{식별자}}", edge: ["a", "b"], do: "{{하는 일}}", fail: "", src: "{{근거}}",
+          branches: [ { label: "{{갈래 1}}", to: 1, note: "{{왜 그렇게 되나}}" }, { label: "{{갈래 2}}", to: -1, note: "{{여기서 끝: 결과}}" } ] },
+        { t: "{{단계 제목}}", code: "", nodes: ["b"], do: "{{하는 일}}", fail: "", src: "{{근거}}" }
+      ], end: "{{끝까지 간 모든 길에서 참인 끝 문구}}" }   // 길마다 끝이 다르면 ends: [{ if: "거절", text: "…" }] (위에서부터 처음 맞는 것, 없으면 end)
+    ]
+  },
+  insights: [ { q: "{{예상하게 하는 질문}}", a: "{{답}}", src: "{{근거}}" } ],
+  missing: "{{빠진 디테일}}",
+  source: "{{원문과 읽은 범위}}"
+};
+// ===== 아래는 동작 코드 =====
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (m) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[m]; }); }
+  function txt(s) { return esc(s).replace(/`([^`]+)`/g, "<code>$1</code>"); }
+  function src(s) { return s ? '<small class="src">근거: ' + txt(s) + "</small>" : ""; }
+  document.title = INTO.title;
+  if (INTO.notice) { $("notice").hidden = false; $("notice").textContent = INTO.notice; }
+  $("h1").innerHTML = txt(INTO.tldr.h); $("sub").innerHTML = txt(INTO.tldr.sub);
+  $("why").innerHTML = "<b>2. 왜 중요한가</b> — " + txt(INTO.why.text);
+  $("topsrc").innerHTML = "근거: " + txt([INTO.tldr.src, INTO.why.src].filter(Boolean).join(" · "));
+  $("read").innerHTML = txt(INTO.hld.read); $("hldsrc").innerHTML = INTO.hld.src ? "근거: " + txt(INTO.hld.src) : "";
+  $("lldh").innerHTML = "4. Low-level design — " + txt(INTO.lld.zoom);
+  $("missing").innerHTML = "빠진 디테일: " + txt(INTO.missing); $("source").innerHTML = "출처: " + txt(INTO.source);
+
+  // ---- 그림: 열·행 격자에 상자를 놓고, 라벨은 상자·다른 라벨과 겹치지 않는 자리를 찾는다
+  var N = {}, BW = 176, BH = 62, GX = INTO.hld.gx || 150, GY = INTO.hld.gy || 78, P = 14;
+  INTO.hld.nodes.forEach(function (n) { N[n.id] = n; n.x = P + n.c * (BW + GX); n.y = P + n.r * (BH + GY); });
+  var cols = Math.max.apply(0, INTO.hld.nodes.map(function (n) { return n.c; })) + 1, rows = Math.max.apply(0, INTO.hld.nodes.map(function (n) { return n.r; })) + 1;
+  var W = P * 2 + cols * BW + (cols - 1) * GX, H = P * 2 + rows * BH + (rows - 1) * GY;
+  function width(s, f) { var w = 0; for (var i = 0; i < s.length; i++) w += /[ᄀ-￿]/.test(s[i]) ? f * 0.94 : f * 0.56; return w; }
+  function wrap(s, max, f) { var out = [], cur = ""; s.split(" ").forEach(function (w) { var t = cur ? cur + " " + w : w; if (width(t, f) <= max || !cur) cur = t; else { out.push(cur); cur = w; } }); if (cur) out.push(cur); return out; }
+  function hit(a, b) { return Math.min(a[2], b[2]) - Math.max(a[0], b[0]) > 1 && Math.min(a[3], b[3]) - Math.max(a[1], b[1]) > 1; }
+  var boxes = INTO.hld.nodes.map(function (n) { return [n.x, n.y, n.x + BW, n.y + BH]; }), used = [], ext = [], svg = "", labels = "", warn = [];
+  function pair(a, b) { return INTO.hld.edges.some(function (e) { return e.from === b && e.to === a; }); }
+  INTO.hld.edges.forEach(function (e, i) {
+    var A = N[e.from], B = N[e.to];
+    if (!A || !B) { warn.push("간선의 노드 없음: " + e.from + "→" + e.to); return; }
+    var ax = A.x + BW / 2, ay = A.y + BH / 2, bx = B.x + BW / 2, by = B.y + BH / 2, two = pair(e.from, e.to), o = two ? 13 : 0;
+    var dx = bx - ax, dy = by - ay, hor = A.c !== B.c, x1, y1, x2, y2;
+    if (hor) { var s = dx > 0 ? 1 : -1; x1 = ax + s * BW / 2; x2 = bx - s * BW / 2; y1 = ay - s * o; y2 = by - s * o; }
+    else { var v = dy > 0 ? 1 : -1; y1 = ay + v * BH / 2; y2 = by - v * BH / 2; x1 = ax - v * o * 2.4; x2 = bx - v * o * 2.4; }
+    var bend = e.bend || 0, mx = (x1 + x2) / 2 + (hor ? 0 : bend), my = (y1 + y2) / 2 + (hor ? bend : 0);
+    function at(t) { var u = 1 - t; return [u * u * x1 + 2 * u * t * mx + t * t * x2, u * u * y1 + 2 * u * t * my + t * t * y2]; }
+    e._p = []; for (var q0 = 0; q0 <= 1.001; q0 += 0.02) e._p.push(at(q0));
+    for (var t = 0.06; t < 0.95; t += 0.04) { var p = at(t); boxes.forEach(function (b, k) { var n = INTO.hld.nodes[k]; if (n !== A && n !== B && p[0] > b[0] + 2 && p[0] < b[2] - 2 && p[1] > b[1] + 2 && p[1] < b[3] - 2) { var m = "간선이 상자를 지남: " + e.from + "→" + e.to + " × " + n.id; if (warn.indexOf(m) < 0) warn.push(m); } }); }
+    e._i = i; e._at = at; e._hor = hor; e._two = two; e._dx = dx; e._dy = dy;
+    svg += '<path class="edge' + (e.key ? " key" : "") + (e.guess ? " guess" : "") + '" id="e' + i + '" d="M' + x1 + "," + y1 + " Q" + mx + "," + my + " " + x2 + "," + y2 + '" marker-end="url(#arr)"/>';
+  });
+  INTO.hld.edges.forEach(function (e, i) {
+    if (e._i == null) return;
+    var at = e._at, hor = e._hor, two = e._two, dx = e._dx, dy = e._dy;
+    var lines = wrap(e.label + (e.guess && e.label.indexOf("추정") < 0 ? " (추정)" : ""), hor ? GX - 4 : 150, 15), lw = Math.max.apply(0, lines.map(function (l) { return width(l, 15); })) + 8, lh = lines.length * 18 + 2, best = null;
+    var cand = []; [0.5, 0.42, 0.58, 0.33, 0.67, 0.25, 0.75].forEach(function (t) { var p = at(t); (hor ? (two && dx < 0 ? [[0, lh / 2 + 5], [0, -lh / 2 - 5]] : [[0, -lh / 2 - 5], [0, lh / 2 + 5]]).concat([[0, 0], [0, -lh - 8], [0, lh + 8]]) : (two && dy > 0 ? [[-lw / 2 - 8, 0], [lw / 2 + 8, 0]] : [[lw / 2 + 8, 0], [-lw / 2 - 8, 0]]).concat([[0, 0]])).forEach(function (d) { cand.push([p[0] + d[0], p[1] + d[1]]); }); });
+    function cross(r) { var w = []; INTO.hld.edges.forEach(function (f) { if (f !== e && f._p && f._p.some(function (p) { return p[0] > r[0] + 3 && p[0] < r[2] - 3 && p[1] > r[1] + 3 && p[1] < r[3] - 3; })) w.push(f.from + "→" + f.to); }); return w; }
+    for (var k = 0; k < cand.length; k++) { var c = cand[k], r = [c[0] - lw / 2, c[1] - lh / 2, c[0] + lw / 2, c[1] + lh / 2]; if (boxes.some(function (b) { return hit(b, r); }) || used.some(function (b) { return hit(b, r); })) continue; var x = cross(r); if (!best || x.length < best.x.length) best = { c: c, r: r, x: x }; if (!x.length) break; }
+    if (best && best.x.length) warn.push("참고: 라벨 위로 다른 선이 지남: " + e.label + " × " + best.x.join(", "));
+    if (!best) { var q = cand[0]; best = { c: q, r: [q[0] - lw / 2, q[1] - lh / 2, q[0] + lw / 2, q[1] + lh / 2] }; warn.push("라벨 자리 없음: " + e.label); }
+    used.push(best.r); e._p.forEach(function (p) { ext.push([p[0], p[1], p[0], p[1]]); });
+    labels += '<g id="l' + i + '"><rect class="lbl-bg" x="' + best.r[0] + '" y="' + best.r[1] + '" width="' + lw + '" height="' + lh + '" rx="3"/>' + lines.map(function (l, j) { return '<text class="lbl" x="' + best.c[0] + '" y="' + (best.r[1] + 15 + j * 18) + '" text-anchor="middle">' + esc(l) + "</text>"; }).join("") + "</g>";
+  });
+  var ns = INTO.hld.nodes.map(function (n) {
+    var ls = wrap(n.label, BW - 16, 17); if (ls.length > 2) warn.push("노드 라벨이 길다: " + n.label);
+    return '<g class="node' + (n.key ? " key" : "") + '" id="n-' + esc(n.id) + '" data-node="' + esc(n.id) + '" tabindex="0" role="button" aria-label="' + esc(n.label) + ' 설명 보기"><rect x="' + n.x + '" y="' + n.y + '" width="' + BW + '" height="' + BH + '" rx="9"/>' + ls.map(function (l, j) { return '<text x="' + (n.x + BW / 2) + '" y="' + (n.y + BH / 2 + 6 + (j - (ls.length - 1) / 2) * 21) + '" text-anchor="middle">' + esc(l) + "</text>"; }).join("") + "</g>";
+  }).join("");
+  var X0 = 0, Y0 = 0, X1 = W, Y1 = H; used.concat(ext).forEach(function (r) { X0 = Math.min(X0, r[0] - 6); Y0 = Math.min(Y0, r[1] - 6); X1 = Math.max(X1, r[2] + 6); Y1 = Math.max(Y1, r[3] + 6); });
+  if (cols > 3) warn.push("열이 3개를 넘는다(글자가 작아진다): " + cols);
+  $("fig").innerHTML = '<svg viewBox="' + [X0, Y0, X1 - X0, Y1 - Y0].join(" ") + '" role="group" aria-label="' + esc(INTO.hld.aria) + '"><defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="context-stroke"/></marker></defs>' + svg + labels + ns + "</svg>";
+
+  function showNode(id, keep) {
+    var n = N[id]; if (!n) return;
+    $("node").innerHTML = "<h3>" + txt(n.label) + "</h3><dl><dt>하는 일</dt><dd>" + txt(n.role) + "</dd>" + (n.in ? "<dt>받는 것</dt><dd>" + txt(n.in) + "</dd>" : "") + (n.out ? "<dt>내보내는 것</dt><dd>" + txt(n.out) + "</dd>" : "") + (n.fail ? "<dt>실패하면</dt><dd>" + txt(n.fail) + "</dd>" : "") + "</dl>" + src(n.src);
+    if (!keep) light({ nodes: [id] }, false);
+  }
+  function light(s, dim) {
+    var ids = (s.nodes || []).concat(s.edge || []);
+    INTO.hld.nodes.forEach(function (n) { var g = $("n-" + n.id); g.classList.toggle("on", ids.indexOf(n.id) >= 0); });
+    INTO.hld.edges.forEach(function (e) { if (e._i == null) return; var on = !!s.edge && e.from === s.edge[0] && e.to === s.edge[1]; $("e" + e._i).classList.toggle("on", on); var g = $("l" + e._i); [].forEach.call(g.querySelectorAll("text"), function (t) { t.classList.toggle("on", on); }); var d = dim && !!s.edge && !on; $("e" + e._i).classList.toggle("dim", d); });
+  }
+  [].forEach.call(document.querySelectorAll("[data-node]"), function (g) { g.addEventListener("click", function () { showNode(g.getAttribute("data-node")); }); g.addEventListener("keydown", function (ev) { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); showNode(g.getAttribute("data-node")); } }); });
+
+  // ---- 한 단계씩
+  var S = INTO.lld.scenarios, si = 0, path = [0], got = [], pick = null, ended = false;
+  function cur() { return S[si].steps[path[path.length - 1]]; }
+  function arr(x) { return x == null ? [] : [].concat(x); }
+  function fits(b, T) { return arr(b.if).every(function (t) { return T.indexOf(t) >= 0; }) && !arr(b.not).some(function (t) { return T.indexOf(t) >= 0; }); }
+  function endText(s, T) { var e = (s.ends || []).filter(function (x) { return fits(x, T); })[0]; return e ? e.text : s.end; }
+  function draw() {
+    $("scs").innerHTML = S.map(function (s, i) { return '<button data-s="' + i + '" aria-pressed="' + (i === si) + '">' + txt(s.name) + "</button>"; }).join("");
+    [].forEach.call($("scs").children, function (b) { b.onclick = function () { si = +b.getAttribute("data-s"); path = [0]; got = []; pick = null; ended = false; draw(); }; });
+    $("trail").innerHTML = S[si].steps.map(function (_, i) { return '<li class="' + (path.indexOf(i) >= 0 ? "on" : "") + '"></li>'; }).join("");
+    var T = [].concat.apply([], got), st = cur(), h = '<p class="muted">시작 조건: ' + txt(S[si].cond) + (S[si].zoom ? "<br>" + txt(S[si].zoom) : "") + "</p>";
+    h += "<h3>" + (path[path.length - 1] + 1) + "단계. " + txt(st.t) + "</h3>" + (st.code ? "<p><code>" + esc(st.code) + "</code></p>" : "") + "<p>" + txt(st.do) + "</p>" + (st.fail ? '<p class="fail">✗ ' + txt(st.fail) + "</p>" : "") + src(st.src);
+    if (st.branches) { h += '<p><b>어느 쪽인가?</b></p><div class="row">' + st.branches.map(function (b, i) { return '<button class="br" data-b="' + i + '" aria-pressed="' + (pick === i) + '"' + (fits(b, T) && !(b.max && T.filter(function (t) { return t === "#" + path[path.length - 1] + "/" + i; }).length >= b.max) ? "" : ' disabled title="앞에서 고른 것과 맞지 않는다"') + ">" + txt(b.label) + "</button>"; }).join("") + "</div>"; if (pick != null) h += "<p>" + txt(st.branches[pick].note) + "</p>"; }
+    var bk = st.branches && pick != null && st.branches[pick].to < 0 ? st.branches[pick] : null;
+    if (ended) h += '<p class="' + (bk && !bk.ok ? "fail" : "") + '"><b>끝.</b> ' + txt(bk ? "이 갈래는 여기서 끝난다." : endText(S[si], T.concat(st.branches ? arr(st.branches[pick].set) : []))) + "</p>";
+    $("step").innerHTML = h;
+    [].forEach.call(document.querySelectorAll(".br"), function (b) { b.onclick = function () { pick = +b.getAttribute("data-b"); ended = !!st.branches[pick] && st.branches[pick].to < 0; draw(); }; });
+    $("prev").disabled = path.length < 2; $("next").disabled = ended || (!!st.branches && pick == null);
+    $("next").textContent = !ended && !st.branches && path[path.length - 1] === S[si].steps.length - 1 ? "끝" : "다음";
+    light(st, true); showNode((st.edge || st.nodes || [])[st.edge ? 1 : 0], true);
+  }
+  function next() { if ($("next").disabled) return; var st = cur(), i = path[path.length - 1], to = st.branches ? st.branches[pick].to : (st.to != null ? st.to : i + 1); if (to < 0 || to >= S[si].steps.length) { ended = true; draw(); return; } got.push(st.branches ? arr(st.branches[pick].set).concat("#" + i + "/" + pick) : []); path.push(to); pick = null; ended = false; draw(); }
+  function prev() { if (path.length < 2) return; path.pop(); got.pop(); pick = null; ended = false; draw(); }
+  $("next").onclick = next; $("prev").onclick = prev;
+  document.addEventListener("keydown", function (ev) { if (/INPUT|TEXTAREA|SUMMARY/.test(document.activeElement.tagName)) return; if (ev.key === "ArrowRight") next(); if (ev.key === "ArrowLeft") prev(); });
+  $("ins").innerHTML = INTO.insights.map(function (x) { return '<details class="card"><summary>' + txt(x.q) + "</summary><p>" + txt(x.a) + "</p>" + src(x.src) + "</details>"; }).join("");
+  draw();
+
+  // 처음부터 끝까지 갈 수 있는 모든 길을 글로 펼친다(한 단계는 길마다 두 번까지). 주소 끝에 #paths를 붙이면 화면 맨 위에 나온다
+  function walk(s, max) {
+    var out = [], stuck = [], more = 0, cut = [], lim = Math.min(4, s.steps.reduce(function (m, st) { return arr(st.branches).reduce(function (n, b) { return Math.max(n, (b.max || 0) + 1); }, m); }, 2));
+    (function go(i, T, seen, t) {
+      if (out.length >= max) { more++; return; }
+      var st = s.steps[i], k = {}, n; for (n in seen) k[n] = seen[n]; k[i] = (k[i] || 0) + 1; if (!st) return; if (k[i] > lim) { cut.push(i + 1); return; }
+      t = t + " → " + (i + 1) + " " + st.t;
+      function leave(to, T2, u, b) { if (to < 0 || to >= s.steps.length) out.push({ t: u + (b && to < 0 ? " ⇒ 끝(" + (b.ok ? (b.ok === true ? "통과" : b.ok) : "중단") + "): " + b.note : " ⇒ 끝: " + endText(s, T2)), shared: !(b && to < 0) && endText(s, T2) === s.end }); else go(to, T2, k, u); }
+      if (!st.branches) { leave(st.to != null ? st.to : i + 1, T, t); return; }
+      var ok = st.branches.filter(function (b, j) { return fits(b, T) && !(b.max && T.filter(function (x) { return x === "#" + i + "/" + j; }).length >= b.max); }); if (!ok.length) stuck.push(i + 1);
+      ok.forEach(function (b) { leave(b.to, T.concat(arr(b.set), "#" + i + "/" + st.branches.indexOf(b)), t + " [" + b.label + "]", b); });
+    })(0, [], {}, s.name + " (" + s.cond + ")");
+    return { out: out, stuck: stuck, more: more, cut: cut };
+  }
+  window.INTO_PATHS = function () { return S.reduce(function (a, s) { var w = walk(s, 150); var pre = []; return a.concat(["■ " + s.name + " (" + s.cond + ")"], [].concat.apply([], s.steps.map(function (st, i) { return ["  " + (i + 1) + " " + st.t + " · " + (st.do || "") + " · 켜짐: " + (st.edge ? st.edge.join("→") : arr(st.nodes).join(", "))].concat(arr(st.branches).map(function (b) { return "      [" + b.label + "] " + b.note + " ⇒ " + (b.to < 0 ? "끝" : b.to + 1); })); })), w.out.map(function (x) { var t = x.t.split(" → "), n = 0; while (n < t.length - 1 && t[n] === pre[n]) n++; pre = t; return n > 1 ? "  〃(앞 " + n + "칸 같음) → " + t.slice(n).join(" → ") : x.t; }), w.more ? [s.name + ": 150개까지만 보였다"] : [], w.cut.length ? [s.name + ": 되풀이가 길어 접은 길 " + w.cut.length + "개(" + w.cut.filter(function (x, i) { return w.cut.indexOf(x) === i; }).join(", ") + "단계로 다시 돌아감). 한 번 더 돌 때도 참인지 따로 읽는다"] : []); }, []); };
+  if (location.hash === "#paths") { var pre = document.createElement("pre"); pre.textContent = INTO_PATHS().join("\n"); pre.style.whiteSpace = "pre-wrap"; document.body.insertBefore(pre, document.body.firstChild); }
+
+  // 자동 점검: 겹침·없는 노드·닿지 않는 단계·끝나지 않는 갈래를 돌려준다
+  window.INTO_CHECK = function () {
+    var w = warn.slice();
+    S.forEach(function (s) {
+      var seen = {}, q = [0], end = false, L = s.steps.length, sets = [], merge = [];
+      s.steps.forEach(function (st, i) {
+        arr(st.branches).forEach(function (b) { sets = sets.concat(arr(b.set)); if (!(b.to === -1 || (b.to >= 0 && b.to < L && b.to % 1 === 0))) w.push(s.name + " " + (i + 1) + "단계: 없는 곳으로 가는 갈래 " + b.label + " (to: " + b.to + ")"); });
+        if (st.to != null && !(st.to === -1 || (st.to >= 0 && st.to < L && st.to % 1 === 0))) w.push(s.name + " " + (i + 1) + "단계: 없는 곳으로 간다 (to: " + st.to + ")");
+        var tos = arr(st.branches).map(function (b) { return b.to; }); tos.forEach(function (t, j) { var k = tos.indexOf(t); if (t >= 0 && k < j && String(arr(st.branches[k].set)) === String(arr(st.branches[j].set))) merge.push((i + 1) + "단계(" + st.branches[k].label + " / " + st.branches[j].label + " → " + (t + 1) + ")"); });
+      });
+      if (L > 10) w.push("참고: " + s.name + ": 단계 " + L + "개(한도 10)");
+      if (merge.length) w.push("참고: " + s.name + ": 상태를 남기지 않고 합쳐지는 갈래 — " + merge.join(", "));
+      var G = walk(s, 60), shared = G.out.filter(function (x) { return x.shared; }).length;
+      G.stuck.forEach(function (i) { w.push(s.name + " " + i + "단계: 앞의 선택과 맞는 갈래가 없다"); });
+      if (shared > 1) w.push("참고: " + s.name + ": 길 " + shared + "개가 끝 문구 하나를 함께 쓴다. INTO_PATHS()로 모두 참인지 읽는다");
+      [].concat.apply([], s.steps.map(function (st) { return arr(st.branches); })).concat(s.ends || []).forEach(function (b) { arr(b.if).concat(arr(b.not)).forEach(function (t) { if (sets.indexOf(t) < 0) w.push(s.name + ": 아무 갈래도 정하지 않는 상태 " + t); }); });
+      while (q.length) { var i = q.pop(); if (seen[i]) continue; seen[i] = 1; var st = s.steps[i]; if (!st) { w.push(s.name + ": 없는 단계 번호 " + i); continue; }
+        (st.nodes || []).concat(st.edge || []).forEach(function (id) { if (!N[id]) w.push(s.name + " " + (i + 1) + "단계: 없는 노드 " + id); });
+        if (!st.nodes && !st.edge) w.push(s.name + " " + (i + 1) + "단계: 그림에서 켤 곳 없음");
+        if (st.edge && !INTO.hld.edges.some(function (e) { return e.from === st.edge[0] && e.to === st.edge[1]; })) w.push(s.name + " " + (i + 1) + "단계: 그림에 없는 간선 " + st.edge.join("→"));
+        (st.branches ? st.branches.map(function (b) { return b.to; }) : [st.to != null ? st.to : i + 1]).forEach(function (t) { if (t < 0 || t >= s.steps.length) end = true; else q.push(t); }); }
+      s.steps.forEach(function (_, i) { if (!seen[i]) w.push(s.name + ": 닿지 않는 단계 " + (i + 1)); });
+      if (!end) w.push(s.name + ": 끝나지 않음");
+      Object.keys(seen).forEach(function (a) { var v = {}, p = [+a], out = false; while (p.length) { var i = p.pop(); if (v[i] || !s.steps[i]) continue; v[i] = 1; var st = s.steps[i]; (st.branches ? st.branches.map(function (b) { return b.to; }) : [st.to != null ? st.to : i + 1]).forEach(function (t) { if (t < 0 || t >= L) out = true; else p.push(t); }); } if (!out) w.push(s.name + " " + (+a + 1) + "단계: 여기서 끝으로 나갈 수 없다"); });
+    });
+    INTO.hld.nodes.forEach(function (n) { ["role", "src"].forEach(function (k) { if (!n[k]) w.push("노드 " + n.id + ": " + k + " 없음"); }); });
+    return w;
+  };
+})();
+</script>
+</body>
+</html>
