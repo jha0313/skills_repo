@@ -1,42 +1,88 @@
-# 에이전트 스킬 모음
+# 실밸개발자가 매일 쓰는 에이전트 스킬
 
-최근 추가한 세 스킬은 한국어 사용자를 위한 지침·예시·실행 안내를 제공한다.
+> AI에게 일을 맡기면 세 가지가 남는다. **이해하기, 확인하기, 다음에 볼 것 고르기.** 이 저장소는 그 세 가지를 줄이는 스킬이다.
 
-| 스킬 | 하는 일 |
+[English](README.en.md) · [변경 기록](CHANGELOG.md) · [기여](CONTRIBUTING.md) · MIT
+
+```bash
+npx skills add jha0313/skills_repo            # 골라서 설치
+npx skills add jha0313/skills_repo --skill into
+```
+
+Claude Code 플러그인으로도 된다: `/plugin marketplace add jha0313/skills_repo` → `/plugin install silbal@silbal`
+
+**2분 안에 해 보기** — 저장소나 PR 하나를 골라 `into eli5 <URL>`. 그다음 같은 것에 `into interactive`.
+
+## 어떤 때 쓰나
+
+### 이해한다 — "에이전트가 잘했다는데 무슨 말인지 모르겠다"
+
+| 스킬 | 한 줄 | 확인한 것 |
+|---|---|---|
+| [into](into/README.md) | PR·저장소·논문·영상·글·스킬을 유형마다 정해진 틀로 짧게 바꾼다: eli5 · ste · html · interactive · doc · slides · test · shorts · video · 전문가 과정 | {{INTO_EVIDENCE}} |
+
+### 맡긴다 — "세션이 열 개인데 뭘 먼저 봐야 하지"
+
+| 스킬 | 한 줄 | 확인한 것 |
+|---|---|---|
+| [chief-of-staff](chief-of-staff/README.md) | 여러 프로젝트를 비서실장 세션 하나에 맡기고, 오늘 볼 것 3개만 받는다 | 테스트 50개 |
+| [workflow-orchestrator](workflow-orchestrator/README.md) | 한 작업을 조사·계획·구현·검증·리뷰로 나눠 끝까지 위임한다 | 행동 평가 사례 10개 |
+
+### 검증한다 — "통과했다는데 정말?"
+
+| 스킬 | 한 줄 | 확인한 것 |
+|---|---|---|
+| [codex-review](codex-review/README.md) | 다른 회사 모델에게 리뷰를 맡기고, 돌아온 지적을 확인한 뒤에만 반영한다 | 테스트 25개(가짜 codex) |
+| [skill-evaluator](skill-evaluator/README.md) | 스킬을 격리된 세션에서 돌려 사례마다 근거와 함께 채점한다 | 테스트 45개 |
+| [eval-writer](eval-writer/README.md) | 스킬의 평가 기준을 먼저 쓴다 | skill-evaluator로 검사 |
+| [skills-lint](skills-lint/README.md) | 설치된 스킬의 규격 위반·겹침·깨진 링크를 찾는다 | 테스트 26개 |
+
+### 매일 정리한다 — "또 이거"
+
+| 스킬 | 한 줄 | 확인한 것 |
+|---|---|---|
+| [time-convert](time-convert/README.md) | 시간대·요일·남은 시간을 머리로 세지 않는다 | 테스트 28개 |
+| [disk-cleanup-analyzer](disk-cleanup-analyzer/README.md) | 맥 용량을 나눠 보여 주되 AI 세션 작업 폴더는 지키게 한다 | 테스트 43개 |
+| [improve-token-efficiency](improve-token-efficiency/README.md) | 세션 기록으로 프로젝트별 토큰·비용을 본다 | 테스트 38개 · 가격 확인 2026-11-24 |
+
+### 저장소를 준비한다 — "에이전트가 자꾸 헤맨다"
+
+| 스킬 | 한 줄 | 확인한 것 |
+|---|---|---|
+| [ai-readiness-cartography](ai-readiness-cartography/README.md) | 에이전트가 일하기 좋은 저장소인지 100점으로 재고 지도를 그린다 | 테스트 34개 |
+
+"확인한 것"은 **돌려 본 것만** 적는다. 테스트 통과는 스크립트가 약속대로 움직인다는 뜻이고, 결과물이 언제나 맞다는 뜻은 아니다.
+
+## 만드는 원칙
+
+1. **정해진 동작은 코드로, 판단만 에이전트에게.** 세기·검사·배치는 스크립트, 무엇이 중요한지는 에이전트.
+2. **관문이 있다.** 근거가 없으면 다음 단계로 가지 않는다.
+3. **지우고 보내는 일은 매번 묻는다.** 기본은 꺼짐.
+4. **짧게.** `SKILL.md`는 100줄 안쪽. 지워도 행동이 바뀌지 않는 문장은 지운다.
+
+## 함께 쓰는 남의 스킬
+
+직접 만들지 않았고 여기 복사해 두지도 않았다. 각 저장소의 안내를 따른다.
+
+| 무엇 | 어디에 |
 |---|---|
-| [workflow-orchestrator](workflow-orchestrator/README.md) | 조사·계획·구현·검증·리뷰를 작업자에게 맡기고 조율자는 의존성과 근거를 관리한다. |
-| [eval-writer](eval-writer/README.md) | 대상 스킬 계약에서 재현 가능한 평가 사례와 루브릭을 작성·검토한다. |
-| [skill-evaluator](skill-evaluator/README.md) | 격리된 실제 실행, 독립 채점, 근거 보존, 한국어 로컬 HTML/Markdown 보고서를 제공한다. |
-| [into](into/README.md) | 에이전트 답·PR·문서·논문·영상·글을 같은 다섯 칸(TL;DR → 왜 중요한가 → HLD → LLD → Insights)으로 바꾸고, eli5·ste·doc·html·interactive·slides·test·shorts·video로 다시 만든다. `into domain-expert`는 한 분야를 조사해 전문가 과정(Easy → 심화)을 만든다. |
+| 발표·대시보드 HTML | [visualize](https://github.com/careerhackeralex/visualize) (MIT) |
+| HTML을 MP4로 | [hyperframes](https://github.com/heygen-com/hyperframes) (Apache-2.0) |
+| 캐묻기·다시 쓰기 같은 일반 개발 스킬 | [mattpocock/skills](https://github.com/mattpocock/skills) (MIT) |
 
-## 설치
+같은 사람이 만든 다른 저장소: [harness_framework](https://github.com/jha0313/harness_framework) · [second-brain-eval-kit](https://github.com/jha0313/second-brain-eval-kit) · [agentic-eng-plugin](https://github.com/jha0313/agentic-eng-plugin)
 
-호스트의 스킬 설치 방식을 따른다. Claude Code에서 폴더를 직접 설치하려면 저장소 루트에서 아래처럼 실행할 수 있다. 기존 대상이 있으면 덮어쓰지 않고 건너뛴다.
+## 지원 종료
 
-```bash
-mkdir -p ~/.claude/skills
-for skill in workflow-orchestrator eval-writer skill-evaluator; do
-  if [ -e "$HOME/.claude/skills/$skill" ] || [ -L "$HOME/.claude/skills/$skill" ]; then
-    printf '기존 설치 보존: %s\n' "$skill"
-  else
-    cp -R "$skill" "$HOME/.claude/skills/$skill"
-  fi
-done
-```
+| 스킬 | 대신 |
+|---|---|
+| [presentation_slides](presentation_slides/SKILL.md) | [visualize](https://github.com/careerhackeralex/visualize) 또는 `into slides` |
+| [ai-readiness-cartography-en](ai-readiness-cartography-en/README.md) | [ai-readiness-cartography](ai-readiness-cartography/README.md) `--lang en` |
 
-SKILL.md만 복사하지 말고 폴더 전체를 설치한다. Codex 등 다른 호스트는 해당 호스트의 스킬 경로를 사용한다. workflow-orchestrator에는 호스트의 subagent 기능이 필요하다. eval-writer·skill-evaluator의 실제 실행은 Python 3.11+, uv, 필요한 native eval 기능이 있는 인증된 Claude Code가 필요하다. 설치가 그 기능·권한을 대신 제공하지는 않는다.
+설치한 사람의 경로가 깨지지 않게 폴더는 남기고 안내만 둔다. 자료: [claude-md-management 플러그인 설명](claude-md-management-plugin-explained.html)
 
-```bash
-uv run skill-evaluator/scripts/evaluate.py doctor
-uv run skill-evaluator/scripts/evaluate.py --help
-```
+## 설치 뒤
 
-## 한국어 사용 예
-
-```text
-workflow-orchestrator로 이번 기능을 개발해보자. 중요한 결정은 나에게 물어보자.
-eval-writer로 이 스킬의 평가 기준을 먼저 만들자.
-skill-evaluator로 검토한 기준을 실행하고 실제 결과와 근거를 보여주자.
-```
-
-명령·flag·스키마 키·enum·스킬 이름·계약상 정확한 인용·과거 실행 근거는 원문을 유지한다. 새 안내·평가 설명·보고서 화면은 한국어이며 원시 근거를 번역해 실측 내용을 바꾸지 않는다. 기존 다른 스킬과 설명 자료는 각 폴더에 그대로 있다.
+- 스킬은 폴더 전체가 있어야 한다(`SKILL.md`만 복사하지 않는다). 손으로 넣으려면 `~/.claude/skills/<이름>/`에 폴더째 복사한다. 이미 있으면 덮어쓰지 않게 먼저 확인한다.
+- `skill-evaluator`·`eval-writer`는 Python 3.11+, `uv`, 인증된 Claude Code가 필요하다. `codex-review`는 로그인된 Codex CLI가 필요하다. 나머지는 `python3`만 있으면 된다.
+- 지우기: `npx skills remove <이름>`
