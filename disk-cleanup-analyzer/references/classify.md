@@ -8,17 +8,19 @@
 
 | 흔한 경로 | 승인 전 조회(캐시를 지우지 않음) | 정리 명령(승인 뒤) | 다시 만들어지는 것 |
 |---|---|---|---|
-| `~/.npm/_cacache` | `npm config get cache` | `npm cache clean --force` | 다음 설치 때 다시 내려받음 |
+| `~/.npm/_cacache` | `npm config get cache --logs-max=1000000 --no-update-notifier` → 지울 경로는 `<출력>/_cacache` | `npm cache clean --force` | 다음 설치 때 다시 내려받음 |
 | `~/.cache/uv` | `uv cache dir`, `uv cache size` | `uv cache prune`(덜 지움) / `uv cache clean` | 다시 내려받고 빌드 |
 | `~/Library/Caches/pip` | `pip3 cache dir`, `pip3 cache info` | `pip3 cache purge` | 다시 내려받음 |
-| pnpm store | `pnpm store path` | `pnpm store prune` | 안 쓰는 패키지만 지움. 다음 설치가 느려질 수 있음 |
-| `~/Library/Caches/Homebrew` | `brew --cache`, `brew cleanup -n --prune=all`(지울 목록만) | `brew cleanup --prune=all` | 내려받은 것만. **옛 버전과 안 쓰는 의존 프로그램 등 캐시 밖도 지운다.** 그 목록은 따로 승인받는다 |
+| pnpm store | `pnpm store path` | 안내만: `pnpm store prune` | 안 쓰는 패키지. 저장소 밖의 만료된 dlx 캐시와 전역 설치 잔여도 지운다 |
+| `~/Library/Caches/Homebrew` | `brew --cache`, `brew cleanup -n --prune=all`(지울 목록만) | 안내만: `brew cleanup --prune=all` | 내려받은 것만. 캐시 밖의 옛 버전, 안 쓰는 의존 프로그램, 잠금 파일도 지운다 |
 
 **승인 전에는 조회 칸의 명령만 친다.** 나머지 크기는 `scan.py <경로>`로 잰다. npm에는 안전한 dry-run이 없다: 11.8은 `--force`가 있으면 `--dry-run`을 줘도 캐시를 지운다(`lib/commands/cache.js`). uv·pip·pnpm의 정리 명령에도 dry-run이 없다. 다른 도구의 dry-run은 도움말과 소스로 지우지 않음을 확인하기 전에는 치지 않는다.
 
-조회도 흔적은 남긴다. npm은 명령마다 자기 로그를 쓰고 오래된 로그를 줄인다(기본 10개). `pnpm store path`는 임시 파일을 만들었다 지운다. `brew cleanup -n`은 지우지 않지만 목록에 안 나오는 것이 있다(잠금 파일, `.DS_Store`, 참조 없는 다운로드). 물을 때 같이 알린다.
+**안내만**인 명령은 네가 치지 않고 그 폴더도 지우지 않는다. 경로 승인보다 넓게 지우고, 미리보기에 다 나오지도 않는다(`brew cleanup -n`은 잠금 파일을 안 보여 준다). 미리보기와 함께 무엇을 더 지우는지 알리고, 사용자가 직접 치게 한다.
 
-경로 하나의 승인은 그 경로까지다. 조회 결과에 캐시 밖 대상이 있으면 그 목록도 보여 주고 따로 승인받는다. 거절하면 그 명령을 쓰지 않는다.
+npm은 옵션 없이 부르면 조회만 해도 로그를 10개만 남기고 지운다. 칸의 두 옵션을 빼지 않는다(로그 하나는 새로 생긴다). `pnpm store path`는 자기 임시 파일을 만들었다 지운다.
+
+경로 하나의 승인은 그 경로까지다. 정리 명령이 그 밖도 지우면 **안내만**으로 다룬다.
 
 오프라인이거나 사내 저장소 접근이 끊겼으면 다시 받을 수 없다. 그때는 ②다.
 

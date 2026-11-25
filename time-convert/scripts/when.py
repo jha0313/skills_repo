@@ -189,8 +189,16 @@ def convert(a):
     src, src_label = resolve(a.src, places)
     tz = ZoneInfo(src)
     now = dt.datetime.now(UTC)
+    notes, warnings = [], []
+
+    def check_weekday(said, day, where=""):
+        warnings.extend(f"{where}{day:%Y-%m-%d}는 {WEEK[d]}요일이 아니라 {WEEK[day.weekday()]}요일이다({src_label} 기준)"
+                        for d in said if d != day.weekday())
+
     if a.now:
-        base = instants(parse(a.now, now.astimezone(tz))[0], tz)
+        base_naive, said, _ = parse(a.now, now.astimezone(tz))
+        check_weekday(said, base_naive, "--now의 ")
+        base = instants(base_naive, tz)
         if not base:
             raise Bad(f"--now가 {src}에 없는 시각이다")
         if len(base) == 2:
@@ -204,14 +212,12 @@ def convert(a):
         if zone not in seen:
             seen.add(zone)
             targets.append((zone, label))
-    notes, warnings = [], []
     if a.when.strip().lower() == "now":
         moments, naive = [now], now.astimezone(tz).replace(tzinfo=None)
     else:
         naive, said, notes = parse(a.when, now.astimezone(tz))
         moments = instants(naive, tz)
-        warnings += [f"{naive:%Y-%m-%d}는 {WEEK[d]}요일이 아니라 {WEEK[naive.weekday()]}요일이다({src_label} 기준)"
-                     for d in said if d != naive.weekday()]
+        check_weekday(said, naive)
         if len(moments) == 2:
             warnings.append(f"{naive:%Y-%m-%d %H:%M}은 {src_label}에서 두 번 온다(시계가 뒤로 감). 어느 쪽인지 정해야 한다")
         if not moments:

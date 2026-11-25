@@ -33,7 +33,7 @@ metadata:
    ```bash
    python3 -I <스킬>/scripts/analyze_sessions.py --repo . --out-dir ./token-report
    ```
-   기록 폴더를 자동으로 찾지 못하면 `--sessions-dir <폴더>`로 받는다. 제목은 `--label <이름>`으로 바꾼다.
+   기록 폴더를 자동으로 찾지 못하면 `--repo`는 그대로 두고 `--sessions-dir <폴더>`를 더한다. 제목은 `--label <이름>`으로 바꾼다.
    - 완료 기준: `[ok]`가 나오고 `token-analysis.json`이 생겼다. 종료 코드 2면 "셀 기록이 없다"고 알리고 끝낸다.
    - **`[ok]`가 없으면 다음 단계로 가지 않는다.**
 3. **경고를 처리한다.** `[warn]`이 있으면:
@@ -54,7 +54,7 @@ metadata:
 - 출력: 두 스크립트의 `[ok]`·`[warn]` 줄을 그대로 보여 준다.
 - 중복 제거: 한 응답이 여러 줄로 적히므로 메시지 id + requestId로 한 번만 센다. 뺀 줄 수는 `notes.duplicate_lines`.
 - 하위 에이전트 기록(`<세션>/subagents/`)은 부모 세션에 더한다.
-- 프로젝트 구분: 기록의 `cwd`로 가른다. 뺀 건수는 `notes.other_project_*`, `notes.unclear_project_*`. `--sessions-dir`로 고른 폴더는 가르지 않는다.
+- 프로젝트 구분: 기록의 `cwd`로 가른다. 뺀 건수는 `notes.other_project_*`, `notes.unclear_project_*`. `--repo` 없이 `--sessions-dir`만 주면 가르지 않는다.
 - 가격: `references/pricing.json` 하나. 확인일과 출처가 들어 있다. fast 모드, 미국 전용 추론, 긴 프롬프트 가격도 여기서 읽는다.
 - 스크립트를 고쳤으면 `python3 -I <스킬>/tests/run_tests.py`를 돌려 통과를 보여 준다.
 

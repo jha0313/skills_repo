@@ -377,11 +377,12 @@ def write_private(path, text):
 
 def main():
     ap = argparse.ArgumentParser(description="Claude Code 세션 기록에서 토큰과 API 정가 환산액을 집계한다.")
-    ap.add_argument("--repo", default=".", help="프로젝트 경로(기본: 현재 폴더)")
-    ap.add_argument("--sessions-dir", help="기록 폴더를 직접 지정")
+    ap.add_argument("--repo", help="프로젝트 경로(기본: 현재 폴더). 이 프로젝트의 cwd로 적힌 기록만 센다")
+    ap.add_argument("--sessions-dir", help="기록 폴더를 직접 지정. --repo 없이 쓰면 프로젝트를 가르지 않는다")
     ap.add_argument("--out-dir", default="./token-report", help="결과 폴더(기본: ./token-report)")
     ap.add_argument("--label", help="보고서 제목에 쓸 이름(기본: 프로젝트 폴더 이름)")
     args = ap.parse_args()
+    repo = args.repo or (None if args.sessions_dir else ".")
 
     try:
         pricing = load_pricing()
@@ -391,14 +392,14 @@ def main():
     if args.sessions_dir:
         sessions_dir = Path(args.sessions_dir).expanduser()
     else:
-        sessions_dir = find_sessions_dir(args.repo, Path("~/.claude/projects").expanduser())
+        sessions_dir = find_sessions_dir(repo, Path("~/.claude/projects").expanduser())
     if not sessions_dir or not sessions_dir.is_dir():
         print("[error] 분석할 세션 기록 폴더가 없다. 이 경로에서 Claude Code를 쓴 적이 없거나 기록이 지워졌다.", file=sys.stderr)
         sys.exit(2)
 
-    label = args.label or ("Claude Code 세션" if args.sessions_dir else Path(os.path.abspath(args.repo)).name)
+    label = args.label or (Path(os.path.abspath(repo)).name if repo else "Claude Code 세션")
     today = datetime.date.today()
-    owner_of = None if args.sessions_dir else owner_finder(args.repo)
+    owner_of = owner_finder(repo) if repo else None
     result = analyze(session_files(sessions_dir), pricing, label, today, owner_of)
     n = result["notes"]
     for key, why in (("other_project", "기록 폴더 이름이 같은 다른 프로젝트의"), ("unclear_project", "cwd로 어느 프로젝트인지 알 수 없는")):

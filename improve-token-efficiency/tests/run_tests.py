@@ -270,6 +270,17 @@ class SameFolderName(Case):
         self.assertEqual(r.returncode, 2)
         self.assertIn("다른 프로젝트", r.stderr)
 
+    def test_폴더를_직접_골라도_repo를_적으면_가른다(self):
+        self.write("aaaa.jsonl", at(self.ours, line("a", "a", inp=10)), folder=self.logs)
+        self.write("bbbb.jsonl", at(self.other, line("b", "b", inp=90)), folder=self.logs)
+        out = self.tmp / "out"
+        r = self.cli("analyze_sessions.py", "--repo", self.ours, "--sessions-dir", self.logs, "--out-dir", out)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        data = json.loads((out / "token-analysis.json").read_text())
+        self.assertEqual((data["totals"]["input"], data["label"]), (10, "my_app"))
+        self.assertEqual([s["session_id"] for s in data["sessions"]], ["aaaa"])
+        self.assertEqual(data["notes"]["other_project_tokens"], 90)
+
     def test_폴더를_직접_고르면_가르지_않는다(self):
         self.write("bbbb.jsonl", at(self.other, line("b", "b", inp=90)), folder=self.folder)
         r = self.cli("analyze_sessions.py", "--sessions-dir", self.folder, "--out-dir", self.tmp / "out")

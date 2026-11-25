@@ -21,6 +21,7 @@ SECRET_NAME = re.compile(r"(?:^|/)(?:\.env(?:\.(?!example$)[^/]+)?|id_(?:rsa|ed2
 LEAKS = [
     ("개인 절대 경로", re.compile(r"(?<![A-Za-z0-9])/(?:Users|home)/(?!(?:me|you|user|name|<[^>]+>|\$|runner|\.\.\.|…)\b)[A-Za-z0-9._-]+")),
     ("이메일", re.compile(r"[A-Za-z0-9._%+-]+@(?!example\.|anthropic\.com|users\.noreply)[A-Za-z0-9-]+\.(?:com|net|org|io|kr|ai)\b")),
+    ("개인키", re.compile(r"-----BEGIN (?:[A-Z]+ )*PRIVATE KEY-----")),
     ("토큰 모양", re.compile(r"\b(?:sk-(?:ant-|proj-)?[A-Za-z0-9]{20,}|gh[pousr]_[A-Za-z0-9]{20,}|xox[abprs]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{30,})")),
 ]
 problems = []
@@ -48,10 +49,25 @@ def frontmatter(path):
 
 
 def links(text):
-    """코드 블록·인라인 코드 밖의 상대 링크."""
-    text = re.sub(r"^[ \t]*(```+|~~~+).*?^[ \t]*\1", "", text, flags=re.S | re.M)
-    text = re.sub(r"`[^`\n]*`", "", text)
-    return [x for x in re.findall(r"\]\(([^)#\s]+)", text) if not re.match(r"[a-z]+:", x) and "{" not in x and "<" not in x]
+    """코드 블록·인라인 코드 밖의 상대 링크. 목록 안 펜스는 펜스로, 네 칸 들여쓴 줄(목록 밖)은 들여쓰기 코드로 본다."""
+    out, fence, inner = [], "", 0  # inner: 지금 목록 항목의 본문이 시작하는 칸
+    for line in text.splitlines():
+        ind = len(line) - len(line.lstrip(" "))
+        f = re.match(r" *(```+|~~~+)", line)
+        if fence:
+            if f and f.group(1).startswith(fence) and not line.strip().strip("`~"):
+                fence = ""
+            continue
+        item = re.match(r" *(?:[-*+]|\d+[.)]) +", line)
+        if item and ind < inner + 4:
+            inner = len(item.group(0))
+        elif line.strip() and ind < inner:
+            inner = 0
+        if f and ind < inner + 4:
+            fence = f.group(1)
+        elif ind < inner + 4:
+            out.append(re.sub(r"`[^`\n]*`", "", line))
+    return [x for x in re.findall(r"\]\(([^)#\s]+)", "\n".join(out)) if not re.match(r"[a-z]+:", x) and "{" not in x and "<" not in x]
 
 
 def skills():
@@ -125,8 +141,10 @@ def check_leaks(deny):
         for w in deny:
             if w.lower() in name.lower():
                 bad(rel, "금칙어(경로·링크)")
-        if p.is_symlink() and any(rx.search(name) for _, rx in LEAKS):
-            bad(rel, "링크 대상에 개인 값")
+        if p.is_symlink():  # 본문은 이 저장소에 실리지 않는다
+            if any(rx.search(name) for _, rx in LEAKS):
+                bad(rel, "링크 대상에 개인 값")
+            continue
         if not p.is_file():
             continue
         if SECRET_NAME.search(rel):

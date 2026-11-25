@@ -354,6 +354,11 @@ class Package(Base):
         for text in (worker, projects):
             self.assertIn("비서실장이 실행한다", text)
 
+    def test_late_push_approval_goes_to_the_same_ship_worker(self):
+        """커밋에서 멈춘 뒤 push를 승인받아도 실행자는 SKILL.md 6단계와 같다."""
+        resume = (SKILL / "references/dispatch.md").read_text("utf-8").split("## 이어 시키기")[1].split("## ")[0]
+        self.assertRegex(resume, "push와 PR.*비서실장은 하지 않고.*지시.*ship 작업자")
+
     def test_interrupted_approval_looks_outside_first(self):
         for doc in ("SKILL.md", "assets/decisions.md"):
             self.assertIn("실행 시작", (SKILL / doc).read_text("utf-8"), doc)

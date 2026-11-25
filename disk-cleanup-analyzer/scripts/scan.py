@@ -29,6 +29,7 @@ class Scan:
     def __init__(self, depth, min_dir, min_file):
         self.depth, self.min_dir, self.min_file = depth, min_dir, min_file
         self.dirs, self.files, self.denied, self.seen = [], [], [], set()
+        self.volumes = []   # 걷지 않은 다른 볼륨
 
     def add_file(self, path, st):
         if st.st_nlink > 1:
@@ -56,6 +57,8 @@ class Scan:
                 self.denied.append(e.path)
                 continue
             self.note(e.path, st)
+            if st.st_dev != dev:
+                self.volumes.append(e.path)
             if e.is_dir(follow_symlinks=False):
                 size, when = self.walk(e.path, dev, level + 1) if st.st_dev == dev else (0, 0)
             else:
@@ -104,26 +107,27 @@ def table(rows, top):
 
 
 def fingerprint(path):
-    """((크기, 최근 수정 ns, 하위 목록 해시), 읽지 못한 곳). 해시는 경로 순으로 정렬한 (상대 경로, 종류, 크기, mtime_ns) 목록의 것이다."""
+    """((크기, 최근 수정 ns, 하위 목록 해시), 확인하지 못한 곳). 해시는 경로 순으로 정렬한 (상대 경로, 종류, 크기, mtime_ns) 목록의 것이다."""
     s = Scan(0, float("inf"), float("inf"))
     s.items = []
     size, when = s.measure(path)
     h = hashlib.sha256()
     for p, *rest in sorted(s.items):
         h.update(repr((p[len(path):], *rest)).encode())
-    return (size, when, h.hexdigest()), s.denied
+    return (size, when, h.hexdigest()), [("읽지 못함", p) for p in s.denied] + [("다른 볼륨", p) for p in s.volumes]
 
 
 def check(records):
-    """기록과 지금이 모두 같으면 0, 다른 것이 있으면 1, 읽지 못한 곳이 있으면 2."""
+    """기록과 지금이 모두 같으면 0, 다른 것이 있으면 1, 확인하지 못한 곳이 있으면 2."""
     code = 0
     for path, old in records:
-        now, denied = fingerprint(path)
-        result = 2 if denied else int(now != old)
+        now, unsure = fingerprint(path)
+        result = 2 if unsure else int(now != old)
         code = max(code, result)
         print(f"{['같음', '달라짐', '확인 못 함'][result]}: {shell(path)}")
-        print(f"  기록 {shown(*old[:2])} / 지금 {shown(*now[:2])}" + (f", 읽지 못한 곳 {len(denied)}개" if denied else
-              ", 하위 목록 다름" if now[2] != old[2] else ""))
+        print(f"  기록 {shown(*old[:2])} / 지금 {shown(*now[:2])}" + (", 하위 목록 다름" if result == 1 and now[2] != old[2] else ""))
+        for why, p in unsure:
+            print(f"  {why}: {shell(p)}")
     return code
 
 
@@ -167,9 +171,9 @@ def main(argv):
         return check(records)
     if a.record:
         got = [(p, *fingerprint(p)) for p in paths]
-        for p, _, denied in got:
-            if denied:
-                ap.error(f"{p}: 읽지 못한 곳이 {len(denied)}개 있어 기록하지 않는다")
+        for p, _, unsure in got:
+            if unsure:
+                ap.error(f"{p}: 확인하지 못한 곳이 있어 기록하지 않는다\n" + "\n".join(f"  {why}: {shell(x)}" for why, x in unsure))
         print(json.dumps([dict(path=p, bytes=b, mtime_ns=t, list=h, shown=shown(b, t)) for p, (b, t, h), _ in got],
                          ensure_ascii=False, indent=1))
         return 0

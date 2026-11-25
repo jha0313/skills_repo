@@ -108,6 +108,28 @@ class Evidence(Base):
         self.write("services/api/pyproject.toml")
         self.assertEqual(self.cats()["E"].sub_scores["E3_TaskValidation"], 2)
 
+    def test_virtualenvs_and_installed_packages_are_not_explored(self):
+        self.write("src/app.py")
+        self.write("CLAUDE.md", "# demo\n")
+        before = score.build_report(self.repo, "ko")
+        for d in (".tox/py312/lib/python3.12/site-packages", ".nox/t/lib", "vendor/site-packages",
+                  "env/lib", "my-tools/lib", "packages/py-env/lib", "node_modules"):
+            self.write(f"{d}/demo/pyproject.toml")
+            self.write(f"{d}/demo/mod.py")
+            self.write(f"{d}/demo/README.md", "`src/none.py`\n")
+            self.write(f"{d}/demo/agent-results.json", "{}")
+        for d in ("env", "my-tools", "packages/py-env"):   # 이름이 무엇이든 가상환경
+            self.write(f"{d}/pyvenv.cfg", "home = /usr/bin\n")
+        after = score.build_report(self.repo, "ko")
+        for k, c in before.categories.items():
+            self.assertEqual((after.categories[k].score, after.categories[k].evidence), (c.score, c.evidence), k)
+        self.assertEqual(after.meta["modules_total"], before.meta["modules_total"])
+        self.assertEqual(after.meta["context_files_total"], before.meta["context_files_total"])
+
+    def test_folder_named_env_without_pyvenv_cfg_is_explored(self):
+        self.write("env/service/pyproject.toml")
+        self.assertEqual(self.cats()["E"].sub_scores["E3_TaskValidation"], 2)
+
     def test_checkout_location_does_not_change_the_score(self):
         totals = []
         for parent in ("plain", ".cache", "build"):

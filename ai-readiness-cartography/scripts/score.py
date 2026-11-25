@@ -29,6 +29,7 @@ IGNORE_DIRS = {
     "node_modules", ".venv", "venv", ".git", ".next", "dist", "build",
     "__pycache__", ".turbo", ".ruff_cache", ".pytest_cache", ".mypy_cache",
     "target", "out", "coverage", ".cache", ".idea", ".vscode",
+    ".tox", ".nox", "site-packages",
 }
 CODE_EXTS = {".py", ".ts", ".tsx", ".js", ".jsx", ".go", ".rs", ".java", ".kt", ".rb", ".php", ".sql", ".swift", ".cs"}
 CONTEXT_FILES = ("CLAUDE.md", "AGENTS.md", "README.md")
@@ -176,10 +177,20 @@ class Report:
 # ----------------------------------------------------------------------------
 # Discovery
 # ----------------------------------------------------------------------------
+def ignored_dir(d: Path) -> bool:
+    """탐색하지 않을 폴더. 이름이 정해진 것과, 이름이 무엇이든 pyvenv.cfg가 있는 가상환경."""
+    return d.name in IGNORE_DIRS or (d / "pyvenv.cfg").is_file()
+
+
+def inside_ignored(p: Path, repo: Path) -> bool:
+    """저장소 안쪽 경로만 본다. 저장소가 놓인 위치는 점수를 바꾸지 않는다."""
+    return any(ignored_dir(d) for d in p.parents if d != repo and d.is_relative_to(repo))
+
+
 def walk_files(root: Path) -> list[Path]:
     out: list[Path] = []
     for r, dirs, files in os.walk(root):
-        dirs[:] = [d for d in dirs if d not in IGNORE_DIRS and not d.startswith(".")]
+        dirs[:] = [d for d in dirs if not ignored_dir(Path(r) / d) and not d.startswith(".")]
         for f in files:
             out.append(Path(r) / f)
     return out
@@ -193,7 +204,7 @@ def find_core_modules(repo: Path) -> list[Module]:
     for d in sorted(repo.iterdir()):
         if not d.is_dir():
             continue
-        if d.name in IGNORE_DIRS or d.name.startswith("."):
+        if ignored_dir(d) or d.name.startswith("."):
             continue
         candidates.append(d)
 
@@ -204,7 +215,7 @@ def find_core_modules(repo: Path) -> list[Module]:
             # remove the parent from candidates if there
             candidates = [c for c in candidates if c != parent]
             for d in sorted(parent.iterdir()):
-                if d.is_dir() and d.name not in IGNORE_DIRS:
+                if d.is_dir() and not ignored_dir(d):
                     candidates.append(d)
 
     # 단일 앱의 도메인 폴더. 코드가 든 하위 폴더가 2개 이상일 때만 펼친다.
@@ -214,7 +225,7 @@ def find_core_modules(repo: Path) -> list[Module]:
         if not parent.is_dir():
             continue
         domains = [d for d in sorted(parent.iterdir())
-                   if d.is_dir() and d.name not in IGNORE_DIRS and not d.name.startswith(".") and code_file_count(d)]
+                   if d.is_dir() and not ignored_dir(d) and not d.name.startswith(".") and code_file_count(d)]
         if len(domains) >= 2:
             domain_roots.append(parent)
             candidates.extend(domains)
@@ -245,7 +256,7 @@ def find_core_modules(repo: Path) -> list[Module]:
 def code_file_count(d: Path, skip: list[Path] | tuple[()] = ()) -> int:
     count = 0
     for r, dirs, files in os.walk(d):
-        dirs[:] = [x for x in dirs if x not in IGNORE_DIRS and not x.startswith(".") and Path(r) / x not in skip]
+        dirs[:] = [x for x in dirs if not ignored_dir(Path(r) / x) and not x.startswith(".") and Path(r) / x not in skip]
         count += sum(1 for f in files if Path(f).suffix in CODE_EXTS)
     return count
 
@@ -262,7 +273,7 @@ def find_all_context_files(repo: Path) -> list[Path]:
     out: list[Path] = []
     seen: set[Path] = set()  # CLAUDE.md -> AGENTS.md 링크를 두 번 세지 않는다
     for r, dirs, files in os.walk(repo):
-        dirs[:] = [d for d in dirs if d not in IGNORE_DIRS and not d.startswith(".")]
+        dirs[:] = [d for d in dirs if not ignored_dir(Path(r) / d) and not d.startswith(".")]
         for f in sorted(files):
             p = Path(r) / f
             if f in CONTEXT_FILES and p.resolve() not in seen:
@@ -585,7 +596,7 @@ def score_e(repo: Path, context_files: list[Path]) -> CategoryScore:
     # E3 Task validation commands actually exist
     have_pkg_json = (repo / "package.json").exists()
     have_pyproject = (repo / "pyproject.toml").exists() or (repo / "apps/api/pyproject.toml").exists() or any(
-        not IGNORE_DIRS.intersection(p.relative_to(repo).parts) for p in repo.glob("**/pyproject.toml"))
+        not inside_ignored(p, repo) for p in repo.glob("**/pyproject.toml"))
     have_make = (repo / "Makefile").exists()
     have_husky = (repo / ".husky").exists() or (repo / ".husky").is_dir()
     have_workflows = (repo / ".github" / "workflows").exists()
@@ -669,7 +680,7 @@ def module_times(m: Module, repo: Path) -> tuple[float, float, bool]:
 def latest_code_mtime(d: Path) -> float:
     latest = 0.0
     for r, dirs, files in os.walk(d):
-        dirs[:] = [x for x in dirs if x not in IGNORE_DIRS and not x.startswith(".")]
+        dirs[:] = [x for x in dirs if not ignored_dir(Path(r) / x) and not x.startswith(".")]
         for f in files:
             if Path(f).suffix in CODE_EXTS:
                 latest = max(latest, file_mtime(Path(r) / f))
@@ -755,7 +766,7 @@ def score_f(modules: list[Module], repo: Path) -> CategoryScore:
 def score_g(repo: Path) -> CategoryScore:
     eval_dirs = [p for p in ("evals", "benchmarks", "agent-evals", "agent-metrics") if (repo / p).exists()]
     metric_files = list(repo.glob("**/agent-results.json")) + list(repo.glob("**/.skill-eval.json"))
-    metric_files = [m for m in metric_files if not any(seg in m.relative_to(repo).parts for seg in IGNORE_DIRS)]
+    metric_files = [m for m in metric_files if not inside_ignored(m, repo)]
     has_telemetry_hint = any(
         re.search(r"telemetry|opentelemetry|claude.*session|agent.*log",
                   read_text(p), re.IGNORECASE)

@@ -181,6 +181,15 @@ class When(unittest.TestCase):
         self.ok("2025-11-24(월) Mon 14:00", "--from", SEOUL)
         self.assertEqual(len(self.ok("2025-11-24(일) Sun 14:00", "--from", SEOUL, code=3)["warnings"]), 1)
 
+    def test_wrong_weekday_in_base_time_warns(self):
+        out = self.ok("2025-11-25 12:00", "--from", SEOUL, "--now", "2025-11-24(일) 12:00", code=3)
+        self.assertEqual(len(out["warnings"]), 1)
+        for text in ("--now", "일요일이 아니라 월요일"):
+            self.assertIn(text, out["warnings"][0])
+        self.ok("now", "--from", SEOUL, "--now", "2025-11-24 Sun 12:00", code=3)
+        self.ok("2025-11-25(월) 12:00", "--from", SEOUL, "--now", "2025-11-24(월) 12:00", code=3)
+        self.ok("2025-11-25 12:00", "--from", SEOUL, "--now", "2025-11-24(월) 12:00")
+
     def test_leftover_text_is_an_error(self):
         # 예전에는 조용히 버려서 다른 시각으로 계산했다
         for text in ("2025-11-24 14:00 PST", "2025-11-24T14:00+09:00", "다음 주 금요일 10:00", "14:00:30",

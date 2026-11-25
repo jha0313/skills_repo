@@ -87,6 +87,16 @@ def stop(proc):
             pass
 
 
+def make_private(path):
+    """빈 0600 파일로 만든다. 이미 있던 파일도 쓰기 전에 권한을 좁힌다."""
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT, 0o600)
+    try:
+        os.fchmod(fd, 0o600)
+        os.ftruncate(fd, 0)
+    finally:
+        os.close(fd)
+
+
 def run(cmd, prompt, log, timeout):
     with open(log, "w", encoding="utf-8") as lf, tempfile.TemporaryFile() as stdin:
         stdin.write(prompt.encode("utf-8"))
@@ -174,12 +184,26 @@ def main(argv):
              note="프롬프트와 Codex가 읽은 파일 내용이 모델 제공사로 나가요. 읽는 범위는 작업 폴더로 제한되지 않아요")
         return 0
 
-    if os.path.exists(out):   # 지난 결과를 새 결과로 착각하지 않게 옮겨 둔다
-        os.replace(out, prev)
+    try:
+        if os.path.exists(out) and os.path.getsize(out):   # 지난 결과를 새 결과로 착각하지 않게 옮겨 둔다
+            os.replace(out, prev)
+            os.chmod(prev, 0o600)
+        for path in (out, log):   # 프롬프트와 리뷰 내용이 들어간다. codex가 쓰기 전에 나만 읽게 만든다
+            make_private(path)
+    except OSError as e:
+        return fail(f"결과·로그 파일을 나만 읽게 만들지 못했어요: {e}")
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(143))   # 종료 신호에도 run()의 정리를 거친다
     t0 = time.time()
-    code = run(cmd, prompt, log, a.timeout_min * 60)
-    size = os.path.getsize(out) if os.path.exists(out) else 0
+    size = 0
+    try:
+        code = run(cmd, prompt, log, a.timeout_min * 60)
+    finally:
+        if os.path.exists(out):
+            size = os.path.getsize(out)
+            if size:
+                os.chmod(out, 0o600)   # codex가 새 파일로 바꿔치기했을 때
+            else:
+                os.unlink(out)   # 미리 만든 빈 파일을 결과로 남기지 않는다
     rec = dict(exit=code, seconds=round(time.time() - t0, 1), out=out, log=log, out_bytes=size,
                model=a.model, effort=effort, sandbox=a.sandbox)
     if a.ping:

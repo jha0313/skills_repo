@@ -6,6 +6,7 @@
 import json
 import os
 import signal
+import stat
 import subprocess
 import sys
 import tempfile
@@ -19,7 +20,9 @@ FAKE = f'''#!{sys.executable}
 import json, os, subprocess, sys, time
 args = sys.argv[1:]
 stdin = sys.stdin.read()
-json.dump(dict(args=args, stdin=stdin), open(os.environ["FAKE_REC"], "w"))
+out = args[args.index("-o") + 1]
+modes = [oct(os.stat(p).st_mode & 0o777) if os.path.exists(p) else None for p in (out, out + ".log")]
+json.dump(dict(args=args, stdin=stdin, modes=modes), open(os.environ["FAKE_REC"], "w"))
 mode = os.environ.get("FAKE_MODE", "ok")
 if mode == "sleep":
     time.sleep(30)
@@ -29,7 +32,12 @@ if mode != "empty":
     reply = "ok\\n" if "Reply with exactly: ok" in stdin else "## findings\\n- none\\n"
     if mode == "badping":
         reply = os.environ.get("FAKE_REPLY", "cannot help") + "\\n"
-    open(args[args.index("-o") + 1], "w").write(reply)
+    if mode == "rename":   # 새 파일을 만들어 바꿔치기하는 codex 흉내
+        open(out + ".tmp", "w").write(reply)
+        os.chmod(out + ".tmp", 0o644)
+        os.replace(out + ".tmp", out)
+    else:
+        open(out, "w").write(reply)
 print("codex log line")
 sys.exit(3 if mode == "fail" else 0)
 '''
@@ -201,6 +209,36 @@ class CodexReviewTest(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("비어", res["error"])
         self.assertTrue(os.path.exists(self.path("r1.out.md.prev")))
+        self.assertFalse(os.path.exists(self.path("r1.out.md")))
+
+    # 권한: 프롬프트와 리뷰 내용이 든 파일은 처음부터 나만 읽는다
+    def mode_of(self, name):
+        return oct(stat.S_IMODE(os.stat(self.path(name)).st_mode))
+
+    def test_result_and_log_are_private_from_the_start(self):
+        for mode in ("ok", "rename"):
+            self.assertEqual(self.review(mode=mode)[0], 0)
+            self.assertEqual(self.fake_call()["modes"], ["0o600", "0o600"], mode)
+            self.assertEqual([self.mode_of("r1.out.md"), self.mode_of("r1.out.md.log")], ["0o600", "0o600"], mode)
+
+    def test_existing_loose_files_become_private(self):
+        for name in ("r1.out.md", "r1.out.md.log", "r1.out.md.prev"):
+            os.chmod(self.write(name, "옛 내용"), 0o644)
+        self.assertEqual(self.review()[0], 0)
+        self.assertEqual(self.fake_call()["modes"], ["0o600", "0o600"])
+        for name in ("r1.out.md", "r1.out.md.log", "r1.out.md.prev"):
+            self.assertEqual(self.mode_of(name), "0o600", name)
+        with open(self.path("r1.out.md.log"), encoding="utf-8") as fh:
+            self.assertNotIn("옛 내용", fh.read())
+
+    def test_interrupted_or_empty_run_keeps_the_previous_result(self):
+        self.review()
+        self.review(mode="empty")
+        self.review("--timeout-min", "0.02", mode="sleep")
+        self.write("r1.out.md", "")   # 강제 종료 뒤 남은 빈 파일
+        self.review(mode="empty")
+        with open(self.path("r1.out.md.prev"), encoding="utf-8") as fh:
+            self.assertIn("findings", fh.read())
         self.assertFalse(os.path.exists(self.path("r1.out.md")))
 
     def test_timeout_returns_124(self):

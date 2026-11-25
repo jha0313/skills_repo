@@ -29,14 +29,14 @@ Claude Code 플러그인으로도 된다: `/plugin marketplace add jha0313/skill
 
 | 스킬 | 한 줄 | 확인한 것 |
 |---|---|---|
-| [chief-of-staff](chief-of-staff/README.md) | 여러 프로젝트를 비서실장 세션 하나에 맡기고, 오늘 볼 것 3개만 받는다 | 테스트 54개 |
+| [chief-of-staff](chief-of-staff/README.md) | 여러 프로젝트를 비서실장 세션 하나에 맡기고, 오늘 볼 것 3개만 받는다 | 테스트 55개 |
 | [workflow-orchestrator](workflow-orchestrator/README.md) | 한 작업을 조사·계획·구현·검증·리뷰로 나눠 끝까지 위임한다 | 행동 평가 사례 10개 |
 
 ### 검증한다 — "통과했다는데 정말?"
 
 | 스킬 | 한 줄 | 확인한 것 |
 |---|---|---|
-| [codex-review](codex-review/README.md) | 다른 회사 모델에게 리뷰를 맡기고, 돌아온 지적을 확인한 뒤에만 반영한다 | 테스트 31개(가짜 codex) |
+| [codex-review](codex-review/README.md) | 다른 회사 모델에게 리뷰를 맡기고, 돌아온 지적을 확인한 뒤에만 반영한다 | 테스트 34개(가짜 codex) |
 | [skill-evaluator](skill-evaluator/README.md) | 스킬을 격리된 세션에서 돌려 사례마다 근거와 함께 채점한다 | 테스트 45개 |
 | [eval-writer](eval-writer/README.md) | 스킬의 평가 기준을 먼저 쓴다 | skill-evaluator로 검사 |
 | [skills-lint](skills-lint/README.md) | 설치된 스킬의 규격 위반·겹침·깨진 링크를 찾는다 | 테스트 28개 |
@@ -45,15 +45,15 @@ Claude Code 플러그인으로도 된다: `/plugin marketplace add jha0313/skill
 
 | 스킬 | 한 줄 | 확인한 것 |
 |---|---|---|
-| [time-convert](time-convert/README.md) | 시간대·요일·남은 시간을 머리로 세지 않는다 | 테스트 31개 |
-| [disk-cleanup-analyzer](disk-cleanup-analyzer/README.md) | 맥 용량을 나눠 보여 주되 AI 세션 작업 폴더는 지키게 한다 | 테스트 61개 |
-| [improve-token-efficiency](improve-token-efficiency/README.md) | 세션 기록으로 프로젝트별 토큰·비용을 본다 | 테스트 47개 · 가격 확인 2026-11-24 |
+| [time-convert](time-convert/README.md) | 시간대·요일·남은 시간을 머리로 세지 않는다 | 테스트 32개 |
+| [disk-cleanup-analyzer](disk-cleanup-analyzer/README.md) | 맥 용량을 나눠 보여 주되 AI 세션 작업 폴더는 지키게 한다 | 테스트 62개 |
+| [improve-token-efficiency](improve-token-efficiency/README.md) | 세션 기록으로 프로젝트별 토큰·비용을 본다 | 테스트 48개 · 가격 확인 2026-11-24 |
 
 ### 저장소를 준비한다 — "에이전트가 자꾸 헤맨다"
 
 | 스킬 | 한 줄 | 확인한 것 |
 |---|---|---|
-| [ai-readiness-cartography](ai-readiness-cartography/README.md) | 에이전트가 일하기 좋은 저장소인지 100점으로 재고 지도를 그린다 | 테스트 37개 |
+| [ai-readiness-cartography](ai-readiness-cartography/README.md) | 에이전트가 일하기 좋은 저장소인지 100점으로 재고 지도를 그린다 | 테스트 39개 |
 
 "확인한 것"은 **돌려 본 것만** 적는다. 테스트 통과는 스크립트가 약속대로 움직인다는 뜻이고, 결과물이 언제나 맞다는 뜻은 아니다.
 
@@ -88,5 +88,5 @@ Claude Code 플러그인으로도 된다: `/plugin marketplace add jha0313/skill
 ## 설치 뒤
 
 - 스킬은 폴더 전체가 있어야 한다(`SKILL.md`만 복사하지 않는다). 손으로 넣으려면 `~/.claude/skills/<이름>/`에 폴더째 복사한다. 이미 있으면 덮어쓰지 않게 먼저 확인한다.
-- `skill-evaluator`·`eval-writer`는 Python 3.11+, `uv`, 인증된 Claude Code가 필요하다. `codex-review`는 로그인된 Codex CLI가 필요하다. 나머지는 `python3`만 있으면 된다.
+- `skill-evaluator`·`eval-writer`는 Python 3.11+, `uv`, 인증된 Claude Code가 필요하다. `codex-review`는 로그인된 Codex CLI, `chief-of-staff`는 Git(PR까지 맡기면 로그인된 `gh`), `workflow-orchestrator`는 subagent를 띄울 수 있는 에이전트가 필요하다. 나머지 여섯은 `python3`만 있으면 된다(`into`의 화면 검사는 Node와 puppeteer가 있으면 더 본다).
 - 지우기: `npx skills remove <이름>`
