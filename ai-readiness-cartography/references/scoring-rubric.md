@@ -1,209 +1,108 @@
-# AI-Ready Codebase Rubric · v2 (100 pt · 7 categories)
+# AI 준비도 루브릭 v2.1 (100점 · 7 카테고리)
 
-이 문서는 자동/수동 채점 모두에 쓰는 단일 진실 기준입니다. `scripts/score.py` 가 자동으로 잡지 못하는 항목은 사람이 보강합니다 — 각 항목 끝의 **Auto / Heuristic / Manual** 태그가 신뢰도를 알려줍니다.
+이 문서는 `scripts/score.py`가 **실제로 계산하는 것**을 적는다. 사람이 볼 것은 "사람 확인"에 따로 적고, 점수에는 넣지 않는다.
 
-| Cat | Name | Points |
-|-----|------|--------|
-| A | AI Navigation & Coverage | 15 |
-| B | Context Document Quality | 20 |
-| C | Tribal Knowledge Externalization | 20 |
-| D | Cross-Module Dependency & Data Flow Mapping | 15 |
-| E | Verification & Quality Gates | 15 |
-| F | Freshness & Self-Maintenance | 10 |
-| G | Agent Performance Outcomes | 5 |
+| 카테고리 | 이름 | 점수 |
+|---|---|---|
+| A | AI Navigation & Coverage — 어디를 봐야 하는지 찾을 수 있나 | 15 |
+| B | Context Document Quality — 안내 문서가 짧고 쓸모 있나 | 20 |
+| C | Tribal Knowledge Externalization — 숨은 규칙이 글로 있나 | 20 |
+| D | Cross-Module Dependency Mapping — 바꾸면 어디가 흔들리는지 아나 | 15 |
+| E | Verification & Quality Gates — 안내와 변경을 검증하나 | 15 |
+| F | Freshness & Self-Maintenance — 안내가 낡지 않나 | 10 |
+| G | Agent Performance Outcomes — 효과를 재나 | 5 |
 
-**Total = 100**
+**용어.** context 파일 = `CLAUDE.md`, `AGENTS.md`, `README.md`(링크로 이어진 같은 파일은 한 번만 센다). 핵심 module = 코드가 든 루트 폴더, `apps/*`·`packages/*`·`services/*`의 각 폴더, 그리고 `src/features|modules|domains/*`(코드가 든 하위 폴더가 2개 이상일 때. `src`는 그 밖의 코드가 남을 때만 module로 센다. 도메인에 자기 파일이 없으면 `src/features` 등이나 `src`의 안내를 물려받는다).
 
----
+## A. 탐색 · 15
 
-## A. AI Navigation & Coverage · /15
+`round(context 있는 module ÷ 전체 module × 15)`. 루트에 `CLAUDE.md`도 `AGENTS.md`도 없으면 2점을 뺀다(둘 중 하나면 된다). 루트에 바로 둔 코드는 module로 세지 않아, 폴더가 없는 작은 저장소는 A와 C가 0점이다.
 
-> AI가 전체 codebase / module / workflow를 빠르게 찾을 수 있는가.
+## B. 문서 품질 · 20 (항목마다 4점, 모든 context 파일의 평균)
 
-| Score | Criteria |
-|-------|----------|
-| 0     | repo를 grep / search로 추측해야 함 |
-| 5     | 일부 module에 README / context 존재 |
-| 10    | 대부분 핵심 module에 역할·entry point·related files 정리 |
-| 15    | 모든 핵심 module / workflow에 navigation guide 존재. "어디를 봐야 하는가"를 1-2 hops 안에 도달 |
+| 항목 | 통과 조건 |
+|---|---|
+| B1 Conciseness | 10~80줄 |
+| B2 Quick Commands | bash·sh·zsh·console 코드 블록이 있다 |
+| B3 Key Files | 파일 경로 3개 이상(1~2개면 절반) |
+| B4 Non-Obvious | `Why:` `Note:` `Gotcha` `Warning` `Don't` `Caveat` `Important:` `반드시` `주의` 중 하나 |
+| B5 Cross References | 상대 링크가 있다 |
 
-**Measurement** *(Auto)*
+**사람 확인:** 명령이 실제로 도는지, 적힌 파일이 정말 핵심인지, 규칙이 실패를 막아 주는지.
 
-```
-Navigation Coverage = (AI-context로 안내 가능한 핵심 module 수) / (전체 핵심 module 수)
-```
+## C. 숨은 지식 · 20 (다섯 질문, 4점씩)
 
-- "핵심 module" = repo 루트의 코드 디렉터리 + `apps/*` / `packages/*` / `services/*` 의 각 자식
-- 점수 = `round(coverage × 15)` 후 cap
-- 파일 개수가 아니라 module / workflow coverage로 평가
+1. 무엇을 맡나 — 제목에 purpose·owns·configures·overview, 또는 본문에 owns·configures
+2. 흔한 수정 방법은 — 제목에 pattern·how to·common change·workflow·recipe
+3. 실패를 부르는 숨은 규칙은 — B4와 같은 표시
+4. 다른 module과의 의존은 — 제목에 depend·cross-module·import·see also·related, 또는 본문에 depends on
+5. 결정 이유를 남기는 곳은 — `MEMORY.md`, `docs/adr`, `docs/decisions`, `adr`, `.claude/memory*`
 
----
+1~4는 module 평균, 5는 저장소에 하나. 제목 판정은 **영어 낱말**만 본다. 한국어 제목만 쓰는 저장소는 실제보다 낮게 나온다.
 
-## B. Context Document Quality · /20
+## D. 의존성 지도 · 15
 
-> Context files가 "compass, not encyclopedia" 원칙을 따르는가.
+`ARCHITECTURE.md`·`docs/architecture.md`·`docs/dependency-graph.md`·`docs/data-flow.md` 중 하나 6점 · context 파일의 mermaid 3점 · 의존성 절이 context 파일 절반 이상 4점(하나라도 있으면 2점) · `turbo.json`·`nx.json`·`pnpm-workspace.yaml`·`lerna.json` 2점.
 
-| Sub | Item | Points | Full-Score Criteria |
-|-----|------|--------|---------------------|
-| B1 | Conciseness *(Auto)*       | 4 | 모든 CLAUDE.md가 25-35 lines 또는 ~1,000 tokens 이하 |
-| B2 | Quick Commands *(Heuristic)* | 4 | copy-paste 가능한 명령어 + 사용 시점 명시 (`~~~bash` 블록 + 주변 설명) |
-| B3 | Key Files *(Heuristic)*    | 4 | 실제 수정에 필요한 3-5개 핵심 파일 경로 제시 |
-| B4 | Non-Obvious Patterns *(Heuristic)* | 4 | 실패 유발 hidden rule + 예외가 명시 (`Why:`, `Note:`, `Gotcha`, `Warning`) |
-| B5 | See Also / Cross References *(Auto)* | 4 | 관련 module / context file / dependency map 연결 (relative links) |
+## E. 검증 · 15
 
-각 sub-item 은 module 평균 또는 최댓값을 4점 만점으로 환산. **문서가 많은 게 아니라 task-relevant context만 담는 것이 핵심.**
+| 항목 | 점수 | 계산 |
+|---|---|---|
+| E1 Reference Accuracy | 5 | context 파일의 경로 중 실제로 있는 비율 × 5. 경로가 없으면 2 |
+| E2 Critic Review | 4 | CODEOWNERS 2 + PR 템플릿 2 |
+| E3 Task Validation | 4 | `package.json`·`pyproject.toml`·`Makefile` 중 하나 2 + husky 1 + GitHub 워크플로 1 |
+| E4 Prompt Tests | 2 | `evals`·`benchmarks`·`agent-evals`·`prompts/test`·`tests/agent` 폴더 |
 
----
+**E1 규칙.** 폴더가 하나 이상 든 경로(`src/app/page.tsx`)만 본다. URL, `~/`·`$HOME/`·`<자리>/`로 시작하는 것은 뺀다. 문서가 있는 폴더부터 저장소 루트까지 올라가며 기준으로 삼아 하나라도 있으면 통과다. 남은 것은 **후보**다. 만들어질 파일, 다른 저장소의 파일, 예시일 수 있으니 열어서 판정한다.
 
-## C. Tribal Knowledge Externalization · /20
+**사람 확인:** 리뷰와 프롬프트 시험의 질, 검증 명령이 실제로 도는지. E3는 `Cargo.toml`·`go.mod` 같은 다른 빌드 파일을 보지 않는다.
 
-> 숨은 규칙, 실패 패턴, human-only knowledge가 구조화되었는가.
+## F. 최신 상태 · 10
 
-### Five-Question Framework *(Heuristic + Manual)*
+- 낡음 6점: `6 × (1 − 낡은 module 비율)`. module의 context 파일보다 코드의 마지막 커밋이 **30일 넘게 새로우면** 낡음.
+- 시각은 git 커밋 시각이다. clone하면 파일 시각이 모두 같아져 쓸 수 없기 때문이다. 커밋 안 된 module은 파일 시각(mtime)으로 보고 `time_basis`에 표시한다. 얕은 clone은 판정하지 않고 중간 점수 3점을 준다.
 
-각 핵심 module에 대해 다음 5개 질문에 답할 수 있으면 4점씩, 총 20점:
+| `time_basis` | 뜻 |
+|---|---|
+| `git` | 모두 커밋 시각 |
+| `git+mtime` | 일부는 커밋이 없어 파일 시각 |
+| `mtime` | git 기록 없음. 복사·압축 해제 뒤에는 믿을 수 없다 |
+| `shallow` | 얕은 clone. 판정 안 함 |
+| `none` | 잴 module이 없음 |
 
-1. **What does this module configure / own?** — `## Purpose`, "configures", "owns" 표현
-2. **What are common modification patterns?** — `## Patterns`, "common changes", "## How to"
-3. **What non-obvious patterns cause failures?** — `Why:`, `Note:`, `Gotcha`, `Don't`
-4. **What are the cross-module dependencies?** — "depends on", "imports", `## Cross-module`
-5. **What tribal knowledge is hidden in comments / history / human memory?** — `MEMORY.md` / `ADR` / `docs/decisions` 존재
+- CI 2점: 워크플로 파일에 `context`·`docs`·`claude`·`adr`·`reference` 낱말이 있다. 실제로 검사하는지는 보지 않는다.
+- hook 2점: `.husky/pre-commit` 또는 `pre-push` 파일이 있다. 내용은 보지 않는다.
 
-### Score band
+## G. 성과 측정 · 5
 
-| Score | Criteria |
-|-------|----------|
-| 0     | senior engineer / Slack / 과거 PR에만 지식 존재 |
-| 5     | 일부 gotcha가 README / comment에 흩어짐 |
-| 10    | 반복 작업의 암묵지 일부 문서화 |
-| 15    | compatibility rule / naming / generated code rule / deprecated-but-required rule 정리 |
-| 20    | 식별된 tribal knowledge 대부분이 context file / checklist / playbook에 반영 + AI가 질의로 회수 가능 |
+`evals`·`benchmarks`·`agent-evals`·`agent-metrics` 폴더 3점 · `agent-results.json`·`.skill-eval.json` 1점 · 루트 문서에 telemetry 관련 낱말 1점. 재 볼 만한 것: 작업 통과율, 작업당 도구 호출과 토큰, 다시 한 PR 비율.
 
-자동 점수 = (5질문 통과 평균 × 20). 실제 깊이는 사람이 검증.
+## 등급
 
----
+| 점수 | 등급 | 색 |
+|---|---|---|
+| 90~100 | AI-Native | green |
+| 75~89 | AI-Ready | green |
+| 60~74 | AI-Assisted | amber |
+| 40~59 | AI-Fragile | amber |
+| 0~39 | AI-Hostile | red |
 
-## D. Cross-Module Dependency & Data Flow Mapping · /15
+등급 경계와 배점은 이 스킬이 정한 것이다. 외부 표준이 아니다.
 
-> 변경 영향 범위를 AI가 추적할 수 있는가.
+## 할 일 순서
 
-| Score | Criteria |
-|-------|----------|
-| 0     | 변경 영향을 사람이 수동으로 추적 |
-| 5     | 일부 architecture diagram 또는 dependency note |
-| 10    | 주요 module 간 dependency / ownership 문서화 |
-| 15    | "What depends on X?" 에 graph / index / map으로 답 가능. repo / service / test / data flow ripple 추적 가능 |
+`우선순위 = 영향(1~10) ÷ 시간`. 영향과 시간은 스크립트에 적어 둔 **추정값**이고 잰 값이 아니다. 시간 표시: S = 1시간 이하, M = 4시간 이하, L = 그 이상.
 
-**Auto checks:**
-- `docs/architecture.md`, `ARCHITECTURE.md`, `docs/dependency-graph*` 존재
-- `mermaid` / `graphviz` 다이어그램 fence 존재
-- CLAUDE.md 안에 `## Dependencies` / `Cross-module` 섹션
-- monorepo 의 `pnpm-workspace.yaml` / `turbo.json` / `nx.json` 으로 graph 도출 가능 여부
+## v2 → v2.1 (점수가 달라지는 곳)
 
-**Why important.** 한 field change가 6개 subsystem에 ripple 되는 대규모 codebase에서 결정적. 이게 약하면 D를 깎는 것이 옳음.
+- 경로 추출: `.tsx`·`.jsx`·`.json`을 자르던 오류, URL·점 폴더·하이픈 폴더를 잘못 세던 오류를 고침 → E1이 오를 수 있다.
+- 루트 `AGENTS.md`만 있어도 A에서 감점하지 않음.
+- 낡음을 git 커밋 시각으로 판정 → F가 바뀔 수 있다.
+- `src/features|modules|domains/*`를 module로 셈 → 도메인마다 문서가 있으면 A·C·F가 오른다. `src`에 안내 하나만 있어도 물려받으므로 깎이지 않는다.
 
----
+v2 점수와 v2.1 점수는 비교하지 않는다.
 
-## E. Verification & Quality Gates · /15
+## 출처 (2026-11-24 확인)
 
-> AI-generated context와 code change를 검증하는 체계가 있는가.
-
-| Sub | Item | Points | Full-Score Criteria |
-|-----|------|--------|---------------------|
-| E1 | Reference Accuracy *(Auto)*        | 5 | CLAUDE.md / context file이 언급한 file path · API · command 의 hallucination 0건 |
-| E2 | Independent Critic Review *(Manual)* | 4 | 최소 2-3 round 독립 review 또는 checklist (CODEOWNERS / review template / agent critic) |
-| E3 | Task Validation *(Auto)*           | 4 | 변경 유형별 build / test / lint / typecheck / e2e 검증 명령 제공 + 실제 실행 가능 |
-| E4 | Prompt / Workflow Tests *(Heuristic)* | 2 | 대표 AI task query를 실제 테스트 (`evals/`, agent test) |
-
-**E1 자동 채점 알고리즘:**
-1. 모든 context file에서 `[A-Za-z0-9_./-]+\.(py|ts|tsx|js|md|sql|json|yaml|yml|toml)` 후보를 추출
-2. 각 후보를 repo 루트 기준으로 존재 검증
-3. `valid / total` 비율 → `round(ratio × 5)`
-
-> Meta 표현으로 "zero hallucinated paths"가 5점의 조건. 이것이 AI-ready의 핵심 — 검증되지 않은 context는 없는 것보다 **위험하다**.
-
----
-
-## F. Freshness & Self-Maintenance · /10
-
-> Context가 stale 해지지 않도록 자동 유지되는가.
-
-| Score | Criteria |
-|-------|----------|
-| 0     | 수동 관리 + stale 여부 불명 |
-| 3     | owner 있음 + 가끔 update |
-| 6     | CI / script로 broken path / reference 일부 검출 |
-| 10    | 주기적 file path validation, coverage gap detection, critic review, stale reference repair 자동 실행 |
-
-**Auto checks:**
-- 각 CLAUDE.md mtime vs 같은 module 내부 코드 파일 latest mtime 비교 — drift 비율
-- `.github/workflows/*` 에 context / docs validation step 존재
-- pre-commit / husky 에 path validation hook 존재
-- `MEMORY.md` Session Notes 의 가장 최근 entry 날짜
-
-**왜 강조되는가.** Stale context는 hallucination을 augmented retrieval로 정당화한다. 없는 것보다 **나쁘다**.
-
----
-
-## G. Agent Performance Outcomes · /5
-
-> 실제 AI task 성공률 / 효율 개선이 측정되는가.
-
-| Score | Criteria |
-|-------|----------|
-| 0     | AI 성능 측정 없음 |
-| 2     | 정성적으로 "도움 된다" 수준 |
-| 3     | 대표 task success rate 또는 human intervention rate 측정 |
-| 5     | tool calls, token usage, task completion time, correctness, prompt pass rate를 before / after로 측정 |
-
-**Tracked metrics (예시):**
-- AI task pass rate
-- 평균 tool calls per task
-- 평균 tokens per task
-- human clarification count
-- failed PR / rework rate
-- hallucinated file path count
-- time-to-first-correct-change
-
-**Auto checks:**
-- `evals/`, `benchmarks/`, `agent-metrics/` 디렉터리 존재
-- `.skill-eval.json`, `agent-results.json` 같은 결과 파일
-- AI usage telemetry 설정 (Claude Code session log, OpenTelemetry)
-
----
-
-## Final Grade
-
-| Score | Level | Meaning | Badge color |
-|-------|-------|---------|-------------|
-| 90-100 | **AI-Native / Agentic-Ready** | Agent가 대부분 반복 작업을 자율 수행 + context layer self-maintaining | green |
-| 75-89  | **AI-Ready** | 대부분 작업에서 AI가 안정적으로 navigation, edit, verify | green |
-| 60-74  | **AI-Assisted** | AI 유용하지만 complex / domain task에는 human context 필요 | amber |
-| 40-59  | **AI-Fragile** | 단순 task는 가능, hidden rule / dependency로 오류 위험 높음 | amber |
-| < 40   | **AI-Hostile** | tribal knowledge 의존도 높음 + AI는 추측 기반 | red |
-
----
-
-## ROI Heuristics for Recommendations
-
-각 갭에 대해 다음 형식으로 액션을 제시:
-
-```
-Effort: S (<1h) / M (1-4h) / L (4h+)
-Impact: time saved per AI task × estimated tasks/period
-Priority = Impact / Effort
-```
-
-대표 액션 ROI 표:
-
-| Action | Effort | Impact (typical) |
-|--------|--------|------------------|
-| 핵심 module에 CLAUDE.md 추가 | S (30-60 min) | task당 2-5 min × 주 N task |
-| god file (>500 lines) 분할 | M (1-3 hr/file) | 토큰 30-50% 절감 + 정확도 ↑ |
-| `## Cross-module deps` 섹션 추가 | S (30 min) | cascade bug 방지 |
-| MEMORY.md / ADR 도입 | M (2-4 hr 초기) | tribal knowledge 보존 (외부화) |
-| path validation CI 추가 | S (1 hr) | stale reference 자동 차단 |
-| agent eval test 추가 | L (4-8 hr) | AI 회귀 catch |
-| naming refactor | M-L | 일관성 향상 (낮은 우선순위) |
-
-상위 5개를 Priority 내림차순으로 정렬해 제시.
+- Meta 엔지니어링 글 [How Meta Used AI to Map Tribal Knowledge in Large-Scale Data Pipelines](https://engineering.fb.com/2026/04/06/developer-tools/how-meta-used-ai-to-map-tribal-knowledge-in-large-scale-data-pipelines/) (2026-04-06): 다섯 질문, "compass, not encyclopedia"(25~35줄, 약 1,000토큰), 참조 경로를 모두 검증해 환각 0건, 몇 주마다 자동 점검. 한 회사의 사례이고, 효율 결과는 작업 6개의 예비 시험이라고 밝힌다. 이 루브릭은 그 생각을 참고했다.
+- 반대 근거: [Evaluating AGENTS.md: Are Repository-Level Context Files Helpful for Coding Agents?](https://arxiv.org/abs/2602.11988) (2026-02-12, v3 2026-09-29). context 파일이 대체로 작업 성공률을 높이지 않았고 추론 비용은 평균 20% 넘게 늘었다. 저장소 개요는 도움이 안 됐고, 일반적이지 않은 규칙을 적는 데는 쓸모가 있다고 본다. **그래서 파일 수를 늘리는 것보다 틀린 경로를 고치고 숨은 규칙을 적는 일을 앞에 둔다.**

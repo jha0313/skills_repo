@@ -1,0 +1,22 @@
+name: Repository checks
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python scripts/check_repo.py --tests
+      - run: python skills-lint/scripts/skills_lint.py --root . --fail-on error --allow-name presentation_slides

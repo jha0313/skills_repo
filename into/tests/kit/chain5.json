@@ -1,0 +1,51 @@
+{
+  "meta": {"public": true, "name": "chain5"},
+  "model": {
+    "type": "design-doc",
+    "title": "존 힌트 설계",
+    "scope": "설계 문서 전체",
+    "source": "설계 문서 전체를 읽음",
+    "missing": "버전 어긋남",
+    "status": "제안",
+    "facts": [
+      {"id": "f1", "t": "엔드포인트마다 쓸 존을 hints에 적는다", "src": ["raw:1"], "key": true},
+      {"id": "f2", "t": "존을 넘으면 비용이 든다", "src": ["raw:2"], "key": true}
+    ],
+    "options": [
+      {"id": "o1", "t": "hints 필드", "chosen": true, "src": ["raw:3"]},
+      {"id": "o2", "t": "노드 단위 topology keys", "src": ["raw:4"]},
+      {"id": "o3", "t": "EndpointSlice 쪼개기", "src": ["raw:5"]}
+    ],
+    "criteria": [{"id": "c1", "t": "단순함"}, {"id": "c2", "t": "서비스 단위로 정하기"}],
+    "cells": [
+      {"o": "o1", "c": "c1", "t": "설정이 적고 kube-proxy는 거르기만", "sign": "+", "src": ["raw:6"]},
+      {"o": "o2", "c": "c1", "t": "API·컨트롤러를 더해 더 복잡하다", "sign": "-", "src": ["raw:7"]},
+      {"o": "o3", "c": "c1", "t": "라우팅과 합치니 둘 다 약해졌다", "sign": "-", "src": ["raw:8"]},
+      {"o": "o1", "c": "c2", "t": "서비스 주석으로 켜고 끈다", "sign": "?", "src": ["raw:9"]},
+      {"o": "o2", "c": "c2", "t": "서비스 단위로 쉽게 못 정한다", "sign": "-", "src": ["raw:10"]}
+    ],
+    "nodes": [
+      {"id": "n1", "t": "ServiceController"},
+      {"id": "n2", "t": "EndpointSliceController"},
+      {"id": "n3", "t": "EndpointSlice"},
+      {"id": "n4", "t": "kube-proxy"},
+      {"id": "n5", "t": "ExternalTrafficPolicyEndpoint"}
+    ],
+    "edges": [
+      {"id": "e1", "from": "n1", "to": "n2", "t": "서비스 주석이 켜졌는지와 존마다 CPU 코어 수", "src": ["raw:11"], "main": true, "if": "주석이 Auto일 때"},
+      {"id": "e2", "from": "n2", "to": "n3", "t": "엔드포인트마다 쓸 존을 hints에 적어 저장", "src": ["raw:12"], "main": true},
+      {"id": "e3", "from": "n3", "to": "n4", "t": "엔드포인트 목록과 hints를 노드마다 내려 보냄", "src": ["raw:13"], "main": true},
+      {"id": "e4", "from": "n4", "to": "n5", "t": "세 조건이 모두 맞으면 내 존 힌트인 곳으로만", "src": ["raw:14"], "main": true},
+      {"id": "e5", "from": "n4", "to": "n5", "t": "조건이 하나라도 거짓이면 전체로 보낸다", "src": ["raw:15"]}
+    ],
+    "flips": [{"id": "x1", "if": "조건 하나라도 거짓", "then": "전체로 보낸다", "src": ["raw:16"]}],
+    "open": [{"t": "가중치를 넣을지 정하지 않았다", "src": ["raw:17"]}]
+  },
+  "html": {
+    "one": {"t": "제안: 엔드포인트마다 쓸 존을 hints에 적어 트래픽을 존 안에 둔다", "f": ["f1"]},
+    "why": [{"t": "존을 넘으면 비용이 든다", "f": ["f2"]}],
+    "options": ["o1", "o2", "o3"],
+    "pic": ["e1", "e2", "e3", "e4", "e5"],
+    "flips": [{"이러면": "조건 하나라도 거짓", "이렇게": "전체로 보낸다", "f": ["x1"]}]
+  }
+}

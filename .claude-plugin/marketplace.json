@@ -1,0 +1,27 @@
+{
+  "name": "silbal",
+  "owner": { "name": "jha0313" },
+  "description": "실밸개발자가 매일 쓰는 에이전트 스킬",
+  "plugins": [
+    {
+      "name": "silbal",
+      "description": "이해한다 · 맡긴다 · 검증한다 · 매일 정리한다 — 매일 쓰는 개발자 스킬 묶음",
+      "source": "./",
+      "strict": false,
+      "license": "MIT",
+      "skills": [
+        "./into",
+        "./chief-of-staff",
+        "./workflow-orchestrator",
+        "./codex-review",
+        "./skill-evaluator",
+        "./eval-writer",
+        "./skills-lint",
+        "./time-convert",
+        "./disk-cleanup-analyzer",
+        "./improve-token-efficiency",
+        "./ai-readiness-cartography"
+      ]
+    }
+  ]
+}

@@ -24,7 +24,7 @@ metadata:
 ## 작성 옵션 확정
 
 - 기본 THOROUGH는 10개. `--basic`은 표준 범주 4개. `--deep`/`--comprehensive` 또는 명시적인 확장 deep/thorough/comprehensive 요청은 30개다.
-- `--binary`는 관찰 기준을 갖춘 0/1과 PASS/FAIL. 그 외에는 evaluator의 Likert 1~5다. 세미나의 별도 팀 점수 규칙(critical 실패→0, 품질 .5~1)은 **이 스키마가 아니다**.
+- `--binary`는 관찰 기준을 갖춘 0/1과 PASS/FAIL. 그 외에는 evaluator의 Likert 1~5다.
 - 주어진 `--source`, `--judge-model`, `--judge-timeout`, `--output`을 전달한다. 작성자는 evaluator의 독립 작성 모델을 사용한다. 승인된 저장소 모델이 없으면 있다고 주장하지 않는다.
 - 기본은 새 기준. `--reuse-criteria`는 명시적으로 요청했을 때만 쓴다. 상대 CLI 경로는 기록한 working directory를 기준으로 해석한다.
 

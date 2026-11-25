@@ -560,11 +560,17 @@ class EvaluatorTests(unittest.TestCase):
         )
 
         # A pending case with a changed skill would mix revisions.
-        with self.assertRaises(core.EvalError):
-            evaluate.regrade(args)
-        manifest["skill"]["skill_hash"] = evaluate.snapshot_hash(skill_dir)
-        core.write_json(source / "manifest.json", manifest)
-        run, new_manifest, new_criteria, _ = evaluate.regrade(args)
+        from unittest.mock import patch
+
+        # The environment check needs a real Claude CLI; CI has none.
+        with patch.object(
+            evaluate, "check_dependencies", return_value={"claude_version": "test"}
+        ):
+            with self.assertRaises(core.EvalError):
+                evaluate.regrade(args)
+            manifest["skill"]["skill_hash"] = evaluate.snapshot_hash(skill_dir)
+            core.write_json(source / "manifest.json", manifest)
+            run, new_manifest, new_criteria, _ = evaluate.regrade(args)
         self.assertEqual(run, (self.root / "regrade-run").resolve())
         self.assertEqual(new_manifest["cases"]["TC-001"]["state"], "executed")
         self.assertIn("evidence_hashes", new_manifest["cases"]["TC-001"])

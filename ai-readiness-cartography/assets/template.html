@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="ko">
+<html lang="{{LANG}}">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>GrowthNote · AI-Readiness Map</title>
+    <title>{{REPO_NAME}} · AI-Readiness Map</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -192,7 +192,14 @@
         gap: 12px;
       }
 
+      .mini-stat {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+      }
+
       .mini-stat .k {
+        word-break: keep-all;
         font-family: "JetBrains Mono", monospace;
         font-size: 11px;
         color: var(--text-3);
@@ -205,7 +212,7 @@
         color: var(--text);
       }
 
-      /* ============ 10 RULES BAR CHART ============ */
+      /* ============ CATEGORY BAR CHART ============ */
       .rules {
         background: var(--surface);
         border: 1px solid var(--border);
@@ -275,6 +282,13 @@
         font-size: 11.5px;
         color: var(--text-3);
         margin-top: 1px;
+      }
+
+      .rule-row .sub-scores {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 10.5px;
+        color: var(--text-2);
+        margin-top: 2px;
       }
 
       .rule-row .bar {
@@ -454,9 +468,12 @@
         gap: 8px;
         font-weight: 500;
         color: var(--text);
+        overflow-wrap: anywhere;
       }
 
       .panel-list .tag {
+        flex: none;
+        white-space: nowrap;
         font-family: "JetBrains Mono", monospace;
         font-size: 10.5px;
         padding: 2px 7px;
@@ -586,51 +603,43 @@
       <!-- =========== HEADER =========== -->
       <header class="header">
         <div>
-          <div class="eyebrow">레포지토리 감사 · AI 준비도 · v2 루브릭</div>
-          <h1>GrowthNote — AI 준비도 지도</h1>
-          <div class="sub">
-            7개 카테고리 채점 · 구조 지도 · ROI 우선순위 액션
-          </div>
+          <div class="eyebrow">{{T_EYEBROW}}</div>
+          <h1>{{REPO_NAME}} — {{T_TITLE}}</h1>
+          <div class="sub">{{T_SUBTITLE}}</div>
         </div>
         <div class="header-meta">
-          <div>점수 측정 <strong>2026-04-28</strong></div>
-          <div>브랜치 <strong>feat/1-blog</strong></div>
-          <div>모듈 <strong>4</strong> · 컨텍스트 파일 <strong>8</strong></div>
+          <div>{{T_SCORED}} <strong>{{SCORED_AT}}</strong></div>
+          <div>{{T_BRANCH}} <strong>{{GIT_BRANCH}}</strong></div>
+          <div>{{T_MODULES}} <strong>{{MODULES_TOTAL}}</strong> · {{T_CONTEXT_FILES}} <strong>{{CONTEXT_FILES_TOTAL}}</strong></div>
         </div>
       </header>
 
       <!-- =========== SCORE STRIP =========== -->
       <section class="score-strip">
         <div class="score-hero">
-          <div class="label">AI 준비도 지수</div>
+          <div class="label">{{T_INDEX}}</div>
           <div class="value">
-            <span class="num">32</span><span class="denom">/ 100</span>
+            <span class="num">{{TOTAL_SCORE}}</span><span class="denom">/ 100</span>
           </div>
           <div class="grade-row">
-            <span class="grade-badge" style="background: var(--red-soft); color: var(--red)">
-              <span class="grade-dot" style="background: var(--red)"></span> AI-Hostile · 에이전트 비친화
+            <span class="grade-badge" style="background: var(--{{GRADE_COLOR}}-soft); color: var(--{{GRADE_COLOR}})">
+              <span class="grade-dot" style="background: var(--{{GRADE_COLOR}})"></span> {{GRADE}}
             </span>
           </div>
-          <div class="desc">
-            7개 카테고리 · 가중치 차등 (A 15 · B 20 · C 20 · D 15 · E 15
-            · F 10 · G 5). 가장 약한 영역은 <strong>C 암묵지 외부화
-            (2/20)</strong> 와 <strong>D 의존성 매핑 (2/15)</strong>.
-            <strong>컨텍스트 파일에 존재하지 않는 경로 27건</strong>이
-            E1 검증 항목을 무너뜨리는 핵심 원인.
-          </div>
+          <div class="desc">{{SCORE_DESC}}</div>
           <hr />
           <div class="mini-stats">
             <div class="mini-stat">
-              <div class="k">컨텍스트 보유 모듈</div>
-              <div class="v">3 / 4</div>
+              <div class="k">{{T_STAT_COVERED}}</div>
+              <div class="v">{{COVERED_MODULES}} / {{MODULES_TOTAL}}</div>
             </div>
             <div class="mini-stat">
-              <div class="k">잘못된 경로</div>
-              <div class="v" style="color: var(--red)">27</div>
+              <div class="k">{{T_STAT_REFS}}</div>
+              <div class="v">{{BROKEN_REFS}}</div>
             </div>
             <div class="mini-stat">
-              <div class="k">300줄 초과 파일</div>
-              <div class="v">20</div>
+              <div class="k">{{T_STAT_LARGE}}</div>
+              <div class="v">{{LARGE_FILES}}</div>
             </div>
           </div>
         </div>
@@ -639,111 +648,85 @@
         <div class="rules">
           <div class="rules-head">
             <div>
-              <h2>7개 카테고리 — 카테고리별 점수</h2>
+              <h2>{{T_BARS}}</h2>
             </div>
             <div class="legend-inline">
-              <span><i style="background: var(--green)"></i> 75% 이상</span>
-              <span><i style="background: var(--amber)"></i> 50–74%</span>
-              <span><i style="background: var(--red)"></i> 50% 미만</span>
+              <span><i style="background: var(--green)"></i> {{T_GOOD}}</span>
+              <span><i style="background: var(--amber)"></i> {{T_WARN}}</span>
+              <span><i style="background: var(--red)"></i> {{T_BAD}}</span>
             </div>
           </div>
 
           <div class="rule-row">
             <div class="idx">A</div>
             <div>
-              <div class="title">AI 탐색 & 커버리지</div>
-              <div class="sub">
-                4개 핵심 모듈 중 3개에 컨텍스트 보유 · <code>scripts/</code> 미커버
-              </div>
+              <div class="title">{{T_A}}</div>
+              <div class="sub">{{A_NOTE}}</div>
             </div>
-            <div class="bar bar-warn">
-              <span style="width: 73%"></span>
-            </div>
-            <div class="num">11/15</div>
+            <div class="bar {{A_BAR}}"><span style="width: {{A_PCT}}%"></span></div>
+            <div class="num">{{A_SCORE}}</div>
           </div>
 
           <div class="rule-row">
             <div class="idx">B</div>
             <div>
-              <div class="title">컨텍스트 문서 품질</div>
-              <div class="sub">
-                길이 초과 1건 · 명령어 블록 · 주의사항 마커 부족
-              </div>
+              <div class="title">{{T_B}}</div>
+              <div class="sub">{{B_NOTE}}</div>
+              <div class="sub-scores">{{B_SUBS}}</div>
             </div>
-            <div class="bar bar-bad">
-              <span style="width: 30%"></span>
-            </div>
-            <div class="num">6/20</div>
+            <div class="bar {{B_BAR}}"><span style="width: {{B_PCT}}%"></span></div>
+            <div class="num">{{B_SCORE}}</div>
           </div>
 
           <div class="rule-row">
             <div class="idx">C</div>
             <div>
-              <div class="title">암묵지 외부화</div>
-              <div class="sub">
-                MEMORY.md / ADR 부재 · Five-Question 통과 1/5
-              </div>
+              <div class="title">{{T_C}}</div>
+              <div class="sub">{{C_NOTE}}</div>
             </div>
-            <div class="bar bar-bad">
-              <span style="width: 10%"></span>
-            </div>
-            <div class="num">2/20</div>
+            <div class="bar {{C_BAR}}"><span style="width: {{C_PCT}}%"></span></div>
+            <div class="num">{{C_SCORE}}</div>
           </div>
 
           <div class="rule-row">
             <div class="idx">D</div>
             <div>
-              <div class="title">모듈 간 의존성 매핑</div>
-              <div class="sub">
-                ARCHITECTURE.md · mermaid · 의존성 섹션 모두 부재
-              </div>
+              <div class="title">{{T_D}}</div>
+              <div class="sub">{{D_NOTE}}</div>
             </div>
-            <div class="bar bar-bad">
-              <span style="width: 13%"></span>
-            </div>
-            <div class="num">2/15</div>
+            <div class="bar {{D_BAR}}"><span style="width: {{D_PCT}}%"></span></div>
+            <div class="num">{{D_SCORE}}</div>
           </div>
 
           <div class="rule-row">
             <div class="idx">E</div>
             <div>
-              <div class="title">검증 & 품질 게이트</div>
-              <div class="sub">
-                <strong style="color: var(--red)">⚠ 잘못된 경로 27/31 참조</strong> · CODEOWNERS · evals 부재
-              </div>
+              <div class="title">{{T_E}}</div>
+              <div class="sub">{{E_NOTE}}</div>
+              <div class="sub-scores">{{E_SUBS}}</div>
             </div>
-            <div class="bar bar-bad">
-              <span style="width: 33%"></span>
-            </div>
-            <div class="num">5/15</div>
+            <div class="bar {{E_BAR}}"><span style="width: {{E_PCT}}%"></span></div>
+            <div class="num">{{E_SCORE}}</div>
           </div>
 
           <div class="rule-row">
             <div class="idx">F</div>
             <div>
-              <div class="title">신선도 & 자가 유지보수</div>
-              <div class="sub">
-                drift 0% · husky pre-push 존재 · CI 검증 단계 부재
-              </div>
+              <div class="title">{{T_F}}</div>
+              <div class="sub">{{F_NOTE}}</div>
             </div>
-            <div class="bar bar-good">
-              <span style="width: 80%"></span>
-            </div>
-            <div class="num">8/10</div>
+            <div class="bar {{F_BAR}}"><span style="width: {{F_PCT}}%"></span></div>
+            <div class="num">{{F_SCORE}}</div>
           </div>
 
           <div class="rule-row">
             <div class="idx">G</div>
             <div>
-              <div class="title">에이전트 성과 측정</div>
-              <div class="sub">
-                evals/ · benchmarks/ 부재 · 측정 인프라 전무
-              </div>
+              <div class="title">{{T_G}}</div>
+              <div class="sub">{{G_NOTE}}</div>
             </div>
-            <div class="bar bar-bad">
-              <span style="width: 0%"></span>
-            </div>
-            <div class="num">0/5</div>
+            <div class="bar {{G_BAR}}"><span style="width: {{G_PCT}}%"></span></div>
+            <div class="num">{{G_SCORE}}</div>
           </div>
         </div>
       </section>
@@ -752,54 +735,21 @@
       <section class="map-section">
         <div class="map-head">
           <div>
-            <h2>구조 지도</h2>
-            <div class="sub">
-              노드 = 디렉터리 · 엣지 = 의존성 · 카드 내부 수치는 해당
-              영역의 AI 준비도 지표
-            </div>
+            <h2>{{T_MAP}}</h2>
+            <div class="sub">{{T_MAP_SUB}}</div>
           </div>
           <div class="map-legend">
-            <span
-              ><span
-                class="legend-dot"
-                style="background: var(--accent)"
-              ></span>
-              CLAUDE.md 보유</span
-            >
-            <span
-              ><span
-                class="legend-dot"
-                style="background: var(--green)"
-              ></span>
-              테스트</span
-            >
-            <span
-              ><span
-                class="legend-square"
-                style="background: var(--red-soft); border: 1px solid var(--red)"
-              ></span>
-              400줄 초과
-            </span>
-            <span>
-              <span
-                class="legend-line"
-                style="border-color: var(--accent)"
-              ></span>
-              타입 연결
-            </span>
-            <span>
-              <span
-                class="legend-line"
-                style="border-color: var(--border-strong); border-style: dashed"
-              ></span>
-              의존성
-            </span>
+            <span><span class="legend-dot" style="background: var(--accent)"></span> {{T_LEG_CONTEXT}}</span>
+            <span><span class="legend-dot" style="background: var(--green)"></span> {{T_LEG_TEST}}</span>
+            <span><span class="legend-dot" style="background: var(--red)"></span> {{T_LEG_REF}}</span>
+            <span><span class="legend-square" style="background: var(--amber-soft); border: 1px solid var(--amber)"></span> {{T_LEG_WARM}}</span>
+            <span><span class="legend-square" style="background: var(--red-soft); border: 1px solid var(--red)"></span> {{T_LEG_HOT}}</span>
+            <span><span class="legend-line" style="border-color: var(--border-strong); border-style: dashed"></span> {{T_LEG_EDGE}}</span>
           </div>
         </div>
 
         <div class="map-body">
           <svg viewBox="0 0 1180 640" xmlns="http://www.w3.org/2000/svg">
-            <!-- subtle grid -->
             <g class="grid-bg">
               <path d="M0,80 H1180" />
               <path d="M0,160 H1180" />
@@ -815,400 +765,8 @@
               <path d="M900,0 V640" />
               <path d="M1100,0 V640" />
             </g>
-
-            <!-- Column headers -->
-            <text
-              x="200"
-              y="32"
-              text-anchor="middle"
-              class="node-meta"
-              style="font-size: 11px; fill: var(--text-2); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;"
-            >
-              프런트엔드 · apps/web
-            </text>
-            <text
-              x="590"
-              y="32"
-              text-anchor="middle"
-              class="node-meta"
-              style="font-size: 11px; fill: var(--text-2); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;"
-            >
-              백엔드 · apps/api
-            </text>
-            <text
-              x="980"
-              y="32"
-              text-anchor="middle"
-              class="node-meta"
-              style="font-size: 11px; fill: var(--text-2); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;"
-            >
-              데이터 · supabase
-            </text>
-
-            <!-- ============ ROOT CLAUDE.md (top center) ============ -->
-            <g transform="translate(440,60)">
-              <rect
-                class="node-card accent"
-                width="300"
-                height="70"
-                rx="8"
-              />
-              <circle cx="22" cy="22" r="14" class="claude-ring" />
-              <circle cx="22" cy="22" r="6" class="claude-dot" />
-              <text x="44" y="26" class="node-title">
-                CLAUDE.md (root)
-              </text>
-              <text x="44" y="42" class="node-meta">
-                프로젝트 개요 · 아키텍처 · API 엔드포인트 맵
-              </text>
-              <text x="44" y="58" class="node-meta" style="fill: var(--text-2)">
-                60 lines
-              </text>
-              <text
-                x="284"
-                y="26"
-                text-anchor="end"
-                class="node-kpi"
-                style="fill: var(--accent)"
-              >
-                루트
-              </text>
-            </g>
-
-            <!-- ============ apps/web column ============ -->
-            <!-- web CLAUDE.md -->
-            <g transform="translate(60,180)">
-              <rect class="node-card accent" width="280" height="64" rx="8" />
-              <circle cx="22" cy="22" r="12" class="claude-ring" />
-              <circle cx="22" cy="22" r="5" class="claude-dot" />
-              <text x="42" y="26" class="node-title">apps/web/CLAUDE.md</text>
-              <text x="42" y="42" class="node-meta">
-                디렉터리 규약 · 네이밍 · TanStack Query 패턴
-              </text>
-              <text x="264" y="26" text-anchor="end" class="node-kpi">
-                360 ln
-              </text>
-            </g>
-
-            <!-- src/app -->
-            <g transform="translate(60,268)">
-              <rect class="node-card" width="280" height="110" rx="8" />
-              <text x="16" y="24" class="node-title">apps/web/src/app</text>
-              <text x="16" y="40" class="node-meta">
-                Next.js App Router · (app) (auth) (blog)
-              </text>
-
-              <!-- file row: manual -->
-              <g transform="translate(16,52)">
-                <rect class="hot" width="248" height="18" rx="3" />
-                <text x="8" y="13" class="node-meta" style="fill: var(--red); font-weight:600">
-                  manual/page.tsx
-                </text>
-                <text x="240" y="13" text-anchor="end" class="node-meta" style="fill: var(--red); font-weight:600">
-                  557
-                </text>
-              </g>
-
-              <!-- file row: upload -->
-              <g transform="translate(16,74)">
-                <rect class="hot" width="248" height="18" rx="3" />
-                <text x="8" y="13" class="node-meta" style="fill: var(--red); font-weight:600">
-                  upload/page.tsx
-                </text>
-                <text x="240" y="13" text-anchor="end" class="node-meta" style="fill: var(--red); font-weight:600">
-                  502
-                </text>
-              </g>
-            </g>
-
-            <!-- src/components -->
-            <g transform="translate(60,402)">
-              <rect class="node-card" width="280" height="130" rx="8" />
-              <text x="16" y="24" class="node-title">apps/web/src/components</text>
-              <text x="16" y="40" class="node-meta">
-                dashboard · blog · product · upload · layout
-              </text>
-
-              <!-- BlueCard -->
-              <g transform="translate(16,52)">
-                <rect class="hot" width="248" height="18" rx="3" />
-                <text x="8" y="13" class="node-meta" style="fill: var(--red); font-weight:600">
-                  dashboard/BlueCard.tsx
-                </text>
-                <text x="240" y="13" text-anchor="end" class="node-meta" style="fill: var(--red); font-weight:600">
-                  449
-                </text>
-              </g>
-
-              <!-- NotionRenderer -->
-              <g transform="translate(16,74)">
-                <rect class="warm" width="248" height="18" rx="3" />
-                <text x="8" y="13" class="node-meta" style="fill: var(--amber); font-weight:600">
-                  blog/NotionRenderer.tsx
-                </text>
-                <text x="240" y="13" text-anchor="end" class="node-meta" style="fill: var(--amber); font-weight:600">
-                  366
-                </text>
-              </g>
-
-              <!-- RedCard -->
-              <g transform="translate(16,96)">
-                <rect class="warm" width="248" height="18" rx="3" />
-                <text x="8" y="13" class="node-meta" style="fill: var(--amber); font-weight:600">
-                  dashboard/RedCard.tsx
-                </text>
-                <text x="240" y="13" text-anchor="end" class="node-meta" style="fill: var(--amber); font-weight:600">
-                  323
-                </text>
-              </g>
-            </g>
-
-            <!-- src/lib + tests (colocated) -->
-            <g transform="translate(60,556)">
-              <rect class="node-card" width="280" height="64" rx="8" />
-              <circle cx="22" cy="22" r="10" fill="var(--green-soft)" />
-              <circle cx="22" cy="22" r="5" class="test-dot" />
-              <text x="42" y="26" class="node-title">
-                apps/web/src/lib &amp; __tests__
-              </text>
-              <text x="42" y="42" class="node-meta">
-                코로케이션 테스트 ✓ · format · backend · notion · blog
-              </text>
-              <text x="264" y="26" text-anchor="end" class="node-kpi" style="fill: var(--green)">
-                5 suites
-              </text>
-            </g>
-
-            <!-- ============ apps/api column ============ -->
-            <!-- api CLAUDE.md -->
-            <g transform="translate(450,180)">
-              <rect class="node-card accent" width="280" height="64" rx="8" />
-              <circle cx="22" cy="22" r="12" class="claude-ring" />
-              <circle cx="22" cy="22" r="5" class="claude-dot" />
-              <text x="42" y="26" class="node-title">apps/api/CLAUDE.md</text>
-              <text x="42" y="42" class="node-meta">
-                파서 레이아웃 · Red/Blue Box · Template Method
-              </text>
-              <text x="264" y="26" text-anchor="end" class="node-kpi">
-                89 ln
-              </text>
-            </g>
-
-            <!-- app/routers -->
-            <g transform="translate(450,268)">
-              <rect class="node-card" width="280" height="110" rx="8" />
-              <text x="16" y="24" class="node-title">apps/api/app/routers</text>
-              <text x="16" y="40" class="node-meta">
-                upload · dashboard · costs · prices · admin
-              </text>
-
-              <!-- upload.py -->
-              <g transform="translate(16,52)">
-                <rect class="hot" width="248" height="18" rx="3" />
-                <text x="8" y="13" class="node-meta" style="fill: var(--red); font-weight:600">
-                  upload.py
-                </text>
-                <text x="240" y="13" text-anchor="end" class="node-meta" style="fill: var(--red); font-weight:600">
-                  539
-                </text>
-              </g>
-
-              <!-- dashboard.py -->
-              <g transform="translate(16,74)">
-                <rect fill="var(--grid)" width="248" height="18" rx="3" />
-                <text x="8" y="13" class="node-meta" style="fill: var(--text-2)">
-                  dashboard.py
-                </text>
-                <text x="240" y="13" text-anchor="end" class="node-meta" style="fill: var(--text-2)">
-                  269
-                </text>
-              </g>
-            </g>
-
-            <!-- app/services -->
-            <g transform="translate(450,402)">
-              <rect class="node-card" width="280" height="130" rx="8" />
-              <text x="16" y="24" class="node-title">apps/api/app/services</text>
-              <text x="16" y="40" class="node-meta">
-                aggregation · blue_box · file_processor · auth
-              </text>
-
-              <!-- aggregation.py -->
-              <g transform="translate(16,52)">
-                <rect class="hot" width="248" height="18" rx="3" />
-                <text x="8" y="13" class="node-meta" style="fill: var(--red); font-weight:600">
-                  aggregation.py
-                </text>
-                <text x="240" y="13" text-anchor="end" class="node-meta" style="fill: var(--red); font-weight:600">
-                  446
-                </text>
-              </g>
-              <!-- file_processor.py -->
-              <g transform="translate(16,74)">
-                <rect class="warm" width="248" height="18" rx="3" />
-                <text x="8" y="13" class="node-meta" style="fill: var(--amber); font-weight:600">
-                  file_processor.py
-                </text>
-                <text x="240" y="13" text-anchor="end" class="node-meta" style="fill: var(--amber); font-weight:600">
-                  345
-                </text>
-              </g>
-              <!-- blue_box.py -->
-              <g transform="translate(16,96)">
-                <rect fill="var(--grid)" width="248" height="18" rx="3" />
-                <text x="8" y="13" class="node-meta" style="fill: var(--text-2)">
-                  blue_box.py · pure fn
-                </text>
-                <text x="240" y="13" text-anchor="end" class="node-meta" style="fill: var(--text-2)">
-                  210
-                </text>
-              </g>
-            </g>
-
-            <!-- api/tests separate -->
-            <g transform="translate(450,556)">
-              <rect
-                class="node-card"
-                width="280"
-                height="64"
-                rx="8"
-                stroke-dasharray="4 3"
-              />
-              <circle cx="22" cy="22" r="10" fill="var(--green-soft)" />
-              <circle cx="22" cy="22" r="5" class="test-dot" />
-              <text x="42" y="26" class="node-title">
-                apps/api/tests &nbsp;<tspan style="fill: var(--amber); font-weight: 500;">(separate tree)</tspan>
-              </text>
-              <text x="42" y="42" class="node-meta">
-                17 test files · parsers · router · aggregation
-              </text>
-              <text x="264" y="26" text-anchor="end" class="node-kpi" style="fill: var(--green)">
-                17 suites
-              </text>
-            </g>
-
-            <!-- ============ supabase column ============ -->
-            <!-- supabase CLAUDE.md -->
-            <g transform="translate(840,180)">
-              <rect class="node-card accent" width="280" height="64" rx="8" />
-              <circle cx="22" cy="22" r="12" class="claude-ring" />
-              <circle cx="22" cy="22" r="5" class="claude-dot" />
-              <text x="42" y="26" class="node-title">supabase/CLAUDE.md</text>
-              <text x="42" y="42" class="node-meta">
-                스키마 규칙 · RLS · staleness 트리거
-              </text>
-              <text x="264" y="26" text-anchor="end" class="node-kpi">
-                50 ln
-              </text>
-            </g>
-
-            <!-- schema.sql -->
-            <g transform="translate(840,268)">
-              <rect class="node-card" width="280" height="110" rx="8" />
-              <text x="16" y="24" class="node-title">supabase/schema.sql</text>
-              <text x="16" y="40" class="node-meta">
-                canonical DDL · BIGINT KRW · RLS policies
-              </text>
-              <g transform="translate(16,52)">
-                <rect fill="var(--grid)" width="248" height="18" rx="3" />
-                <text x="8" y="13" class="node-meta" style="fill: var(--text-2)">
-                  8 tables · 단일 RLS 패턴
-                </text>
-              </g>
-              <g transform="translate(16,74)">
-                <rect fill="var(--grid)" width="248" height="18" rx="3" />
-                <text x="8" y="13" class="node-meta" style="fill: var(--text-2)">
-                  staleness triggers · ON DELETE CASCADE
-                </text>
-              </g>
-            </g>
-
-            <!-- docs/ -->
-            <g transform="translate(840,402)">
-              <rect class="node-card" width="280" height="110" rx="8" />
-              <text x="16" y="24" class="node-title">docs/ · MEMORY.md</text>
-              <text x="16" y="40" class="node-meta">
-                설계 문서 · 계산 로직 · 의사결정 "Why:"
-              </text>
-              <g transform="translate(16,52)">
-                <rect fill="var(--accent-soft)" width="248" height="18" rx="3" />
-                <text x="8" y="13" class="node-meta" style="fill: var(--accent); font-weight:600">
-                  dashboard-calculation-logic
-                </text>
-              </g>
-              <g transform="translate(16,74)">
-                <rect fill="var(--accent-soft)" width="248" height="18" rx="3" />
-                <text x="8" y="13" class="node-meta" style="fill: var(--accent); font-weight:600">
-                  blue-box-logic · parser-system
-                </text>
-              </g>
-            </g>
-
-            <!-- =================== EDGES =================== -->
-            <!-- Root CLAUDE.md → each sub CLAUDE.md -->
-            <path
-              class="edge edge-dash"
-              d="M500,130 C 500,160 200,160 200,180"
-            />
-            <path
-              class="edge edge-dash"
-              d="M590,130 C 590,160 590,160 590,180"
-            />
-            <path
-              class="edge edge-dash"
-              d="M680,130 C 680,160 980,160 980,180"
-            />
-
-            <!-- Type sync edge: web/src/app ↔ api/routers (thicker) -->
-            <path
-              class="edge edge-type"
-              d="M340,300 C 400,300 400,300 450,300"
-            />
-            <text
-              x="395"
-              y="293"
-              text-anchor="middle"
-              class="node-meta"
-              style="fill: var(--accent); font-weight: 600"
-            >
-              HTTP · JWT 인증
-            </text>
-
-            <!-- Type sync warning: web/lib/types ↔ api/models/schemas -->
-            <path
-              class="edge edge-warn edge-dash"
-              d="M340,588 C 400,540 400,500 450,460"
-            />
-            <text
-              x="395"
-              y="528"
-              text-anchor="middle"
-              class="node-meta"
-              style="fill: var(--amber); font-weight: 600"
-            >
-              types ↔ schemas (manual)
-            </text>
-
-            <!-- api/services → supabase schema -->
-            <path
-              class="edge edge-dash"
-              d="M730,460 C 790,460 790,320 840,320"
-            />
-            <text
-              x="790"
-              y="395"
-              text-anchor="middle"
-              class="node-meta"
-              style="fill: var(--text-2)"
-            >
-              DB 입출력
-            </text>
-
-            <!-- docs ← CLAUDE.md root -->
-            <path
-              class="edge edge-dash"
-              d="M740,95 C 900,95 980,95 980,402"
-            />
+            <!-- snippets: references/map-snippets.md -->
+            {{MAP_SVG}}
           </svg>
         </div>
       </section>
@@ -1217,144 +775,26 @@
       <div class="findings">
         <section class="panel panel-strength">
           <div class="panel-head">
-            <h3>강점</h3>
-            <span class="count">유지할 것들</span>
+            <h3>{{T_WINS}}</h3>
+            <span class="count">{{T_WINS_SUB}}</span>
           </div>
           <ul class="panel-list">
-            <li>
-              <div class="head">
-                <span class="tag tag-rule">Cat A</span>
-                root + 3 module CLAUDE.md 체계
-              </div>
-              <div class="note">
-                root → web → api → supabase. 에이전트가 상위에서 하위로
-                드릴다운하며 필요한 만큼만 context 로드 가능.
-              </div>
-            </li>
-            <li>
-              <div class="head">
-                <span class="tag tag-rule">Cat F</span>
-                Context drift 0% · husky pre-push 가동
-              </div>
-              <div class="note">
-                CLAUDE.md mtime 이 최근 코드 변경보다 신선함. pre-push
-                hook 으로 빌드 게이트 가동 중.
-              </div>
-            </li>
-            <li>
-              <div class="head">
-                <span class="tag tag-rule">Cat E3</span>
-                Build/test infra 완비
-              </div>
-              <div class="note">
-                <code>turbo.json</code> + 각 앱의 <code>package.json</code>
-                / <code>pyproject.toml</code>. agent가 변경 후 검증
-                가능한 명령 즉시 실행 가능.
-              </div>
-            </li>
-            <li>
-              <div class="head">
-                <span class="tag tag-rule">Cat A</span>
-                Monorepo 3-province 경계
-              </div>
-              <div class="note">
-                apps/web · apps/api · supabase 가 명확히 분리되어 병렬
-                agent run 시 충돌 없음.
-              </div>
-            </li>
+            {{WINS_ITEMS}}
           </ul>
         </section>
 
         <section class="panel panel-risk">
           <div class="panel-head">
-            <h3>최우선 ROI 액션</h3>
-            <span class="count">우선순위 정렬</span>
+            <h3>{{T_ACTIONS}}</h3>
+            <span class="count">{{T_ACTIONS_SUB}}</span>
           </div>
           <ul class="panel-list">
-            <li>
-              <div class="head">
-                <span class="tag tag-rule" style="background: var(--red-soft); color: var(--red)">Cat E1 · S</span>
-                hallucinated path 27 / 31 ref 즉시 수정
-              </div>
-              <div class="note">
-                <strong>Effort 0.5 hr · Impact 10/10.</strong>
-                <code>AGENTS.md</code> · 각 CLAUDE.md 의 잘못된 경로
-                (예: <code>src/middleware.ts</code> → 실제는
-                <code>apps/web/src/middleware.ts</code>) 를 정정. agent
-                의 가짜 path-following 즉시 차단.
-              </div>
-            </li>
-            <li>
-              <div class="head">
-                <span class="tag tag-rule">Cat A · S</span>
-                <code>scripts/</code> module 에 CLAUDE.md 신설
-              </div>
-              <div class="note">
-                <strong>Effort 0.5 hr · Impact 9/10.</strong>
-                navigation coverage 3/4 → 4/4. 신규 script 작성 시
-                agent가 패턴 복제 가능.
-              </div>
-            </li>
-            <li>
-              <div class="head">
-                <span class="tag tag-rule">Cat F · S</span>
-                CI / pre-push hook 에 path validation 추가
-              </div>
-              <div class="note">
-                <strong>Effort 1.0 hr · Impact 8/10.</strong>
-                stale reference 가 머지 시점에서 자동 차단. F1 향상 +
-                E1 회귀 방지 동시 달성.
-              </div>
-            </li>
-            <li>
-              <div class="head">
-                <span class="tag tag-rule">Cat C · M</span>
-                MEMORY.md / docs/adr/ 도입으로 tribal knowledge 외부화
-              </div>
-              <div class="note">
-                <strong>Effort 3.0 hr · Impact 8/10.</strong>
-                Red/Blue Box 차이 · VAT 처리 · staleness 전략 등 의사결정
-                근거를 외부 store 에. 신규 agent run 시 오류 ↓.
-              </div>
-            </li>
-            <li>
-              <div class="head">
-                <span class="tag tag-rule">Cat D · M</span>
-                ARCHITECTURE.md + mermaid dependency 그림
-              </div>
-              <div class="note">
-                <strong>Effort 2.5 hr · Impact 7/10.</strong>
-                cross-module ripple 시각화. 변경 영향 분석 시간 절반.
-              </div>
-            </li>
-            <li>
-              <div class="head">
-                <span class="tag tag-rule">Cat B · M</span>
-                <code>apps/web/CLAUDE.md</code> 압축 (360 → ~80 lines)
-              </div>
-              <div class="note">
-                <strong>Effort 2.0 hr · Impact 7/10.</strong>
-                "compass, not encyclopedia" 원칙. agent context 로드 시간
-                단축 + 핵심 정보 가시성 ↑.
-              </div>
-            </li>
-            <li>
-              <div class="head">
-                <span class="tag tag-rule">Cat G · L</span>
-                <code>evals/</code> 디렉터리 + 대표 task pass-rate 측정
-              </div>
-              <div class="note">
-                <strong>Effort 6.0 hr · Impact 6/10.</strong>
-                개선 ROI 자체를 정량화. AI 회귀 측정 가능.
-              </div>
-            </li>
+            {{ACTION_ITEMS}}
           </ul>
         </section>
       </div>
 
-      <footer>
-        GrowthNote · AI 준비도 감사 · v2 루브릭 (7 카테고리 / 100점) · 측정일 2026-04-28
-      </footer>
+      <footer>{{REPO_NAME}} · AI-Readiness {{RUBRIC_VERSION}} · {{T_SCORED}} {{SCORED_AT}}</footer>
     </div>
   </body>
 </html>

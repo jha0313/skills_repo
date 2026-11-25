@@ -1,0 +1,35 @@
+{
+ "id": "x02", "meta": {"public": true, "name": "x02"},
+ "model": {
+  "type": "social-post", "title": "내가 Claude Code를 쓰는 방법", "source": "x.com/bcherny/status/2007179832300581177 — 본인 글 15개. 이미지·답글 안 읽음", "missing": "외부 도구(Slack·BigQuery·Sentry), 세션 옮기기(`&`·`--teleport`), ralph-wiggum",
+  "facts": [
+   {"id": "f1", "t": "많이들 물어서 쓴 답이다. 설정은 의외로 기본에 가깝다", "src": "1/15"},
+   {"id": "f2", "t": "아주 긴 일: 배경 에이전트나 Stop 훅으로 확인", "src": "13/15"},
+   {"id": "f3", "t": "확인 방법은 분야마다 다르다", "src": "14/15"}
+  ],
+  "claims": [
+   {"id": "c1", "t": "터미널 5개 + 웹 5–10개를 동시에(폰에서도 시작). 알림이 오면 답한다", "ev": "사례", "quote": "I run 5 Claudes in parallel in my terminal.", "src": "2–3/15"},
+   {"id": "c2", "t": "전부 Opus 4.5. 느려도 덜 이끌어서 거의 항상 더 빨리 끝난다", "ev": "주장만", "quote": "it is almost always faster than using a smaller model in the end.", "src": "4/15"},
+   {"id": "c3", "t": "Claude가 틀리면 팀이 git의 CLAUDE.md에 적어 다음을 막는다", "ev": "사례", "quote": "Anytime we see Claude do something incorrectly we add it to the CLAUDE.md", "src": "5–6/15"},
+   {"id": "c4", "t": "대부분 Plan 모드로 시작. 계획이 좋으면 자동 승인 → 대개 한 번에", "ev": "사례", "quote": "Most sessions start in Plan mode", "src": "7/15"},
+   {"id": "c5", "t": "날마다 하는 일은 슬래시 명령(/commit-push-pr)과 서브에이전트", "ev": "사례", "src": "8–9/15"},
+   {"id": "c6", "t": "PostToolUse 훅이 코드 포맷의 마지막 10%를 맡는다", "ev": "사례", "src": "10/15"},
+   {"id": "c7", "t": "권한 건너뛰기 대신 안전한 명령만 /permissions로 허락", "ev": "사례", "src": "11/15"},
+   {"id": "c8", "t": "확인 방법을 주면 결과 품질이 2–3배", "ev": "주장만", "src": "14/15"}
+  ]
+ },
+ "html": {
+  "one": {"t": "Claude Code를 만든 Boris Cherny의 사용법. 첫째는 \"Claude에게 제 일을 확인할 방법을 줘라\"", "f": ["f1"]},
+  "why": {"t": "많이들 물어서 쓴 답이다. 설정은 의외로 기본에 가깝다. 정답은 하나가 아니고 팀원마다 매우 다르게 쓴다고 한다.", "f": ["f1"]},
+  "claims": "all",
+  "run": [{"t": "Plan 모드(`shift+tab` 두 번)로 계획을 주고받는다", "f": ["c4"]}, {"t": "계획이 좋으면 자동 승인, 대개 한 번에 끝난다", "f": ["c4"]}, {"t": "Claude가 브라우저를 열어 화면을 시험한다(14/15)", "f": ["c8"]}, {"t": "돌아가고 쓰기 좋을 때까지 고친다", "f": ["c8"]}],
+  "catch": [{"t": "아주 긴 일(13/15): 끝나면 배경 에이전트나 Stop 훅으로 확인. 권한 건너뛰기는 sandbox에서만", "f": ["f2"]}, {"t": "확인 방법은 분야마다 다르다", "f": ["f3"]}]
+ },
+ "interactive": {
+  "one": {"t": "Claude Code를 만든 Boris Cherny의 사용법 13가지. 가장 중요하게 꼽은 것은 \"Claude에게 제 일을 확인할 방법을 줘라\"", "f": ["f1"]},
+  "why": {"t": "많이들 물어서 쓴 답이다. 설정은 의외로 기본에 가깝다. 정답은 하나가 아니고 팀원마다 매우 다르게 쓴다고 한다.", "f": ["f1"]},
+  "claims": "all",
+  "run": [{"t": "Plan 모드로 시작해 계획이 마음에 들 때까지 주고받는다.", "f": ["c4"]}, {"t": "올리는 변경마다 브라우저를 열어 화면을 시험한다.", "f": ["c8"]}, {"t": "틀린 것은 CLAUDE.md에 적는다.", "f": ["c3"]}],
+  "ask": [{"q": "아주 긴 일이라 지켜볼 수 없다면?", "a": "끝나면 배경 에이전트나 Stop 훅으로 확인한다. 허락 창은 sandbox에서만 없앤다(13/15).", "f": ["f2"]}, {"q": "모든 분야에서 브라우저로 확인하나?", "a": "아니다. 확인 방법은 분야마다 다르다(14/15).", "f": ["f3"]}]
+ }
+}

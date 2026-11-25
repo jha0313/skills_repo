@@ -1,16 +1,13 @@
 #!/usr/bin/env python3
-"""AI-Readiness Cartography — repo scorer (v2 rubric, 100 points, 7 categories).
+"""AI-Readiness Cartography — 저장소 채점기 (루브릭 v2.1, 100점, 7 카테고리).
 
-Audits a repository against the 7-category AI-Ready rubric and emits structured
-findings, ROI-ranked actions, and a JSON scorecard suitable for the dashboard
-template at assets/template.html.
+저장소를 읽기만 하고, 점수·지적·액션을 JSON과 markdown으로 낸다.
 
-Usage:
-    python score.py [repo_path]                # default: .
-    python score.py /path/to/repo --json out.json
-    python score.py . --markdown               # human-readable to stdout (default)
+    python3 -I score.py [저장소]                   # 기본: 현재 폴더, markdown 출력
+    python3 -I score.py 저장소 --json score.json   # fill_template.py가 읽는 JSON도 저장
+    python3 -I score.py 저장소 --lang en           # 문구만 영어로 (점수는 같다)
 
-Pure stdlib — no external dependencies.
+표준 라이브러리만 쓴다.
 """
 from __future__ import annotations
 
@@ -32,15 +29,21 @@ IGNORE_DIRS = {
     "node_modules", ".venv", "venv", ".git", ".next", "dist", "build",
     "__pycache__", ".turbo", ".ruff_cache", ".pytest_cache", ".mypy_cache",
     "target", "out", "coverage", ".cache", ".idea", ".vscode",
+    ".tox", ".nox", "site-packages",
 }
 CODE_EXTS = {".py", ".ts", ".tsx", ".js", ".jsx", ".go", ".rs", ".java", ".kt", ".rb", ".php", ".sql", ".swift", ".cs"}
 CONTEXT_FILES = ("CLAUDE.md", "AGENTS.md", "README.md")
 PRIMARY_CONTEXT = ("CLAUDE.md", "AGENTS.md")  # anything stronger than README
 
 # Heuristic regex
+RE_URL = re.compile(r"[A-Za-z][A-Za-z0-9+.-]*://[^\s)>\]\"'`]+")
+# 확장자 순서(tsx가 ts보다 앞)와 끝 경계가 둘 다 있어야 page.tsx를 page.ts로 자르지 않는다.
+# 앞 경계: ~/x, $HOME/x, <dir>/x, my-app/x의 app/x 같은 꼬리를 저장소 경로로 세지 않는다.
 RE_PATH_REF = re.compile(
-    r"(?<![A-Za-z0-9_/])"
-    r"((?:\./|[A-Za-z0-9_]+/)[A-Za-z0-9_./-]+\.(?:py|ts|tsx|js|jsx|md|sql|json|yaml|yml|toml|html|css|sh|go|rs|java|kt|rb|php))"
+    r"(?<![A-Za-z0-9_./~$@%{}<>*\\-])"
+    r"((?:(?:\.{1,2}/)+(?:[A-Za-z0-9_.-]+/)*|(?:\.?[A-Za-z0-9_][A-Za-z0-9_.-]*/)+)"
+    r"[A-Za-z0-9_.-]+\.(?:tsx|ts|jsx|json|js|py|md|sql|yaml|yml|toml|html|css|sh|go|rs|java|kt|rb|php))"
+    r"(?![A-Za-z0-9_])"
 )
 RE_BASH_FENCE = re.compile(r"```(?:bash|sh|shell|zsh|console)\s*\n([\s\S]*?)```", re.IGNORECASE)
 RE_NON_OBVIOUS = re.compile(r"\b(Why:|Note:|Gotcha|Warning|Don't|Caveat|Important:|반드시|주의)", re.IGNORECASE)
@@ -49,6 +52,80 @@ RE_DEPS_HEADING = re.compile(r"^#+\s.*(depend|cross[- ]module|imports?|see also|
 RE_PURPOSE_HEADING = re.compile(r"^#+\s.*(purpose|owns?|configures?|overview)", re.IGNORECASE | re.MULTILINE)
 RE_PATTERN_HEADING = re.compile(r"^#+\s.*(pattern|how to|common change|workflow|recipe)", re.IGNORECASE | re.MULTILINE)
 RE_MERMAID = re.compile(r"```mermaid", re.IGNORECASE)
+
+
+# ----------------------------------------------------------------------------
+# Messages (ko, en) — 점수는 언어와 무관하고 문구만 바뀐다
+# ----------------------------------------------------------------------------
+LANGS = ("ko", "en")
+MSG: dict[str, tuple[str, str]] = {
+    "a.gap": ("context가 없는 핵심 module {n}개: {items}",
+              "{n} core modules without context: {items}"),
+    "a.nomodule": ("하위 폴더에서 코드가 든 module을 찾지 못함 (루트에 바로 둔 코드는 module로 세지 않음)",
+                   "no code-bearing sub-directory found (code placed directly at the root is not counted as a module)"),
+    "a.root": ("루트에 CLAUDE.md도 AGENTS.md도 없음 — 진입점 안내 없음",
+               "no CLAUDE.md or AGENTS.md at the root — no entry-point briefing"),
+    "b.none": ("context 파일이 하나도 없음", "no context files at all"),
+    "b.long": ("100줄을 넘는 context {n}건: {items}", "{n} context files over 100 lines: {items}"),
+    "b.quick": ("bash 코드 블록이 적음 — 바로 쓸 명령을 넣을 것", "too few bash code blocks — add ready-to-run commands"),
+    "b.keyfiles": ("핵심 파일 경로가 적음 — 3~5개를 적을 것", "too few key file paths cited — list 3-5"),
+    "b.nonobvious": ("Why·Note·Gotcha처럼 숨은 규칙을 알리는 표시가 적음",
+                     "too few hidden-rule markers like Why/Note/Gotcha"),
+    "b.crossref": ("관련 module·context로 가는 링크가 적음", "too few cross-links between related modules / context"),
+    "c.store": ("MEMORY.md·ADR·docs/decisions가 없음 — 결정 이유를 남길 곳이 없음",
+                "no MEMORY.md / ADR / docs/decisions — nowhere to keep decisions"),
+    "c.deps": ("module 절반 이상에 의존성 절이 없음", "dependencies section missing in more than half of modules"),
+    "c.patterns": ("module 절반 이상에 '흔한 수정 방법' 절이 없음",
+                   "common modification patterns section missing in more than half of modules"),
+    "d.arch": ("ARCHITECTURE.md나 의존성 지도가 없음", "ARCHITECTURE.md / dependency map missing"),
+    "d.mermaid": ("context 파일에 mermaid 그림이 없음", "no mermaid diagram in the context files"),
+    "d.section": ("어떤 context 파일에도 의존성 절이 없음", "no dependency section in any context file"),
+    "e.refs": ("없는 경로 후보 {n}건 (참조 {total}건 중) — 예: {items}",
+               "{n} candidate missing paths (of {total} refs) — e.g. {items}"),
+    "e.review": ("CODEOWNERS도 PR 템플릿도 없음", "no CODEOWNERS / PR template"),
+    "e.evals": ("에이전트 평가·프롬프트 시험 폴더가 없음", "no agent eval / prompt test directory"),
+    "f.drift": ("module {total}개 중 {n}개의 context가 코드보다 30일 넘게 뒤처짐",
+                "context for {n}/{total} modules is 30+ days behind the code"),
+    "f.mtime": ("module {n}개는 git 커밋이 없어 파일 시각(mtime)으로 판정 — 복사·압축 해제 뒤에는 믿을 수 없음",
+                "{n} modules have no git commits and were judged by file mtime — unreliable after a copy or unzip"),
+    "f.shallow": ("얕은 clone이라 낡음을 판정하지 못함(중간 점수 3/6) — git fetch --unshallow 뒤 다시 실행",
+                  "shallow clone, drift not judged (neutral 3/6) — run git fetch --unshallow and score again"),
+    "f.ci": ("CI 워크플로에서 문서·context 검사로 보이는 낱말을 찾지 못함",
+             "no word suggesting a docs / context check in CI workflows"),
+    "f.hook": ("husky pre-commit·pre-push hook 파일이 없음", "no husky pre-commit / pre-push hook file"),
+    "g.evals": ("에이전트 평가·benchmark 폴더나 결과 파일이 없음",
+                "no agent eval / benchmark directories or result files"),
+    "g.telemetry": ("AI 사용 기록의 단서가 없음 (session log / OpenTelemetry)",
+                    "no AI usage telemetry hints (session log / OpenTelemetry)"),
+    "i.total": ("총점 {total}/100 · 등급 {grade}", "Total {total}/100 · grade {grade}"),
+    "i.weak": ("가장 낮은 카테고리: {k} {name} {score}/{max}", "Lowest category: {k} {name} {score}/{max}"),
+    "i.refs": ("없는 경로 후보 {n}건 — 하나씩 열어 확인할 것", "{n} candidate missing paths — open and verify each one"),
+    "i.drift": ("낡은 context 비율 {pct}", "context drift {pct}"),
+    "act.a.t": ("핵심 module {n}개에 CLAUDE.md 또는 AGENTS.md 추가 ({items})",
+                "Add CLAUDE.md or AGENTS.md to {n} core modules ({items})"),
+    "act.a.i": ("에이전트가 들어갈 곳을 찾으려고 뒤지는 일을 줄인다", "less searching before the agent finds the right place"),
+    "act.b.t": ("100줄을 넘는 context 파일을 줄이고 자세한 내용은 링크로",
+                "Shorten context files over 100 lines and link out to details"),
+    "act.b.i": ("매번 읽는 양이 줄고 핵심이 앞에 온다", "less text loaded every time, key points come first"),
+    "act.c.t": ("MEMORY.md 또는 docs/adr/에 결정 이유 남기기", "Record decisions in MEMORY.md or docs/adr/"),
+    "act.c.i": ("사람 머릿속 규칙을 에이전트도 찾아 읽을 수 있다", "rules kept in people's heads become readable by agents"),
+    "act.d.t": ("ARCHITECTURE.md 또는 mermaid 의존성 그림 추가", "Add ARCHITECTURE.md or a mermaid dependency diagram"),
+    "act.d.i": ("한 곳을 고치면 어디가 바뀌는지 따라갈 수 있다", "makes it possible to trace what a change affects"),
+    "act.e.t": ("context의 없는 경로 후보 {n}건 확인하고 고치기", "Verify and fix {n} candidate missing paths in context"),
+    "act.e.i": ("에이전트가 없는 파일을 찾아 헤매지 않는다", "stops agents from following paths that do not exist"),
+    "act.f.t": ("CI나 pre-push hook에 context 경로 검사 추가", "Add context path validation to CI or a pre-push hook"),
+    "act.f.i": ("틀린 경로를 합치기 전에 잡는다", "catches broken paths before merge"),
+    "act.god.t": ("500줄 넘는 파일 {n}개 중 큰 것부터 나누기: {items}",
+                  "Split the largest of {n} files over 500 lines: {items}"),
+    "act.god.i": ("한 번에 읽는 양이 줄어든다", "less to read at once"),
+    "act.g.t": ("evals/ 폴더와 대표 작업 통과율 측정 도입", "Introduce evals/ and measure pass rate on representative tasks"),
+    "act.g.i": ("고친 것이 실제로 나아졌는지 잴 수 있다", "lets you measure whether a change helped"),
+}
+_lang = "ko"
+
+
+def msg(key: str, **kw: Any) -> str:
+    return MSG[key][LANGS.index(_lang)].format(**kw)
 
 
 # ----------------------------------------------------------------------------
@@ -100,24 +177,34 @@ class Report:
 # ----------------------------------------------------------------------------
 # Discovery
 # ----------------------------------------------------------------------------
+def ignored_dir(d: Path) -> bool:
+    """탐색하지 않을 폴더. 이름이 정해진 것과, 이름이 무엇이든 pyvenv.cfg가 있는 가상환경."""
+    return d.name in IGNORE_DIRS or (d / "pyvenv.cfg").is_file()
+
+
+def inside_ignored(p: Path, repo: Path) -> bool:
+    """저장소 안쪽 경로만 본다. 저장소가 놓인 위치는 점수를 바꾸지 않는다."""
+    return any(ignored_dir(d) for d in p.parents if d != repo and d.is_relative_to(repo))
+
+
 def walk_files(root: Path) -> list[Path]:
     out: list[Path] = []
     for r, dirs, files in os.walk(root):
-        dirs[:] = [d for d in dirs if d not in IGNORE_DIRS and not d.startswith(".")]
+        dirs[:] = [d for d in dirs if not ignored_dir(Path(r) / d) and not d.startswith(".")]
         for f in files:
             out.append(Path(r) / f)
     return out
 
 
 def find_core_modules(repo: Path) -> list[Module]:
-    """Top-level + apps/* + packages/* + services/* code-bearing dirs."""
+    """Top-level + apps/* + packages/* + services/* + src/(features|modules|domains)/*."""
     candidates: list[Path] = []
 
     # top-level dirs
     for d in sorted(repo.iterdir()):
         if not d.is_dir():
             continue
-        if d.name in IGNORE_DIRS or d.name.startswith("."):
+        if ignored_dir(d) or d.name.startswith("."):
             continue
         candidates.append(d)
 
@@ -128,29 +215,50 @@ def find_core_modules(repo: Path) -> list[Module]:
             # remove the parent from candidates if there
             candidates = [c for c in candidates if c != parent]
             for d in sorted(parent.iterdir()):
-                if d.is_dir() and d.name not in IGNORE_DIRS:
+                if d.is_dir() and not ignored_dir(d):
                     candidates.append(d)
+
+    # 단일 앱의 도메인 폴더. 코드가 든 하위 폴더가 2개 이상일 때만 펼친다.
+    domain_roots: list[Path] = []
+    for pattern in ("features", "modules", "domains"):
+        parent = repo / "src" / pattern
+        if not parent.is_dir():
+            continue
+        domains = [d for d in sorted(parent.iterdir())
+                   if d.is_dir() and not ignored_dir(d) and not d.name.startswith(".") and code_file_count(d)]
+        if len(domains) >= 2:
+            domain_roots.append(parent)
+            candidates.extend(domains)
 
     modules: list[Module] = []
     for d in candidates:
-        code_count = 0
-        for r, dirs, files in os.walk(d):
-            dirs[:] = [x for x in dirs if x not in IGNORE_DIRS and not x.startswith(".")]
-            for f in files:
-                if Path(f).suffix in CODE_EXTS:
-                    code_count += 1
+        # src는 펼친 도메인 밖의 코드만 센다. 남는 코드가 없으면 module이 아니다.
+        code_count = code_file_count(d, skip=domain_roots)
         if code_count == 0:
             continue
         ctx_file, ctx_kind = pick_context_file(d)
+        if ctx_file is None and d.parent in domain_roots:
+            # 도메인은 src/features, src에 있는 안내를 물려받는다 (폴더마다 파일을 늘리게 하지 않는다)
+            ctx_file, ctx_kind = pick_context_file(d.parent)
+            if ctx_file is None:
+                ctx_file, ctx_kind = pick_context_file(d.parent.parent)
         modules.append(Module(
             path=d,
-            rel=str(d.relative_to(repo)),
+            rel=d.relative_to(repo).as_posix(),
             code_files=code_count,
             has_context=ctx_file is not None,
             context_file=ctx_file,
             context_kind=ctx_kind,
         ))
     return modules
+
+
+def code_file_count(d: Path, skip: list[Path] | tuple[()] = ()) -> int:
+    count = 0
+    for r, dirs, files in os.walk(d):
+        dirs[:] = [x for x in dirs if not ignored_dir(Path(r) / x) and not x.startswith(".") and Path(r) / x not in skip]
+        count += sum(1 for f in files if Path(f).suffix in CODE_EXTS)
+    return count
 
 
 def pick_context_file(d: Path) -> tuple[Path | None, str]:
@@ -163,17 +271,39 @@ def pick_context_file(d: Path) -> tuple[Path | None, str]:
 
 def find_all_context_files(repo: Path) -> list[Path]:
     out: list[Path] = []
+    seen: set[Path] = set()  # CLAUDE.md -> AGENTS.md 링크를 두 번 세지 않는다
     for r, dirs, files in os.walk(repo):
-        dirs[:] = [d for d in dirs if d not in IGNORE_DIRS and not d.startswith(".")]
-        for f in files:
-            if f in CONTEXT_FILES:
-                out.append(Path(r) / f)
+        dirs[:] = [d for d in dirs if not ignored_dir(Path(r) / d) and not d.startswith(".")]
+        for f in sorted(files):
+            p = Path(r) / f
+            if f in CONTEXT_FILES and p.resolve() not in seen:
+                seen.add(p.resolve())
+                out.append(p)
     return out
 
 
-def find_root_claude(repo: Path) -> Path | None:
-    p = repo / "CLAUDE.md"
-    return p if p.exists() else None
+def find_path_refs(text: str) -> set[str]:
+    return set(RE_PATH_REF.findall(RE_URL.sub(" ", text)))
+
+
+def ref_exists(ref: str, ctx: Path, repo: Path) -> bool:
+    """context 파일의 폴더부터 저장소 루트까지 올라가며 기준으로 삼아 본다."""
+    base = ctx.parent
+    while True:
+        if (base / ref).exists():
+            return True
+        if base == repo:
+            return False
+        base = base.parent
+
+
+def find_root_context(repo: Path) -> Path | None:
+    """루트 진입점. CLAUDE.md와 AGENTS.md를 똑같이 본다."""
+    for name in PRIMARY_CONTEXT:
+        p = repo / name
+        if p.exists():
+            return p
+    return None
 
 
 def count_lines(p: Path) -> int:
@@ -200,21 +330,23 @@ def file_mtime(p: Path) -> float:
 # ----------------------------------------------------------------------------
 # A. Navigation Coverage
 # ----------------------------------------------------------------------------
-def score_a(modules: list[Module], root_claude: Path | None) -> CategoryScore:
-    total = max(1, len(modules))
+def score_a(modules: list[Module], root_context: Path | None) -> CategoryScore:
+    total = len(modules)
     covered = sum(1 for m in modules if m.has_context)
-    coverage = covered / total
+    coverage = covered / total if total else 0.0
     pts = round(coverage * 15)
-    if root_claude is None:
+    if root_context is None:
         pts = max(0, pts - 2)
     pts = max(0, min(15, pts))
 
     findings: list[str] = []
-    if coverage < 1.0:
+    if not modules:
+        findings.append(msg("a.nomodule"))
+    elif coverage < 1.0:
         gap_modules = [m.rel for m in modules if not m.has_context]
-        findings.append(f"context 미보유 핵심 module {len(gap_modules)}개: {', '.join(gap_modules[:6])}")
-    if root_claude is None:
-        findings.append("root CLAUDE.md 부재 — 진입점 브리핑 없음")
+        findings.append(msg("a.gap", n=len(gap_modules), items=", ".join(gap_modules[:6])))
+    if root_context is None:
+        findings.append(msg("a.root"))
 
     return CategoryScore(
         name="AI Navigation & Coverage",
@@ -224,7 +356,7 @@ def score_a(modules: list[Module], root_claude: Path | None) -> CategoryScore:
             "core_modules": total,
             "covered_modules": covered,
             "coverage_ratio": round(coverage, 3),
-            "root_claude": str(root_claude.name) if root_claude else None,
+            "root_context": root_context.name if root_context else None,
         },
         findings=findings,
     )
@@ -237,7 +369,7 @@ def score_b(context_files: list[Path], repo: Path) -> CategoryScore:
     if not context_files:
         return CategoryScore(name="Context Document Quality", score=0, max=20,
                              evidence={"context_files": 0},
-                             findings=["context file 자체가 없음"])
+                             findings=[msg("b.none")])
 
     n = len(context_files)
     sub: dict[str, int] = {}
@@ -256,8 +388,8 @@ def score_b(context_files: list[Path], repo: Path) -> CategoryScore:
     key_ratio = 0.0
     for p in context_files:
         text = read_text(p)
-        refs = RE_PATH_REF.findall(text)
-        uniq = len(set(refs))
+        refs = find_path_refs(text)
+        uniq = len(refs)
         if uniq >= 3:
             key_ratio += 1
         elif uniq >= 1:
@@ -278,17 +410,17 @@ def score_b(context_files: list[Path], repo: Path) -> CategoryScore:
     findings: list[str] = []
     if over_long:
         findings.append(
-            f"conciseness 초과(>100 lines) context {len(over_long)}건: "
-            + ", ".join(f"{p.relative_to(repo)} ({ln})" for p, ln in over_long[:4])
+            msg("b.long", n=len(over_long),
+                items=", ".join(f"{p.relative_to(repo)} ({ln})" for p, ln in over_long[:4]))
         )
     if sub["B2_QuickCommands"] < 3:
-        findings.append("bash 코드블록이 부족 — quick command 보강 필요")
+        findings.append(msg("b.quick"))
     if sub["B3_KeyFiles"] < 3:
-        findings.append("핵심 파일 경로 인용 부족 — 3-5개 명시 권장")
+        findings.append(msg("b.keyfiles"))
     if sub["B4_NonObvious"] < 3:
-        findings.append("Why/Note/Gotcha 같은 hidden rule 마커 부족")
+        findings.append(msg("b.nonobvious"))
     if sub["B5_CrossRefs"] < 3:
-        findings.append("관련 module / context 간 cross-link 부족")
+        findings.append(msg("b.crossref"))
 
     return CategoryScore(
         name="Context Document Quality",
@@ -355,11 +487,11 @@ def score_c(modules: list[Module], repo: Path) -> CategoryScore:
 
     findings: list[str] = []
     if not has_tribal_store:
-        findings.append("MEMORY.md / ADR / docs/decisions 부재 — tribal knowledge 외부화 store 없음")
+        findings.append(msg("c.store"))
     if q_pass[3] < n / 2:
-        findings.append("Cross-module dependencies 섹션이 절반 이상 module에서 누락")
+        findings.append(msg("c.deps"))
     if q_pass[1] < n / 2:
-        findings.append("Common modification patterns 섹션 누락")
+        findings.append(msg("c.patterns"))
 
     return CategoryScore(
         name="Tribal Knowledge Externalization",
@@ -408,11 +540,11 @@ def score_d(repo: Path, context_files: list[Path]) -> CategoryScore:
 
     findings: list[str] = []
     if not has_arch:
-        findings.append("ARCHITECTURE.md / dependency map 부재")
+        findings.append(msg("d.arch"))
     if not has_mermaid:
-        findings.append("mermaid 다이어그램 없음 — 시각적 의존도 표현 부재")
+        findings.append(msg("d.mermaid"))
     if has_deps_section == 0:
-        findings.append("어떤 context file에도 cross-module dependency 섹션 없음")
+        findings.append(msg("d.section"))
 
     return CategoryScore(
         name="Cross-Module Dependency Mapping",
@@ -439,11 +571,9 @@ def score_e(repo: Path, context_files: list[Path]) -> CategoryScore:
     bad_refs: list[tuple[Path, str]] = []
     for p in context_files:
         text = read_text(p)
-        for ref in set(RE_PATH_REF.findall(text)):
+        for ref in sorted(find_path_refs(text)):
             total_refs += 1
-            # try repo-relative and context-file-relative
-            candidates = [repo / ref, p.parent / ref]
-            if not any(c.exists() for c in candidates):
+            if not ref_exists(ref, p, repo):
                 bad_refs.append((p, ref))
     if total_refs == 0:
         sub["E1_RefAccuracy"] = 2  # neutral — nothing to verify
@@ -465,7 +595,8 @@ def score_e(repo: Path, context_files: list[Path]) -> CategoryScore:
 
     # E3 Task validation commands actually exist
     have_pkg_json = (repo / "package.json").exists()
-    have_pyproject = (repo / "pyproject.toml").exists() or (repo / "apps/api/pyproject.toml").exists() or any(repo.glob("**/pyproject.toml"))
+    have_pyproject = (repo / "pyproject.toml").exists() or (repo / "apps/api/pyproject.toml").exists() or any(
+        not inside_ignored(p, repo) for p in repo.glob("**/pyproject.toml"))
     have_make = (repo / "Makefile").exists()
     have_husky = (repo / ".husky").exists() or (repo / ".husky").is_dir()
     have_workflows = (repo / ".github" / "workflows").exists()
@@ -488,11 +619,11 @@ def score_e(repo: Path, context_files: list[Path]) -> CategoryScore:
     findings: list[str] = []
     if bad_refs:
         sample = ", ".join(f"{p.relative_to(repo)}: {ref}" for p, ref in bad_refs[:4])
-        findings.append(f"hallucinated path {len(bad_refs)}건 (총 {total_refs} 참조 중) — 예: {sample}")
+        findings.append(msg("e.refs", n=len(bad_refs), total=total_refs, items=sample))
     if not has_codeowners and not has_pr_template:
-        findings.append("CODEOWNERS / PR template 없음 — independent critic infra 부재")
+        findings.append(msg("e.review"))
     if not has_evals:
-        findings.append("agent eval / prompt test 디렉터리 없음 — AI 회귀 catch 없음")
+        findings.append(msg("e.evals"))
 
     return CategoryScore(
         name="Verification & Quality Gates",
@@ -501,6 +632,7 @@ def score_e(repo: Path, context_files: list[Path]) -> CategoryScore:
         evidence={
             "ref_total": total_refs,
             "ref_broken": len(bad_refs),
+            "broken_refs": [f"{p.relative_to(repo).as_posix()}: {ref}" for p, ref in bad_refs],
             "codeowners": has_codeowners,
             "pr_template": has_pr_template,
             "ci_workflows": have_workflows,
@@ -515,10 +647,40 @@ def score_e(repo: Path, context_files: list[Path]) -> CategoryScore:
 # ----------------------------------------------------------------------------
 # F. Freshness & Self-Maintenance
 # ----------------------------------------------------------------------------
+def git(repo: Path, *args: str) -> str:
+    """읽기 전용 git. 대상 저장소 설정이 다른 프로그램을 부르지 않게 끈다. 실패하면 빈 문자열."""
+    try:
+        r = subprocess.run(
+            ["git", "--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "log.showSignature=false",
+             "-C", str(repo), *args],
+            capture_output=True, text=True, timeout=20,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+    return r.stdout.strip() if r.returncode == 0 else ""
+
+
+def commit_time(repo: Path, *pathspecs: str) -> float:
+    out = git(repo, "log", "-1", "--format=%ct", "--", *pathspecs)
+    return float(out) if out.isdigit() else 0.0
+
+
+def module_times(m: Module, repo: Path) -> tuple[float, float, bool]:
+    """(context 시각, 코드 시각, git 기준인가). 둘 다 커밋돼 있을 때만 커밋 시각을 쓴다."""
+    target = m.context_file.resolve()  # 링크(CLAUDE.md -> AGENTS.md)면 실제 파일의 커밋을 본다
+    ctx = (target if target.is_relative_to(repo) else m.context_file).relative_to(repo).as_posix()
+    rel = re.sub(r"([\[\]*?\\])", r"\\\1", m.rel)
+    ctx_time = commit_time(repo, f":(literal){ctx}")
+    code_time = commit_time(repo, *(f"{rel}/*{ext}" for ext in sorted(CODE_EXTS))) if ctx_time else 0.0
+    if ctx_time and code_time:
+        return ctx_time, code_time, True
+    return file_mtime(m.context_file), latest_code_mtime(m.path), False
+
+
 def latest_code_mtime(d: Path) -> float:
     latest = 0.0
     for r, dirs, files in os.walk(d):
-        dirs[:] = [x for x in dirs if x not in IGNORE_DIRS and not x.startswith(".")]
+        dirs[:] = [x for x in dirs if not ignored_dir(Path(r) / x) and not x.startswith(".")]
         for f in files:
             if Path(f).suffix in CODE_EXTS:
                 latest = max(latest, file_mtime(Path(r) / f))
@@ -529,18 +691,26 @@ def score_f(modules: list[Module], repo: Path) -> CategoryScore:
     # Drift: how many modules' context is older than their newest code file
     drifted = 0
     measurable = 0
+    git_based = 0
+    shallow = git(repo, "rev-parse", "--is-shallow-repository") == "true"
     for m in modules:
-        if not m.context_file:
+        if not m.context_file or shallow:
             continue
-        ctx_mtime = file_mtime(m.context_file)
-        code_mtime = latest_code_mtime(m.path)
-        if code_mtime == 0:
+        ctx_time, code_time, from_git = module_times(m, repo)
+        if code_time == 0:
             continue
         measurable += 1
+        git_based += from_git
         # 30-day staleness window
-        if ctx_mtime + 30 * 86400 < code_mtime:
+        if ctx_time + 30 * 86400 < code_time:
             drifted += 1
     drift_ratio = (drifted / measurable) if measurable else 0.0
+    if shallow:
+        basis = "shallow"
+    elif not measurable:
+        basis = "none"
+    else:
+        basis = "git" if git_based == measurable else "mtime" if git_based == 0 else "git+mtime"
 
     # CI / hook validators
     workflows = list((repo / ".github" / "workflows").glob("*.yml")) + list((repo / ".github" / "workflows").glob("*.yaml")) if (repo / ".github" / "workflows").exists() else []
@@ -554,6 +724,8 @@ def score_f(modules: list[Module], repo: Path) -> CategoryScore:
     if measurable:
         # up to 6 pts for low drift
         pts += round(6 * (1 - drift_ratio))
+    elif shallow:
+        pts += 3  # neutral — history is cut off, nothing to judge
     if ctx_validation_workflow:
         pts += 2
     if hook_validates_paths:
@@ -562,17 +734,22 @@ def score_f(modules: list[Module], repo: Path) -> CategoryScore:
 
     findings: list[str] = []
     if drifted:
-        findings.append(f"{drifted}/{measurable} module의 context가 코드 변경 후 30일 이상 미갱신")
+        findings.append(msg("f.drift", n=drifted, total=measurable))
+    if basis == "shallow":
+        findings.append(msg("f.shallow"))
+    elif "mtime" in basis:
+        findings.append(msg("f.mtime", n=measurable - git_based))
     if not ctx_validation_workflow:
-        findings.append("CI에 context / docs validation step 없음")
+        findings.append(msg("f.ci"))
     if not hook_validates_paths:
-        findings.append("pre-commit / pre-push hook에 path 검증 없음")
+        findings.append(msg("f.hook"))
 
     return CategoryScore(
         name="Freshness & Self-Maintenance",
         score=pts,
         max=10,
         evidence={
+            "time_basis": basis,
             "drifted_modules": drifted,
             "measurable_modules": measurable,
             "drift_ratio": round(drift_ratio, 3),
@@ -589,7 +766,7 @@ def score_f(modules: list[Module], repo: Path) -> CategoryScore:
 def score_g(repo: Path) -> CategoryScore:
     eval_dirs = [p for p in ("evals", "benchmarks", "agent-evals", "agent-metrics") if (repo / p).exists()]
     metric_files = list(repo.glob("**/agent-results.json")) + list(repo.glob("**/.skill-eval.json"))
-    metric_files = [m for m in metric_files if not any(seg in m.parts for seg in IGNORE_DIRS)]
+    metric_files = [m for m in metric_files if not inside_ignored(m, repo)]
     has_telemetry_hint = any(
         re.search(r"telemetry|opentelemetry|claude.*session|agent.*log",
                   read_text(p), re.IGNORECASE)
@@ -608,9 +785,9 @@ def score_g(repo: Path) -> CategoryScore:
 
     findings: list[str] = []
     if not eval_dirs and not metric_files:
-        findings.append("agent eval / benchmark 디렉터리·결과 파일 부재 — 성능 측정 인프라 없음")
+        findings.append(msg("g.evals"))
     if not has_telemetry_hint:
-        findings.append("AI usage telemetry 단서 없음 (session log / OpenTelemetry)")
+        findings.append(msg("g.telemetry"))
 
     return CategoryScore(
         name="Agent Performance Outcomes",
@@ -655,6 +832,10 @@ def grade_label(total: int) -> tuple[str, str]:
     return "AI-Hostile", "red"
 
 
+def effort_label(hours: float) -> str:
+    return "S" if hours <= 1 else "M" if hours <= 4 else "L"
+
+
 def derive_actions(report_partial: dict[str, CategoryScore], modules: list[Module],
                     large_files: list[tuple[Path, int]], repo: Path) -> list[Action]:
     actions: list[Action] = []
@@ -664,10 +845,10 @@ def derive_actions(report_partial: dict[str, CategoryScore], modules: list[Modul
     missing = [m.rel for m in modules if not m.has_context]
     if missing:
         actions.append(Action(
-            title=f"{len(missing)}개 핵심 module에 CLAUDE.md 신설 ({', '.join(missing[:3])}{'…' if len(missing) > 3 else ''})",
+            title=msg("act.a.t", n=len(missing), items=", ".join(missing[:3]) + ("…" if len(missing) > 3 else "")),
             category="A",
-            effort="S", effort_hours=0.5 * len(missing),
-            impact=f"task당 ~3 min × ~5 task/일 절감 → 모듈 1개당 주 1-2 hr 회수",
+            effort=effort_label(0.5 * len(missing)), effort_hours=0.5 * len(missing),
+            impact=msg("act.a.i"),
             impact_score=9,
             priority=9 / max(0.5, 0.5 * len(missing)),
         ))
@@ -675,10 +856,10 @@ def derive_actions(report_partial: dict[str, CategoryScore], modules: list[Modul
     # B — over-long context
     if B.evidence.get("max_lines", 0) > 100:
         actions.append(Action(
-            title="과도한 CLAUDE.md를 25-35 lines로 압축 (compass-not-encyclopedia)",
+            title=msg("act.b.t"),
             category="B",
             effort="M", effort_hours=2.0,
-            impact="agent context 로드 시간 단축 + 핵심 정보 가시성 ↑",
+            impact=msg("act.b.i"),
             impact_score=7,
             priority=7 / 2.0,
         ))
@@ -686,10 +867,10 @@ def derive_actions(report_partial: dict[str, CategoryScore], modules: list[Modul
     # C — no MEMORY/ADR
     if not C.evidence.get("memory_md") and not C.evidence.get("adr"):
         actions.append(Action(
-            title="MEMORY.md 또는 docs/adr/ 도입으로 tribal knowledge 외부화",
+            title=msg("act.c.t"),
             category="C",
             effort="M", effort_hours=3.0,
-            impact="senior 의존 의사결정 외부화 → 신규 agent run 시 오류 ↓",
+            impact=msg("act.c.i"),
             impact_score=8,
             priority=8 / 3.0,
         ))
@@ -697,10 +878,10 @@ def derive_actions(report_partial: dict[str, CategoryScore], modules: list[Modul
     # D — no architecture doc
     if not D.evidence.get("architecture_doc"):
         actions.append(Action(
-            title="ARCHITECTURE.md 또는 mermaid dependency 다이어그램 추가",
+            title=msg("act.d.t"),
             category="D",
             effort="M", effort_hours=2.5,
-            impact="cross-module ripple 추적 → 변경 영향 분석 시간 절반",
+            impact=msg("act.d.i"),
             impact_score=7,
             priority=7 / 2.5,
         ))
@@ -708,10 +889,10 @@ def derive_actions(report_partial: dict[str, CategoryScore], modules: list[Modul
     # E1 — broken refs
     if E.evidence.get("ref_broken", 0) > 0:
         actions.append(Action(
-            title=f"context의 hallucinated path {E.evidence['ref_broken']}건 수정 (referential trust)",
+            title=msg("act.e.t", n=E.evidence["ref_broken"]),
             category="E",
             effort="S", effort_hours=0.5,
-            impact="agent의 잘못된 path-following 방지 — stale = worse than missing",
+            impact=msg("act.e.i"),
             impact_score=10,
             priority=10 / 0.5,
         ))
@@ -719,10 +900,10 @@ def derive_actions(report_partial: dict[str, CategoryScore], modules: list[Modul
     # E — no path validation in CI
     if not F.evidence.get("ctx_validation_workflow") and not F.evidence.get("hook_validates_paths"):
         actions.append(Action(
-            title="CI 또는 pre-push hook에 context path 검증 추가",
+            title=msg("act.f.t"),
             category="F",
             effort="S", effort_hours=1.0,
-            impact="stale reference를 코드 머지 시점에 차단 — 회귀 방지",
+            impact=msg("act.f.i"),
             impact_score=8,
             priority=8 / 1.0,
         ))
@@ -731,22 +912,23 @@ def derive_actions(report_partial: dict[str, CategoryScore], modules: list[Modul
     huge = [(p, ln) for p, ln in large_files if ln > 500]
     if huge:
         sample = ", ".join(f"{p.relative_to(repo).as_posix()} ({ln})" for p, ln in huge[:3])
+        hours = 2.5 * len(huge[:3])  # 이름을 적은 파일만큼만 잡는다
         actions.append(Action(
-            title=f"god file {len(huge)}개 분할 (>500 lines): {sample}",
+            title=msg("act.god.t", n=len(huge), items=sample),
             category="B",
-            effort="L", effort_hours=2.5 * len(huge),
-            impact=f"파일당 ~5K-10K token 절감 + 편집 정확도 ↑",
+            effort=effort_label(hours), effort_hours=hours,
+            impact=msg("act.god.i"),
             impact_score=6,
-            priority=6 / max(2.5, 2.5 * len(huge)),
+            priority=6 / hours,
         ))
 
     # G — no eval infra
     if G.score < 3:
         actions.append(Action(
-            title="evals/ 디렉터리 + 대표 task pass-rate 측정 도입",
+            title=msg("act.g.t"),
             category="G",
             effort="L", effort_hours=6.0,
-            impact="AI 회귀 측정 가능 — 개선 ROI 자체를 정량화",
+            impact=msg("act.g.i"),
             impact_score=6,
             priority=6 / 6.0,
         ))
@@ -761,25 +943,23 @@ def derive_actions(report_partial: dict[str, CategoryScore], modules: list[Modul
 def generate_insights(cats: dict[str, CategoryScore], total: int) -> list[str]:
     out: list[str] = []
     grade, _ = grade_label(total)
-    out.append(f"총점 {total}/100 · 등급 {grade}")
+    out.append(msg("i.total", total=total, grade=grade))
 
     # weakest categories
     norm = sorted(cats.items(), key=lambda kv: kv[1].score / kv[1].max)
     weakest = norm[:2]
     for k, c in weakest:
-        out.append(f"가장 낮은 카테고리: {k} {c.name} {c.score}/{c.max}")
+        out.append(msg("i.weak", k=k, name=c.name, score=c.score, max=c.max))
 
-    # E1 hallucination is special
+    # E1 missing paths get their own line
     e = cats.get("E")
     if e and e.evidence.get("ref_broken", 0) > 0:
-        out.append(
-            f"⚠️  context에 hallucinated path {e.evidence['ref_broken']}건 — Meta 기준으로는 0이어야 함"
-        )
+        out.append(msg("i.refs", n=e.evidence["ref_broken"]))
 
     # F freshness
     f = cats.get("F")
     if f and f.evidence.get("drift_ratio", 0) > 0.3:
-        out.append(f"context drift 높음 ({f.evidence['drift_ratio']:.0%}) — stale 위험")
+        out.append(msg("i.drift", pct=f"{f.evidence['drift_ratio']:.0%}"))
 
     return out
 
@@ -788,24 +968,20 @@ def generate_insights(cats: dict[str, CategoryScore], total: int) -> list[str]:
 # Main
 # ----------------------------------------------------------------------------
 def git_branch(repo: Path) -> str:
-    try:
-        r = subprocess.run(
-            ["git", "-C", str(repo), "rev-parse", "--abbrev-ref", "HEAD"],
-            capture_output=True, text=True, timeout=5,
-        )
-        return r.stdout.strip() or "unknown"
-    except Exception:
-        return "unknown"
+    return git(repo, "rev-parse", "--abbrev-ref", "HEAD") or "unknown"
 
 
-def build_report(repo: Path) -> Report:
+def build_report(repo: Path, lang: str = "ko") -> Report:
+    global _lang
+    _lang = lang
+    repo = repo.resolve()
     modules = find_core_modules(repo)
     context_files = find_all_context_files(repo)
-    root_claude = find_root_claude(repo)
+    root_context = find_root_context(repo)
     large_files = find_large_files(repo, 300)
 
     cats = {
-        "A": score_a(modules, root_claude),
+        "A": score_a(modules, root_context),
         "B": score_b(context_files, repo),
         "C": score_c(modules, repo),
         "D": score_d(repo, context_files),
@@ -821,10 +997,10 @@ def build_report(repo: Path) -> Report:
     return Report(
         meta={
             "repo": repo.name,
-            "path": str(repo.resolve()),
             "scored_at": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
             "git_branch": git_branch(repo),
-            "rubric_version": "v2-100pt",
+            "rubric_version": "v2.1-100pt",
+            "lang": _lang,
             "modules_total": len(modules),
             "context_files_total": len(context_files),
             "large_files_300plus": len(large_files),
@@ -836,7 +1012,11 @@ def build_report(repo: Path) -> Report:
         insights=insights,
         actions=actions,
         extras={
-            "modules": [asdict(m) | {"path": str(m.path), "context_file": str(m.context_file) if m.context_file else None} for m in modules],
+            "modules": [
+                {"rel": m.rel, "code_files": m.code_files,
+                 "context_file": m.context_file.relative_to(repo).as_posix() if m.context_file else None}
+                for m in modules
+            ],
             "large_files": [
                 {"path": str(p.relative_to(repo).as_posix()), "lines": ln}
                 for p, ln in large_files[:30]
@@ -912,15 +1092,16 @@ def main() -> int:
     p.add_argument("repo", nargs="?", default=".", help="repo path (default: cwd)")
     p.add_argument("--json", dest="json_out", help="write JSON report to this path")
     p.add_argument("--markdown", action="store_true", help="emit markdown to stdout (default)")
+    p.add_argument("--lang", choices=LANGS, default="ko", help="message language; scores are identical (default: ko)")
     p.add_argument("--quiet", action="store_true", help="suppress stdout output")
     args = p.parse_args()
 
     repo = Path(args.repo).resolve()
-    if not repo.exists():
-        print(f"error: repo path not found: {repo}", file=sys.stderr)
+    if not repo.is_dir():
+        print(f"error: not a directory: {repo}", file=sys.stderr)
         return 2
 
-    report = build_report(repo)
+    report = build_report(repo, args.lang)
     payload = serialize(report)
 
     if args.json_out:

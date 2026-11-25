@@ -1,158 +1,72 @@
 ---
 name: ai-readiness-cartography
-description: Audits any repository against the v2 AI-Ready rubric (100 pts · 7 categories — Navigation, Context Quality, Tribal Knowledge, Dependency Mapping, Verification Gates, Freshness, Agent Outcomes) and produces a professional single-file HTML dashboard plus an ROI-ranked action list. The skill bundles a Python scorer (`scripts/score.py`) that auto-detects coverage, hallucinated paths, drift, and god files. Trigger whenever the user asks for an "AI-readiness 지도", "AI-ready 시각화", "repo cartography", "codebase audit 시각화", "ai-readiness-cartography", or anything that sounds like "score how agent-friendly this codebase is and visualize it", "check how AI-ready our repo is", "map the repo against the rubric", or "audit our codebase for agent readiness". Also trigger when the user points at a repo and asks whether it is ready for coding agents / LLM workflows — even without the exact keyword. The output is always a clean technical-dashboard HTML (Inter + JetBrains Mono, light surface, blue/green/amber/red accents), never a fantasy map.
+description: 저장소가 코딩 에이전트와 일할 준비가 됐는지 100점(7개 카테고리)으로 채점하고, 근거 JSON·한 장짜리 HTML 대시보드·먼저 할 일 목록을 만든다. "AI 준비도 점수 매겨줘", "AI-readiness 지도", "이 레포 에이전트 친화적이야?", "CLAUDE.md·AGENTS.md 점검", "audit our codebase for agent readiness", "repo cartography"에 쓴다. 코드 리뷰나 보안 점검에는 쓰지 않는다.
+license: MIT
+compatibility: Python 3.11+ (표준 라이브러리만). git이 있으면 낡음 판정이 정확하다. 대시보드는 Google Fonts를 부르며, 오프라인이면 시스템 글꼴로 보인다.
+metadata:
+  version: "2.1.0"
 ---
 
 # AI-Readiness Cartography
 
-이 스킬은 임의 레포지토리를 **AI-Ready 코드베이스 v2 루브릭** (100점 · 7 카테고리 A-G) 으로 감사합니다. 산출물은 한 장의 전문 기술 대시보드 HTML + 자동 채점 JSON + ROI 순으로 정렬된 actionable 액션 리스트입니다. 이름은 "cartography" 지만 톤은 의사결정용 계기판 — 판타지 양피지 / 컴퍼스 로즈 같은 장식은 절대 쓰지 않습니다.
+이 SKILL.md가 있는 폴더를 `SKILL_DIR`, 채점할 저장소를 `REPO`라 한다. English: `references/SKILL.en.md`.
 
-## When to use
+**한계 먼저.** 채점은 파일이 있는지, 낱말이 있는지를 보는 어림이다. 점수가 높으면 에이전트 성공률이 오른다는 증거는 아니다(근거와 반대 연구: `references/scoring-rubric.md` "출처").
 
-- "AI-readiness 지도 / 시각화 / 점수 매겨줘"
-- "이 레포가 얼마나 agent-friendly 한지 보여줘"
-- "codebase audit", "repo cartography"
-- "Claude Code 가 이 레포를 잘 다룰 수 있을까" 같은 우회 표현
-- 트리거 키워드 없이도 LLM workflow 적합도 평가를 원하면 트리거
+## 1. 언제 쓰나
 
-## What to produce
+- 저장소에 CLAUDE.md·AGENTS.md·README가 얼마나 있고 맞는지 한눈에 보고 싶을 때, 무엇부터 고칠지 정할 때.
+- 쓰지 않는 때: 버그·보안 리뷰, 사람 개발자용 문서 평가, 두 저장소의 순위 매기기(구조가 다르면 점수를 비교할 수 없다).
 
-**3가지 결과물을 한 번에 만듭니다.**
+## 2. 순서
 
-1. **JSON 점수표** (raw 데이터, 다른 도구가 소비할 수 있음)
-2. **단일 HTML 대시보드** (사람이 보고 의사결정)
-3. **ROI 순 액션 리스트** (우선순위가 매겨진 다음 단계)
+**1) 채점.** `python3 -I SKILL_DIR/scripts/score.py REPO --json OUT/ai-readiness-score.json` (영어 보고면 `--lang en`)
+- `OUT`: 사용자가 준 경로 > `REPO/docs/` > `REPO/.claude/` > `REPO`. 이미 같은 이름의 파일이 있으면 덮어쓰기 전에 묻는다.
+- 완료: 종료 코드 0, JSON에 `total`과 A~G 7개가 있다. JSON이 없으면 다음 단계로 가지 않는다.
 
-기본 저장 위치 우선순위:
-- 레포에 `docs/` 가 있으면 → `docs/ai-readiness-map.html`, `docs/ai-readiness-score.json`
-- `.claude/` 가 있으면 → `.claude/ai-readiness-{map.html,score.json}`
-- 없으면 레포 루트
-- 사용자가 명시적 경로를 지정하면 그 경로 우선
+**2) 후보 확인.** `categories.E.evidence.broken_refs`를 하나씩 연다. 정말 없는 경로 / 만들어질 파일·다른 저장소·예시라서 괜찮은 것으로 나눈다.
+- `F.evidence.time_basis`가 `git`이 아니면(`mtime`, `git+mtime`, `shallow`, `none`) 보고에 그 이유를 적는다.
+- 완료: 후보마다 판정이 하나씩 있다. 판정하지 않은 후보를 "틀린 경로"라고 쓰지 않는다.
 
-## Workflow
+**3) 대시보드 채우기.** `python3 -I SKILL_DIR/scripts/fill_template.py OUT/ai-readiness-score.json -o OUT/ai-readiness-map.html`
+- 숫자·색·막대·라벨·할 일 목록은 스크립트가 채운다. 남은 자리 10개만 만든 HTML에 글로 쓴다(아래 표).
+- 완료: `python3 -I SKILL_DIR/scripts/fill_template.py --check OUT/ai-readiness-map.html`이 "통과". 남은 `{{자리}}`가 있으면 열거나 보고하지 않는다.
 
-### 1. Python 스크립트로 자동 채점
+**4) 눈으로 확인하고 열기.** 글자 겹침·잘림이 없는지 본다. `open`(macOS) / `xdg-open`(Linux). 열지 말라고 하면 경로만 알린다.
 
-```bash
-python3 ~/.claude/skills/ai-readiness-cartography/scripts/score.py <repo-path> \
-  --json <output-path>/ai-readiness-score.json
-```
+| 자리 | 누가 | 넣을 것 |
+|---|---|---|
+| `{{REPO_NAME}}` `{{SCORED_AT}}` `{{GIT_BRANCH}}` `{{MODULES_TOTAL}}` `{{CONTEXT_FILES_TOTAL}}` `{{RUBRIC_VERSION}}` `{{LANG}}` | 스크립트 | `meta` |
+| `{{TOTAL_SCORE}}` `{{GRADE}}` `{{GRADE_COLOR}}` `{{COVERED_MODULES}}` `{{BROKEN_REFS}}` `{{LARGE_FILES}}` | 스크립트 | 총점·등급·요약 숫자 |
+| `{{X_SCORE}}` `{{X_PCT}}` `{{X_BAR}}` (X = A~G) `{{B_SUBS}}` `{{E_SUBS}}` | 스크립트 | 카테고리 점수·막대 |
+| `{{ACTION_ITEMS}}` | 스크립트 | `actions` 앞 7개 |
+| `{{T_*}}` | 스크립트 | 화면 라벨(ko·en) |
+| `{{SCORE_DESC}}` | 나 | 가장 약한 2개 카테고리와 이유, 한두 문장 |
+| `{{X_NOTE}}` (X = A~G) | 나 | 근거 1~2개. 숫자는 JSON에 있는 값만 |
+| `{{MAP_SVG}}` | 나 | 구조 지도. `references/map-snippets.md`의 조각을 복사해 쓴다 |
+| `{{WINS_ITEMS}}` | 나 | 점수가 높은 카테고리의 근거 3~5개, `<li>` 조각 |
 
-스크립트는 stdlib only (deps 없음, Python 3.10+). 출력:
-- `--json` 으로 지정한 경로에 구조화된 점수표 (categories A-G, evidence, sub_scores, findings, ROI actions, large files)
-- stdout 에 사람이 읽기 좋은 markdown 요약
+## 3. 근거로 보여 줄 것
 
-채점이 자동으로 잡는 것:
-- **A** 핵심 module navigation coverage (CLAUDE.md / AGENTS.md 보유 비율)
-- **B1, B5** conciseness · cross-references
-- **C Q1-Q4** Five-Question framework heuristic + Q5 MEMORY/ADR 존재
-- **D** ARCHITECTURE.md / mermaid / workspace 파일 검출
-- **E1** **hallucinated path 검증** (context의 모든 path 후보를 실제 존재 검증) — 이 항목이 가장 중요
-- **E3** build/test infra 존재
-- **F** context drift (mtime 비교) + CI / hook validation
-- **G** evals/ benchmarks/ 디렉터리 + telemetry 단서
+- 실행한 명령과 총점 줄, E1 후보의 판정, `--check` 통과 줄.
+- 등급: 90↑ AI-Native · 75↑ AI-Ready · 60↑ AI-Assisted · 40↑ AI-Fragile · 그 아래 AI-Hostile.
+- 스크립트가 못 보는 것(명령·핵심 파일·숨은 규칙의 깊이, 리뷰와 프롬프트 시험의 질)은 직접 읽고 글로만 덧붙인다.
 
-자동이 잡지 못하는 것 (Manual):
-- B2-B4 quick commands / key files / non-obvious 의 깊이
-- C 의 tribal knowledge depth
-- E2 critic review 품질
-- E4 prompt test 품질
+## 4. 하지 말 것
 
-LLM 이 JSON 을 받은 뒤 manual 항목을 보강하거나 그대로 차트에 반영합니다.
+- **점수를 손으로 바꾸지 않는다.** 같은 저장소가 같은 점수를 받아야 다음 측정과 비교할 수 있다.
+- **`assets/template.html` 원본에 값을 쓰지 않는다.** 한 저장소의 이름과 점수가 스킬에 남아 다음 사람에게 새어 나간다.
+- **재지 않은 절감 수치를 만들지 않는다**("토큰 30% 절감" 등). 시간과 우선순위는 스크립트의 추정값이라고 밝힌다.
+- **결과를 공개하기 전에 묻는다.** HTML·JSON에는 저장소 이름, 브랜치, 파일 경로가 들어간다.
+- **디자인을 새로 만들지 않는다.** 글꼴·색·배경은 템플릿 그대로, 차트 라이브러리·이모지·지도 장식은 넣지 않는다. 매번 달라지면 전후 비교가 안 된다.
+- **점수를 올리려고 빈 CLAUDE.md를 만들지 않는다.** 고치는 일은 이 스킬의 범위가 아니다. 사용자가 시킬 때만 한다.
 
-### 2. JSON 으로 HTML 대시보드 채우기
+## 답 형식
 
-`assets/template.html` 을 복사 후 JSON 의 값을 끼워 넣습니다. **절대 처음부터 쓰지 말 것** — 디자인이 매번 바뀝니다.
+1. 총점과 등급 한 줄 (`NN/100 · 등급`).
+2. 가장 약한 카테고리 1~2개와 이유.
+3. 먼저 할 일 3개(추정 시간 포함).
+4. E1 후보 판정 결과와 낡음 판정 기준(`time_basis`).
+5. 만든 파일의 경로.
 
-바꿔야 할 블록:
-
-**(a) 헤더**
-- `<title>` · h1 의 `{{REPO_NAME}}`
-- `header-meta` 의 날짜 (오늘) · git branch · `meta.modules_total` · `meta.context_files_total`
-
-**(b) Score hero**
-- `score-hero .num` ← `total`
-- `grade-badge` 텍스트 ← grade (`AI-Native` / `AI-Ready` / `AI-Assisted` / `AI-Fragile` / `AI-Hostile`)
-- `grade-badge` 배경/색 ← `grade_color` (green / amber / red)
-- 등급 임계값:
-  - 90-100 AI-Native (green)
-  - 75-89  AI-Ready (green)
-  - 60-74  AI-Assisted (amber)
-  - 40-59  AI-Fragile (amber)
-  - < 40   AI-Hostile (red)
-- `.desc` 한 줄로 가장 약한 카테고리 2개 언급
-- Mini stats 3개: modules · context_files · large_files_300plus (또는 ref_broken 강조)
-
-**(c) 7 카테고리 막대차트**
-10 rule 차트를 7 카테고리로 교체. 각 행:
-- A 15 / B 20 / C 20 / D 15 / E 15 / F 10 / G 5
-- 막대 width = `score / max * 100%`
-- 색: score/max ≥ 0.75 → bar-good (green) · 0.5-0.74 → bar-warn (amber) · < 0.5 → bar-bad (red)
-- `.sub` 에 evidence 1-2개를 짧게 (예: "coverage 75% · 1 module 누락")
-- B 와 E 는 sub_scores 가 있으니 행 아래 작게 펼쳐서 5/4개 sub-item 의 점수도 보이게
-
-**(d) Structural Map (SVG)**
-대상 레포 구조에 맞게 컬럼 재설정. 카드 안에 `large_files` 의 상위 항목을 hot/warm 바로 표시. CLAUDE.md / AGENTS.md 보유 module 은 accent border + 점등. `ref_broken` 이 있는 module 은 빨간 점 표시.
-
-**(e) Wins / Top ROI Actions 패널**
-- 왼쪽 "Wins": evidence 에서 점수 높은 카테고리 위주, 핵심 강점 5개
-- 오른쪽 "Top ROI Actions": JSON 의 `actions` 상위 5-7개. 각 행에:
-  - Category 태그 (A-G)
-  - Effort (S / M / L · 시간)
-  - Impact (1줄)
-  - Priority score (선택)
-
-**(f) 푸터**
-`{{REPO_NAME}} · AI-Readiness v2 · scored {{YYYY-MM-DD}}`
-
-### 3. 브라우저에서 열기
-
-```bash
-open <output-path>/ai-readiness-map.html   # macOS
-xdg-open <path>                            # Linux
-```
-
-사용자가 "열지 마라" 하면 경로만 알림.
-
-### 4. 요약 보고
-
-마지막으로 다음 4가지를 한 문단으로:
-1. **총점 / 등급** (`32/100 · AI-Hostile`)
-2. **최약점 카테고리 1-2개** + 한 줄 진단
-3. **Top 3 ROI 액션** (Effort + Impact 짧게)
-4. 생성된 **파일 경로**
-
-## Style rules (non-negotiable)
-
-이 스킬의 정체성. 어긋나면 스킬이 아닙니다.
-
-- **폰트**: Inter (본문), JetBrains Mono (숫자/코드). 다른 폰트 금지.
-- **색**: 템플릿의 CSS 변수 팔레트 고정.
-- **배경**: `#fafafa` light. 다크 모드 만들지 않음.
-- **장식 금지**: 컴퍼스 로즈, 양피지, 필기체, 이모지, 스탬프 — 전부 없이.
-- **차트 라이브러리 금지**: 모든 시각화는 인라인 SVG + CSS.
-
-## Common pitfalls
-
-- **루브릭이 v2 임을 잊고 10-rule 로 채점** — 이전 버전 잔재. 현재는 **A-G 7 카테고리 / 100점**.
-- **스크립트 출력을 무시하고 직접 점수 매기기** — 자동이 잡는 것은 자동이 더 정확. 스크립트 실행 후 그 위에 보강.
-- **E1 hallucinated path 를 가볍게 다룸** — Meta 표준 "0 hallucinated paths". 1건이라도 있으면 즉시 fix 액션.
-- **template 무시하고 처음부터 쓰기** — 매번 디자인 달라짐. 복사 → 수정.
-- **판타지 회귀** — 이름이 cartography라고 지도 은유 강하게 쓰지 말 것.
-- **ROI 정성적 형용사만** — "효율 ↑" 같은 모호한 임팩트 금지. "task당 ~3 min × ~5/일" 처럼 구체적 단위.
-
-## ROI framing
-
-각 액션의 effort/impact 표현 규약:
-
-- **Effort**: S (<1h) / M (1-4h) / L (4h+)
-- **Impact**: 정량 단위 우선 — "task당 N min × M task/주", "토큰 X% 절감", "회귀 Y건 catch"
-- **Priority**: `impact_score / effort_hours` 로 자동 정렬됨
-
-대표 액션 ROI 표는 `references/scoring-rubric.md` 끝 참조.
-
-## Files
-
-- `assets/template.html` — 복사 후 채울 원본 대시보드
-- `references/scoring-rubric.md` — 7 카테고리 채점 기준 v2
-- `scripts/score.py` — 자동 채점 + ROI 액션 생성 (Python 3.10+, stdlib only)
+채점 기준을 물으면 `references/scoring-rubric.md`를 읽는다.

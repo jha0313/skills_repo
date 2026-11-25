@@ -1,0 +1,12 @@
+{
+  "$schema": "https://skills.sh/schemas/skills.sh.schema.json",
+  "groupings": [
+    { "title": "이해한다", "description": "에이전트 결과물을 내가 이해하는 모양으로", "skills": ["into"] },
+    { "title": "맡긴다", "description": "여러 프로젝트와 긴 작업을 맡기고 확인만 한다", "skills": ["chief-of-staff", "workflow-orchestrator"] },
+    { "title": "검증한다", "description": "다른 모델과 테스트로 결과를 확인한다", "skills": ["codex-review", "skill-evaluator", "eval-writer", "skills-lint"] },
+    { "title": "매일 정리한다", "description": "시각 계산 · 디스크 · 토큰", "skills": ["time-convert", "disk-cleanup-analyzer", "improve-token-efficiency"] },
+    { "title": "저장소를 준비한다", "description": "에이전트가 일하기 좋은 저장소인지 잰다", "skills": ["ai-readiness-cartography"] },
+    { "title": "지원 종료", "description": "안내만 남겼다", "skills": ["presentation_slides", "ai-readiness-cartography-en"] }
+  ],
+  "notGrouped": "bottom"
+}

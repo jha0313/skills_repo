@@ -1,126 +1,84 @@
 ---
 name: improve-token-efficiency
-description: Claude Code 세션 JSONL 로그를 파싱하여 토큰/컨텍스트 효율 리포트(HTML 대시보드 + $ 절감안)를 생성하는 스킬. '토큰 효율 분석', '세션 효율', '비용 분석', 'Claude Code usage report', 'analyze token efficiency', 'show session cost', 'improve token efficiency', 'efficiency score', 'how much did I spend on Claude', 'session report' 등의 요청에 반드시 트리거할 것. 사용자가 레포의 Claude Code 사용 패턴/비용/효율을 알고 싶어하거나 어떻게 줄일지 문의할 때 사용. 단일 세션이 아니라 '여러 세션 전체'에 대한 집계·점수화·시각화가 필요한 모든 경우에 적용.
+description: 한 프로젝트의 Claude Code 세션 기록을 모아 토큰, API 정가 환산 금액, 캐시 적중률, 어림 점수를 세고 HTML 보고서를 만든다. 가격을 모르는 모델은 금액을 짐작하지 않는다. '토큰 효율 분석', '세션 비용 분석', '이 프로젝트에서 얼마나 썼어', '토큰 줄이고 싶어', 'token efficiency report', 'how much did I spend on Claude'.
+license: MIT
+compatibility: Claude Code 기록이 있는 macOS·Linux, Python 3.11+. 네트워크는 쓰지 않는다(가격표 갱신 때만 필요).
+metadata:
+  version: "2.0.0"
 ---
 
 # Improve Token Efficiency
 
-Claude Code 가 `~/.claude/projects/<encoded-repo-path>/*.jsonl` 에 남기는 세션 로그를 파싱해서, 레포 단위로 **토큰 사용·캐시 효율·비용·점수**를 집계하고 개선안을 제시하는 HTML 대시보드를 만든다.
+여러 세션의 사용량을 프로젝트 단위로 세고, 어디에 돈이 걸려 있는지 보여 준다.
 
-왜 JSONL을 직접 파싱하는가: Anthropic CLI가 세션당 모든 assistant 메시지의 `usage` 필드를 기록해 둔다. 여기에 `input_tokens`, `output_tokens`, `cache_creation_input_tokens`, `cache_read_input_tokens`, 그리고 `cache_creation.ephemeral_5m_input_tokens` / `ephemeral_1h_input_tokens` 이 다 들어있다. 그래서 별도 API 호출 없이 레포 하나의 전체 비용 구조를 재구성할 수 있다.
+**먼저 말할 한계**
+- 금액은 API 정가로 환산한 추정이다. 구독으로 썼다면 청구액이 아니다. 계약 할인, 웹 검색 요금, 클라우드 사업자 가격은 들어 있지 않다.
+- 기록이 남은 기간만 센다. Claude Code는 기본 30일 뒤 기록을 지운다(`cleanupPeriodDays`).
+- 기록 형식은 공개 규격이 아니다. Claude Code가 바뀌면 숫자가 틀릴 수 있다.
 
-## 동작 흐름
+## 언제 쓰나
 
-### 1. 대상 레포 결정
+- 한 프로젝트의 여러 세션을 합쳐 토큰·금액·캐시·모델별 비중을 볼 때.
+- 습관을 바꾸기 전과 뒤를 같은 방법으로 비교할 때.
 
-사용자가 경로를 명시했으면 그것을 쓴다. 아니면 현재 작업 디렉터리(`pwd`)를 기준으로 삼는다. 경로를 `-`, `/` 처리한 규칙으로 `~/.claude/projects/<encoded>/` 를 구성한다. 예:
+쓰지 않는 때: 지금 세션의 비용이나 구독 한도 → `/usage`. 지금 컨텍스트에 무엇이 들었나 → `/context`. 실제 청구액 → Claude Console 또는 클라우드 청구서. API 앱의 비용 → 이 기록에 없다.
 
-- `/Users/jaeha/Projects/GrowthNote` → `-Users-jaeha-Projects-GrowthNote`
+## 순서
 
-스크립트가 이 변환을 자동으로 한다. 사용자에게 확인할 필요 없다.
+`<스킬>`은 이 `SKILL.md`가 있는 폴더다.
 
-### 2. 세션 분석 실행
+1. **대상과 결과 폴더를 정한다.** 경로를 받지 않았으면 현재 폴더, 결과는 `./token-report`.
+   - 완료 기준: 두 경로를 한 줄로 알렸다.
+2. **집계한다.**
+   ```bash
+   python3 -I <스킬>/scripts/analyze_sessions.py --repo . --out-dir ./token-report
+   ```
+   기록 폴더를 자동으로 찾지 못하면 `--repo`는 그대로 두고 `--sessions-dir <폴더>`를 더한다. 제목은 `--label <이름>`으로 바꾼다.
+   - 완료 기준: `[ok]`가 나오고 `token-analysis.json`이 생겼다. 종료 코드 2면 "셀 기록이 없다"고 알리고 끝낸다.
+   - **`[ok]`가 없으면 다음 단계로 가지 않는다.**
+3. **경고를 처리한다.** `[warn]`이 있으면:
+   - 가격을 모르는 모델: 몇 건이 금액에서 빠졌는지 사용자에게 말한다.
+   - 다른 프로젝트이거나 어느 프로젝트인지 모르는 응답: 합계에서 빠진 건수와 토큰을 말한다. 짐작해서 더하지 않는다.
+   - 가격표 90일 초과: 갱신할지 묻는다. 갱신은 `references/pricing.json`의 `source_url`을 **직접 열어** 값과 `checked_on`을 함께 고치고 2단계를 다시 한다. 열지 못한 모델은 `null`로 둔다.
+   - 완료 기준: 경고마다 처리했거나 답에 적었다.
+4. **보고서를 만든다.**
+   ```bash
+   python3 -I <스킬>/scripts/build_dashboard.py --out-dir ./token-report
+   ```
+   - 완료 기준: `token-report.html`이 생겼다. 경로를 알려 주고, 사용자가 원하면 연다.
+5. **답한다.** 숫자는 `token-analysis.json`에서만 옮긴다.
+   - 완료 기준: 아래 답 형식의 칸을 모두 채웠다.
 
-```bash
-python3 ~/.claude/skills/improve-token-efficiency/scripts/analyze_sessions.py \
-    --repo "$(pwd)" \
-    --out /tmp/session_analysis.json
-```
+## 근거
 
-- `--repo` 없으면 cwd. `--sessions-dir` 로 직접 지정도 가능.
-- 출력: `/tmp/session_analysis.json` (totals + per-session stats + scores).
-- 빈 세션(usage 기록 0)은 자동 제외한다.
+- 출력: 두 스크립트의 `[ok]`·`[warn]` 줄을 그대로 보여 준다.
+- 중복 제거: 한 응답이 여러 줄로 적히므로 메시지 id + requestId로 한 번만 센다. 뺀 줄 수는 `notes.duplicate_lines`.
+- 하위 에이전트 기록(`<세션>/subagents/`)은 부모 세션에 더한다.
+- 프로젝트 구분: 기록의 `cwd`로 가른다. 뺀 건수는 `notes.other_project_*`, `notes.unclear_project_*`. `--repo` 없이 `--sessions-dir`만 주면 가르지 않는다.
+- 가격: `references/pricing.json` 하나. 확인일과 출처가 들어 있다. fast 모드, 미국 전용 추론, 긴 프롬프트 가격도 여기서 읽는다.
+- 스크립트를 고쳤으면 `python3 -I <스킬>/tests/run_tests.py`를 돌려 통과를 보여 준다.
 
-스크립트가 세션별로 다음을 계산한다:
+점수는 이 스킬이 정한 어림 기준이다(공식 기준 아님).
 
-| 필드 | 설명 |
-|---|---|
-| `input_tokens` | 캐시 미스 입력 토큰 |
-| `cache_create_5m / 1h` | 5분/1시간 에페메럴 캐시 쓰기 |
-| `cache_read` | 캐시 읽기 (재사용) |
-| `output_tokens` | 실제 생성 토큰 |
-| `cache_hit_ratio` | `cache_read / total_input` |
-| `redundant_reads` | 동일 파일을 Read 툴로 반복 호출한 횟수 합 |
-| `tool_use_counter` | 툴별 호출 수 |
-| `cost_usd` | 모델별 가격 × 토큰 |
-
-### 3. 점수화 (Rubric)
-
-`scripts/analyze_sessions.py` 가 각 세션을 4개 지표로 0–100 점화하고 가중 합산한다. 아래 기준을 바꾸고 싶으면 `--weights` 플래그나 스크립트 내 상수 수정.
-
-| 지표 | 가중치 | 측정 |
+| 지표 | 비중 | 재는 법 |
 |---|---|---|
-| **Cache utilization** | 40% | `cache_read / total_input`. 0.85 이상이 만점. 캐시 재사용률이 높을수록 매 turn 토큰 재전송 비용이 줄어든다. |
-| **Output density** | 20% | `output / total_input`. ~2%가 sweet spot. 너무 낮으면 읽기만 많고 산출 부족 (thrash), 너무 높으면 긴 독백. |
-| **Read redundancy** | 20% | `redundant_reads / total_reads`. 같은 파일을 여러 번 Read하면 감점. Grep/Glob으로 위치 먼저 좁히지 않은 패턴. |
-| **Tool economy** | 20% | 출력 1k 토큰당 툴 호출 수. 2–10 사이가 건강한 범위. >20은 탐색 thrash 신호. |
+| 캐시 활용도 | 40% | 캐시 읽기 ÷ 총 입력, 0.85면 만점 |
+| 산출 밀도 | 20% | 출력 ÷ 총 입력, 2% 근처가 만점 |
+| 파일 다시 읽기 | 20% | 같은 파일을 다시 Read한 비율(다른 구간 읽기 포함) |
+| 도구 사용 | 20% | 출력 1,000토큰당 도구 호출 수, 2회 근처가 만점 |
 
-최종 등급: A+ ≥90, A ≥85, A- ≥80, B+ ≥75, B ≥70, B- ≥65, C+ ≥60, C ≥55, C- ≥50, D ≥40, F <40.
+## 하지 말 것
 
-### 4. 대시보드 생성
+- **절감액을 지어내지 않는다.** 보고서의 숫자는 그 항목에 걸린 크기다. 실제 절감은 바꾼 뒤 다시 재야 안다.
+- **모르는 모델에 비슷한 모델 가격을 쓰지 않는다.** 예전 판이 그렇게 해서 금액이 틀렸다.
+- **fast 모드를 절약 수단으로 권하지 않는다.** 더 빠른 대신 더 비싼 요금이다.
+- **기록 원문을 대화나 결과에 옮기지 않는다.** 프롬프트와 명령 출력에 비밀번호가 있을 수 있다. 스크립트는 본문과 파일 경로를 결과에 쓰지 않는다.
+- **보고서를 올리거나 보내지 않는다.** 세션 id와 프로젝트 이름이 들어 있다. 공유는 사용자가 정한다.
+- **설정을 대신 바꾸지 않는다.** 캐시 수명·모델·effort 변경은 제안만 한다.
 
-```bash
-python3 ~/.claude/skills/improve-token-efficiency/scripts/build_dashboard.py \
-    --input /tmp/session_analysis.json \
-    --out /tmp/efficiency_report.html
-open /tmp/efficiency_report.html
-```
+## 답 형식
 
-Chart.js 기반 단일 HTML 파일이며 네트워크가 되는 브라우저면 CDN만으로 즉시 열린다. 포함 요소:
-
-- **KPI 카드**: 누적 비용, 총 토큰, 캐시 적중률, 평균 점수, 툴 호출 수
-- **비용 내역 doughnut**: cache write 1h/5m, cache read, output, input
-- **Pareto 차트**: 세션별 비용 내림차순 + 누적 %
-- **등급 히스토그램**: A+ ~ F 분포
-- **Cost vs Score 버블 scatter**: x=비용(log), y=점수, 버블=툴 호출 수
-- **Rubric 표**: 각 기준별 평균 점수 및 설명
-- **Top 20 세션 표**: 비용·툴·캐시 적중률·중복 read·점수·등급
-- **개선 카드 6종**: 각 개선안마다 예상 절감 $ 표시
-
-### 5. 사용자에게 요약 보고
-
-HTML을 연 뒤 Korean 으로 최상위 수치와 가장 큰 개선 3가지를 2–3줄로 요약. 예:
-
-> 106개 세션 / $1,248 / 평균 B+. 상위 14개가 전체 비용의 63% 차지. **Opus→Sonnet 라우팅, 장시간 세션 /compact, 이미지 세션 관리** 3가지만 해도 ~40% 절감 기대.
-
-## 가격 기준 (per 1M tokens, USD)
-
-스크립트에 하드코딩된 기본값. 새 모델이 나오면 `scripts/analyze_sessions.py` 상단 `PRICING` dict 수정.
-
-| Model | Input | Output | Cache write 5m | Cache write 1h | Cache read |
-|---|---|---|---|---|---|
-| Opus 4.x (`claude-opus-4-6`, `claude-opus-4-7`) | 15.0 | 75.0 | 18.75 | 30.0 | 1.50 |
-| Sonnet 4.x (`claude-sonnet-4-6`) | 3.0 | 15.0 | 3.75 | 6.0 | 0.30 |
-| Haiku 4.x (`claude-haiku-4-5-*`) | 0.80 | 4.0 | 1.0 | 1.6 | 0.08 |
-| `<synthetic>` | 0 | 0 | 0 | 0 | 0 |
-
-## 개선안 산정 로직
-
-`build_dashboard.py` 가 6가지 휴리스틱으로 예상 절감을 계산한다. 보수적으로 단순 합산이 전체 비용의 40–50%를 넘으면 단일 카드에 "중복 고려 시 실제로는 30–40% 수준" 주석을 붙인다.
-
-1. **Opus → Sonnet 라우팅**: 전체의 30%를 Sonnet으로 이관한다고 가정 → `cost × 0.3 × (1 − 1/5)` 절감. Opus/Sonnet 비용비 약 5배.
-2. **장시간 세션 `/compact`**: 상위 14개 세션(Pareto 기준)의 `cache_read` 의 30% 감소 가정.
-3. **이미지 세션 관리**: 이미지 포함 세션에서 장당 ~40k 토큰이 세션 내내 유지된다고 보고, 이의 50%가 컴팩션으로 사라지는 경우.
-4. **Cache TTL 1h → 5m**: 전체 1h 캐시 쓰기의 40%가 5m 로 충분하다고 가정 → `× ($30 − $18.75) / $30` 절감.
-5. **세션 scope 축소**: 상위 14개 외 세션의 `cache_read` 15% 감소 가정.
-6. **중복 Read 제거**: `redundant_reads × 3000토큰 × (cache write + 10 re-read)` 비용.
-
-이 숫자는 참고용이다. 사용자가 "실제로 얼만큼 절감되나?" 물으면 "휴리스틱 추정치, 실행 후 재측정 필요" 라고 답한다.
-
-## 에지 케이스 / 주의사항
-
-- **세션 디렉터리가 없다**: 레포가 Claude Code 로 한 번도 열린 적 없는 경우. "분석할 세션 없음" 안내하고 종료.
-- **모든 세션이 빈 usage**: 아주 오래된 CLI 버전일 수 있음. 스크립트가 자동으로 걸러내고 남은 게 없으면 종료.
-- **가격 미등록 모델**: 기본값으로 Opus 가격 적용하고, 콘솔에 `[warn] unknown model: <id>, applying Opus default` 출력.
-- **Python 3.9+**: dataclass / walrus 사용 없음, 순수 stdlib 만 필요. pip install 불필요.
-- **Chart.js CDN 의존**: 오프라인 환경이면 `--inline-chartjs` 옵션으로 로컬 복사본 사용 가능 (스크립트가 지원).
-
-## 품질 기준 (skill 자체에 대한)
-
-이 스킬이 유용하려면:
-
-1. **동일 결과의 재현성**: 같은 세션 디렉터리를 두 번 돌리면 동일 JSON / 동일 점수 나와야 함.
-2. **cwd 외 레포 지원**: `--repo /path/to/other-repo` 로도 동작.
-3. **가격 업데이트 용이**: 새 모델이 나와도 `PRICING` dict 한 줄 추가로 대응.
-4. **개선안 수치 방어 가능**: 각 항목마다 계산 로직을 주석으로 명기. 사용자가 "왜 이 숫자?" 물으면 답할 수 있어야 함.
-5. **보고 언어**: 사용자가 Korean 사용자임이 명확하면 보고는 Korean, 용어는 영어 병기 (예: "캐시 적중률(cache hit ratio)").
+1. 한 줄: 기간, 세션 수, 환산 금액(또는 "가격 모름"), 캐시 적중률. "API 정가 환산, 구독이면 청구액 아님"을 붙인다.
+2. 빠진 것: 가격을 모르는 응답 건수와 토큰, 다른 프로젝트·귀속 불명 응답 건수, 읽지 못한 줄, 가격표 확인일.
+3. 돈이 걸린 곳 1~3개: 항목, 걸린 크기, 바꿔 볼 한 가지.
+4. 보고서 경로.
