@@ -1,6 +1,6 @@
 ---
 name: presentation_slides
-description: Deprecated. 지원을 끝낸 스킬이다(2026-11). 발표 자료는 visualize 또는 into slides를 쓴다.
+description: Deprecated. 지원을 끝낸 스킬이다(2026-11). 발표 자료는 visualize를 쓴다(뼈대는 into).
 disable-model-invocation: true
 ---
 
@@ -11,7 +11,7 @@ disable-model-invocation: true
 | 하고 싶은 것 | 대신 쓸 것 |
 |---|---|
 | 주제·자료로 발표용 HTML 만들기 | [visualize](https://github.com/careerhackeralex/visualize) (다른 개발자의 스킬, MIT) |
-| PR·저장소·문서를 이해하기 쉬운 슬라이드로 | 이 저장소의 [into](../into/README.md) — `into slides <입력>` |
+| PR·저장소·문서를 이해하기 쉬운 슬라이드로 | [visualize](https://github.com/careerhackeralex/visualize) + 이 저장소의 [into](../into/README.md) — `/visualize 슬라이드로, into <포맷> <입력>` |
 
 ```text
 claude plugin marketplace add careerhackeralex/visualize

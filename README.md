@@ -15,7 +15,7 @@ Claude Code 플러그인으로도 된다: `/plugin marketplace add jha0313/skill
 | 설치 | 물어본다 | 이렇게 답한다 |
 |---|---|---|
 | `npx skills add jha0313/skills_repo --skill time-convert` | 서울 2026-11-25 오후 2시가 런던으로 몇 시야? | 2026-11-25(수) 05:00 — 스크립트가 계산한다 |
-| `npx skills add jha0313/skills_repo --skill into` | `into eli5 <PR·저장소·글 주소>`, 그다음 `into interactive` | 한 화면 그림, 그다음 눌러 보는 화면 |
+| `npx skills add jha0313/skills_repo --skill into` | `ELI5로 이 PR 설명해줘 <주소>`, 그다음 `/visualize into PR 간단히` | 정해진 뼈대대로 쉬운 설명, 그다음 한 장 그림 |
 
 ## 어떤 때 쓰나
 
@@ -23,7 +23,7 @@ Claude Code 플러그인으로도 된다: `/plugin marketplace add jha0313/skill
 
 | 스킬 | 한 줄 | 확인한 것 |
 |---|---|---|
-| [into](into/README.md) | PR·저장소·논문·영상·글·스킬을 유형마다 정해진 틀로 짧게 바꾼다: eli5 · ste · html · interactive · doc · slides · test · shorts · video · 전문가 과정 | 테스트 208개 · 처음 보는 원문 11편에서 0.7 → 1.0: eli5 82 → 74%(글자는 3할), html 72 → 77% ([DESIGN](into/DESIGN.md)) |
+| [into](into/README.md) | PR·저장소·논문·커뮤니티 글 등 자료마다 쉽게 읽히는 **뼈대**(간단히·자세히·아주 자세히). 말투는 ELI5·STE100, 그리기는 visualize와 함께 쓴다 | 포맷 12개를 실제 자료로 한 번씩(간단히), 그중 visualize로 5장. 자연스러운 한국어 부탁에 켜져야 할 30번 중 30번, 켜지면 안 될 8번 중 8번([작은 표본](into/README.md#확인한-것)). 사람이 읽어 본 시험은 아직 없다 |
 
 ### 맡긴다 — "세션이 열 개인데 뭘 먼저 봐야 하지"
 
@@ -80,7 +80,7 @@ Claude Code 플러그인으로도 된다: `/plugin marketplace add jha0313/skill
 
 | 스킬 | 대신 |
 |---|---|
-| [presentation_slides](presentation_slides/SKILL.md) | [visualize](https://github.com/careerhackeralex/visualize) 또는 `into slides` |
+| [presentation_slides](presentation_slides/SKILL.md) | [visualize](https://github.com/careerhackeralex/visualize) (뼈대는 [into](into/README.md)) |
 | [ai-readiness-cartography-en](ai-readiness-cartography-en/README.md) | [ai-readiness-cartography](ai-readiness-cartography/README.md) `--lang en` |
 
 설치한 사람의 경로가 깨지지 않게 폴더는 남기고 안내만 둔다. 자료: [claude-md-management 플러그인 설명](claude-md-management-plugin-explained.html)
@@ -88,5 +88,5 @@ Claude Code 플러그인으로도 된다: `/plugin marketplace add jha0313/skill
 ## 설치 뒤
 
 - 스킬은 폴더 전체가 있어야 한다(`SKILL.md`만 복사하지 않는다). 손으로 넣으려면 `~/.claude/skills/<이름>/`에 폴더째 복사한다. 이미 있으면 덮어쓰지 않게 먼저 확인한다.
-- `skill-evaluator`·`eval-writer`는 Python 3.11+, `uv`, 인증된 Claude Code가 필요하다. `codex-review`는 로그인된 Codex CLI, `chief-of-staff`는 Git(PR까지 맡기면 로그인된 `gh`), `workflow-orchestrator`는 subagent를 띄울 수 있는 에이전트가 필요하다. `disk-cleanup-analyzer`는 macOS 전용이다. 나머지는 Python 3.9+면 된다(`time-convert`는 시스템 시간대 자료도 쓴다. `into`의 화면 검사는 Node와 puppeteer가 있으면 더 본다).
+- `skill-evaluator`·`eval-writer`는 Python 3.11+, `uv`, 인증된 Claude Code가 필요하다. `codex-review`는 로그인된 Codex CLI, `chief-of-staff`는 Git(PR까지 맡기면 로그인된 `gh`), `workflow-orchestrator`는 subagent를 띄울 수 있는 에이전트가 필요하다. `disk-cleanup-analyzer`는 macOS 전용이다. 나머지는 Python 3.9+면 된다(`time-convert`는 시스템 시간대 자료도 쓴다. `into`는 글뿐이라 필요한 것이 없다).
 - 지우기: `npx skills remove <이름>`
