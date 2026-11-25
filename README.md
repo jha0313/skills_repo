@@ -23,7 +23,7 @@ Claude Code 플러그인으로도 된다: `/plugin marketplace add jha0313/skill
 
 | 스킬 | 한 줄 | 확인한 것 |
 |---|---|---|
-| [into](into/README.md) | PR·저장소·논문·영상·글·스킬을 유형마다 정해진 틀로 짧게 바꾼다: eli5 · ste · html · interactive · doc · slides · test · shorts · video · 전문가 과정 | {{INTO_EVIDENCE}} |
+| [into](into/README.md) | PR·저장소·논문·영상·글·스킬을 유형마다 정해진 틀로 짧게 바꾼다: eli5 · ste · html · interactive · doc · slides · test · shorts · video · 전문가 과정 | 테스트 208개 · 처음 보는 원문 11편에서 0.7 → 1.0: eli5 82 → 74%(글자는 3할), html 72 → 77% ([DESIGN](into/DESIGN.md)) |
 
 ### 맡긴다 — "세션이 열 개인데 뭘 먼저 봐야 하지"
 

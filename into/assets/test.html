@@ -24,9 +24,9 @@ p{margin:6px 0}
 textarea{width:100%;font:inherit;color:inherit;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px}
 .rv+.rv{margin-top:28px;padding-top:20px;border-top:1px solid var(--line)}
 .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
-button{font:inherit;padding:8px 16px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);color:#fff;cursor:pointer}
+button{font:inherit;padding:8px 16px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);color:var(--bg);cursor:pointer}
 button.ghost{background:transparent;color:var(--accent)}
-button:disabled{opacity:.4;cursor:not-allowed}
+button:disabled{background:none;border:1px dashed var(--muted);color:var(--muted);cursor:not-allowed}
 #fb{margin-top:14px;border-top:1px solid var(--line);padding-top:12px}
 .ok{color:var(--ok)}.ng{color:var(--ng)}
 .src{font-size:14px;color:var(--muted)}

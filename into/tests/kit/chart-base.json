@@ -1,0 +1,20 @@
+{"page": {"mode": "interactive", "type": "paper-concept", "typeName": "논문·개념", "title": "기준과 단위", "name": "기준과 단위", "one": "행마다 제 기준·단위로 견준다", "layout": "wide",
+  "figs": [{"part": "chart", "key": "results", "aria": "결과", "results": [
+    {"id": "a", "label": "지연", "group": "작은 것: 10에서 늘었다", "value": 20, "unit": "ms", "base": 10},
+    {"id": "b", "label": "지연", "group": "큰 것: 900에서 늘었다", "value": 1000, "unit": "ms", "base": 900},
+    {"id": "c", "label": "점수", "group": "문자열 기준: 늘었다", "value": "-10", "base": "-12"},
+    {"id": "d", "label": "점수", "group": "빼기 글자: 줄었다", "value": "−14", "base": "−12"},
+    {"id": "e", "label": "시작", "group": "900 ms에서 늘었다", "value": "1.2 s", "base": "900 ms"},
+    {"id": "f", "label": "정확도", "group": "차이 없음: 비슷하다", "value": 71.2, "unit": "%", "base": "70.9%", "cond": "차이 없음"},
+    {"id": "h", "label": "지연", "group": "기준 없음: 열기만", "value": 50, "unit": "ms"},
+    {"id": "i", "label": "변화", "group": "변화량: 줄었다", "value": "−17", "unit": "%", "base": "책만"},
+    {"id": "k", "label": "변화 2", "group": "같은 기준의 +: 늘었다", "value": "+48", "unit": "%", "base": "책만"},
+    {"id": "l", "label": "이름 기준", "group": "기준 이름만: 열기만", "value": 50, "unit": "ms", "base": "기존 버전"},
+    {"id": "m", "label": "이름 기준", "group": "옆의 −: 열기만", "value": "−3", "unit": "ms"},
+    {"id": "n", "label": "이름 기준", "group": "이름 기준의 −: 열기만", "value": "−4", "unit": "ms", "base": "기존 버전"},
+    {"id": "o", "label": "기온", "group": "기준 이름뿐인 기온: 열기만", "value": "−3", "unit": "°C", "base": "평년"},
+    {"id": "p", "label": "기온 2", "group": "옆의 영상 기온: 열기만", "value": "+2", "unit": "°C", "base": "평년"},
+    {"id": "j","label": "변화", "group": "적은 값: 열기만", "value": 60.2, "unit": "%"},
+    {"id": "g", "label": "정확도", "group": "조금이라도 늘었다", "value": 71.0, "unit": "%", "base": "70.9%"}
+  ]}],
+  "source": "지어낸 예"}}

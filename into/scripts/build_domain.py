@@ -6,7 +6,7 @@
   --check  만들지 않고 검사만 한다. FAIL이 하나라도 있으면 종료 코드 1.
 검사는 빠진 칸·끊긴 연결·없는 파일·문항 수만 본다. 사실과 순서는 사람이 대조한다.
 """
-import html, json, os, re, sys
+import hashlib, html, json, os, re, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 MODES = {"eli5", "ste", "doc", "html", "interactive", "slides", "test", "shorts", "video", "source"}
@@ -14,7 +14,7 @@ FAIL, WARN = [], []
 
 
 def inline(t):
-    t = html.escape(t, quote=False)
+    t = html.escape(t, quote=True)
     keep = []
     t = re.sub(r"`([^`]+)`", lambda m: keep.append(m[1]) or f"\0{len(keep)-1}\0", t)
     t = re.sub(r"\[([^\]]+)\]\((https?://[^)\s]+)\)", r'<a href="\2" target="_blank" rel="noopener">\1</a>', t)
@@ -159,14 +159,22 @@ def main():
     src = {s["id"] for s in C["sources"]}
     for s in C["sources"]:
         need(s, ["id", "title", "type", "grade", "finding"], f"출처 {s.get('id')}")
+        if s.get("url") and not re.match(r"https?://", s["url"]):
+            FAIL.append(f"출처 {s.get('id')}: url은 http(s)만")
         if s.get("grade") not in ("A", "B", "C", "D"):
             FAIL.append(f"출처 {s.get('id')}: grade는 A~D")
+    for k, n in (("learner", 130), ("vision", 95), ("strategy", 180), ("goal", 180)):
+        if len(str(C.get(k, ""))) > n:
+            WARN.append(f"{k} {len(C[k])}자 (첫 화면은 {n}자까지)")
     secs = [s for l in C["levels"] for s in l["sections"]]; ids = [s["id"] for s in secs]
     if len(set(ids)) != len(ids):
         FAIL.append("섹션 id가 겹친다")
+    for i in ids + list(kp):
+        if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]*", str(i)):
+            FAIL.append(f"id {str(i)[:30]!r}: 영문자로 시작하는 영문·숫자·-·_만")
     if not 8 <= len(secs) <= 14:
         WARN.append(f"섹션 {len(secs)}개 (8~14개 권장)")
-    raised, modes, hours, seen, vis = set(), {}, 0, set(), []
+    raised, modes, hours, seen, vis, long_why = set(), {}, 0, set(), [], []
     for s in secs:
         w = s["id"]
         need(s, ["title", "question", "vision", "strategy", "goal", "deliverable", "kpi", "lessons", "gate", "hours", "ask"], w)
@@ -188,11 +196,18 @@ def main():
         if len({l["mode"] for l in s["lessons"]}) < 2:
             FAIL.append(f"{w}: 레슨 형식이 한 가지뿐")
         for j, l in enumerate(s["lessons"]):
+            if len(l.get("why", "")) > 60:
+                long_why.append(f"{w}{j+1}")
+            l.pop("html", None)  # 레슨 HTML은 아래 md()가 만든 것만 쓴다
+            if l.get("url") and not re.match(r"https?://", l["url"]):
+                FAIL.append(f"{w} 레슨{j+1}: url은 http(s)만")
             t = f"{w} 레슨{j+1}"; need(l, ["mode", "title", "why", "min"], t); modes[l["mode"]] = modes.get(l["mode"], 0) + 1
             if l["mode"] not in MODES:
                 FAIL.append(f"{t}: 없는 형식 {l['mode']}")
             if l.get("file"):
                 p = os.path.join(root, l["file"])
+                if not os.path.realpath(p).startswith(os.path.realpath(root) + os.sep):
+                    FAIL.append(f"{t}: {l['file']}은 과정 폴더 밖이다"); continue
                 if not os.path.exists(p):
                     FAIL.append(f"{t}: {l['file']} 없음"); continue
                 if l["file"].endswith(".md"):
@@ -321,6 +336,8 @@ def main():
             FAIL.append(f"사례 규모가 {sorted(map(str, z))}뿐 (대기업·중견·중소·스타트업 등 3가지 이상)")
     if len([m for m in modes if modes[m]]) < 6:
         WARN.append(f"쓴 형식 {sorted(modes)} (6가지 이상 권장)")
+    if long_why:
+        WARN.append(f"레슨 why가 60자를 넘는다: {' '.join(long_why)}")
     for m in FAIL:
         print("FAIL", m)
     for m in WARN:
@@ -328,10 +345,17 @@ def main():
     if same:
         print("INFO 두 시험이 같은 낱말을 쓴다. 한쪽 해설이 다른 쪽 답을 알려 주지 않는지 본다:", " / ".join(same))
     print(f"섹션 {len(secs)} · 레슨 {sum(modes.values())} {modes} · 시간 {hours} · 출처 {len(src)} · 사례 {len(C.get('cases', []))} · FAIL {len(FAIL)} · WARN {len(WARN)}")
-    if "--check" not in sys.argv:
+    if "--check" not in sys.argv and not FAIL:
+        out = os.path.join(root, "index.html"); mark = "\n<!-- into-build %s -->\n"
+        if os.path.lexists(out):
+            old = "" if os.path.islink(out) else open(out, encoding="utf-8", errors="ignore").read()
+            body, sep, tail = old.rpartition("\n<!-- into-build ")
+            if not sep or tail != hashlib.sha1(body.encode()).hexdigest() + " -->\n":
+                print(f"FAIL {out}: 이 스크립트가 만든 그대로가 아니다(사람이 고쳤거나 남의 파일). 옮긴 뒤 다시"); sys.exit(1)
         t = open(os.path.join(HERE, "..", "assets", "domain-expert.html"), encoding="utf-8").read()
         data = json.dumps(C, ensure_ascii=False).replace("</", "<\\/").replace("<!--", "<\\u0021--")
-        out = os.path.join(root, "index.html"); open(out, "w", encoding="utf-8").write(t.replace("/*COURSE*/", data)); print(out)
+        t = t.replace("/*COURSE*/", data)
+        open(out, "w", encoding="utf-8").write(t + mark % hashlib.sha1(t.encode()).hexdigest()); print(out)
     sys.exit(1 if FAIL else 0)
 
 
