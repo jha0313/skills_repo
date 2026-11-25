@@ -4,7 +4,7 @@
   scan.py                    홈과 /Library
   scan.py <경로> [<경로>…]   그 경로만 (/Applications 추가 등)
   scan.py --free             남은 용량만
-  scan.py --record <경로>…   승인 기록을 JSON으로 낸다(원래 경로·바이트·mtime_ns)
+  scan.py --record <경로>…   승인 기록을 JSON으로 낸다(원래 경로·바이트·mtime_ns·하위 목록 해시)
   scan.py --check <기록>     기록의 경로를 다시 재서 대조한다. 종료 코드: 0 같음 / 1 달라짐 / 2 확인 못 함
 
 - 실제로 차지한 블록을 센다. 내려받지 않은 iCloud 파일은 0에 가깝고, 하드 링크는 한 번만 센다.
@@ -12,16 +12,20 @@
 - 경로는 셸에 붙여 넣을 수 있게 따옴표를 붙여 낸다(공백·작은따옴표·개행 포함).
 """
 import argparse
+import hashlib
 import json
 import os
 import re
 import shlex
 import shutil
+import stat
 import sys
 import time
 
 
 class Scan:
+    items = None   # 리스트면 걸은 항목의 (경로, 종류, 크기, mtime_ns)를 모은다(승인 기록용)
+
     def __init__(self, depth, min_dir, min_file):
         self.depth, self.min_dir, self.min_file = depth, min_dir, min_file
         self.dirs, self.files, self.denied, self.seen = [], [], [], set()
@@ -51,6 +55,7 @@ class Scan:
             except OSError:
                 self.denied.append(e.path)
                 continue
+            self.note(e.path, st)
             if e.is_dir(follow_symlinks=False):
                 size, when = self.walk(e.path, dev, level + 1) if st.st_dev == dev else (0, 0)
             else:
@@ -60,8 +65,13 @@ class Scan:
             self.dirs.append((total, newest, path))
         return total, newest
 
+    def note(self, path, st):
+        if self.items is not None:
+            self.items.append((path, stat.S_IFMT(st.st_mode), st.st_size, st.st_mtime_ns))
+
     def measure(self, path):
         st = os.lstat(path)
+        self.note(path, st)
         if os.path.isdir(path) and not os.path.islink(path):
             return self.walk(path, st.st_dev)
         self.dirs.append((st.st_blocks * 512, st.st_mtime_ns, path))
@@ -85,22 +95,36 @@ def shell(path):
 
 def table(rows, top):
     print("| 크기 | 마지막 수정 | 경로 |\n|---|---|---|")
-    for size, when, path in sorted(rows, key=lambda r: -r[0])[:top]:
+    rows = sorted(rows, key=lambda r: -r[0])
+    for size, when, path in rows[:top]:
         day = time.strftime("%Y-%m-%d", time.localtime(when / 1e9)) if when else "?"
         print(f"| {human(size)} | {day} | {shell(path)} |")
+    if len(rows) > len(rows[:top]):
+        print(f"\n{len(rows) - len(rows[:top])}개는 줄였다(--top을 빼면 모두 낸다).")
+
+
+def fingerprint(path):
+    """((크기, 최근 수정 ns, 하위 목록 해시), 읽지 못한 곳). 해시는 경로 순으로 정렬한 (상대 경로, 종류, 크기, mtime_ns) 목록의 것이다."""
+    s = Scan(0, float("inf"), float("inf"))
+    s.items = []
+    size, when = s.measure(path)
+    h = hashlib.sha256()
+    for p, *rest in sorted(s.items):
+        h.update(repr((p[len(path):], *rest)).encode())
+    return (size, when, h.hexdigest()), s.denied
 
 
 def check(records):
-    """기록과 지금이 모두 같으면 0, 하나라도 다르면 1."""
-    changed = 0
+    """기록과 지금이 모두 같으면 0, 다른 것이 있으면 1, 읽지 못한 곳이 있으면 2."""
+    code = 0
     for path, old in records:
-        s = Scan(0, float("inf"), float("inf"))
-        now = s.measure(path)
-        same = now == old and not s.denied
-        changed |= not same
-        print(f"{'같음' if same else '달라짐'}: {shell(path)}")
-        print(f"  기록 {shown(*old)} / 지금 {shown(*now)}" + (f", 읽지 못한 곳 {len(s.denied)}개" if s.denied else ""))
-    return int(changed)
+        now, denied = fingerprint(path)
+        result = 2 if denied else int(now != old)
+        code = max(code, result)
+        print(f"{['같음', '달라짐', '확인 못 함'][result]}: {shell(path)}")
+        print(f"  기록 {shown(*old[:2])} / 지금 {shown(*now[:2])}" + (f", 읽지 못한 곳 {len(denied)}개" if denied else
+              ", 하위 목록 다름" if now[2] != old[2] else ""))
+    return code
 
 
 def main(argv):
@@ -112,7 +136,7 @@ def main(argv):
     ap.add_argument("--depth", type=int, default=4, help="폴더를 몇 단계까지 보일지 (기본 4)")
     ap.add_argument("--min-dir-mb", type=float, default=1000, help="이보다 작은 폴더는 줄인다 (기본 1000)")
     ap.add_argument("--min-file-mb", type=float, default=500, help="이보다 작은 파일은 줄인다 (기본 500)")
-    ap.add_argument("--top", type=int, default=50)
+    ap.add_argument("--top", type=int, help="표마다 이 줄 수까지만 (기본: 모두)")
     a = ap.parse_args(argv)
     home = os.path.expanduser("~")
     checking = a.check is not None
@@ -127,7 +151,7 @@ def main(argv):
     if checking:
         try:
             with open(a.check, encoding="utf-8") as f:
-                records = [(r["path"], (r["bytes"], r["mtime_ns"])) for r in json.load(f)]
+                records = [(r["path"], (r["bytes"], r["mtime_ns"], r["list"])) for r in json.load(f)]
         except (OSError, ValueError, KeyError, TypeError) as e:
             ap.error(f"{a.check}: 기록을 읽지 못했다({e})")
         if not records:
@@ -142,8 +166,12 @@ def main(argv):
     if checking:
         return check(records)
     if a.record:
-        got = [(p, *Scan(0, float("inf"), float("inf")).measure(p)) for p in paths]
-        print(json.dumps([dict(path=p, bytes=b, mtime_ns=t, shown=shown(b, t)) for p, b, t in got], ensure_ascii=False, indent=1))
+        got = [(p, *fingerprint(p)) for p in paths]
+        for p, _, denied in got:
+            if denied:
+                ap.error(f"{p}: 읽지 못한 곳이 {len(denied)}개 있어 기록하지 않는다")
+        print(json.dumps([dict(path=p, bytes=b, mtime_ns=t, list=h, shown=shown(b, t)) for p, (b, t, h), _ in got],
+                         ensure_ascii=False, indent=1))
         return 0
     print(free)
     s = Scan(a.depth, a.min_dir_mb * 1e6, a.min_file_mb * 1e6)

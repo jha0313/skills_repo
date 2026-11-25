@@ -28,7 +28,7 @@ if mode == "child":   # 래퍼가 본체를 하위 프로세스로 띄우는 설
 if mode != "empty":
     reply = "ok\\n" if "Reply with exactly: ok" in stdin else "## findings\\n- none\\n"
     if mode == "badping":
-        reply = "cannot help\\n"
+        reply = os.environ.get("FAKE_REPLY", "cannot help") + "\\n"
     open(args[args.index("-o") + 1], "w").write(reply)
 print("codex log line")
 sys.exit(3 if mode == "fail" else 0)
@@ -118,9 +118,23 @@ class CodexReviewTest(unittest.TestCase):
         self.assertIn('model_reasoning_effort="high"', a)
         self.assertEqual((a[a.index("--add-dir") + 1], a[a.index("-s") + 1]), (self.path("home"), "workspace-write"))
 
-    def test_web_is_not_passed_by_default(self):
-        self.review()
-        self.assertFalse([x for x in self.fake_call()["args"] if "web_search" in x])
+    def test_web_is_turned_off_unless_asked(self):
+        """사용자 Codex 설정이 live여도 --web 없이는 검색하지 않게 값을 명시한다."""
+        for args in ((), ("--sandbox", "workspace-write")):
+            self.review(*args)
+            a = self.fake_call()["args"]
+            self.assertEqual([x for x in a if "web_search" in x], ['web_search="disabled"'])
+            self.assertEqual(a[a.index('web_search="disabled"') - 1], "-c")
+        self.call("--ping")
+        self.assertIn('web_search="disabled"', self.fake_call()["args"])
+        self.review("--web")
+        self.assertEqual([x for x in self.fake_call()["args"] if "web_search" in x], ['web_search="live"'])
+
+    def test_dry_run_shows_search_mode_and_that_it_is_not_inherited(self):
+        for args, mode in (((), "disabled"), (("--web",), "live")):
+            _, res, _ = self.review("--dry-run", *args)
+            self.assertEqual((res["web_search"], res["web_search_inherited"]), (mode, False))
+            self.assertIn(f'web_search="{mode}"', res["cmd"])
 
     def test_effort_rejects_config_injection(self):
         code, _, err = self.review("--effort", 'low" , x="1')
@@ -269,8 +283,18 @@ class CodexReviewTest(unittest.TestCase):
         self.assertIn('model_reasoning_effort="low"', self.fake_call()["args"])
 
     def test_ping_unexpected_reply(self):
-        code, res, _ = self.call("--ping", mode="badping")
-        self.assertEqual((code, res["ping_ok"]), (1, False))
+        for reply in ("cannot help", "okay, I cannot do this", "ok then"):
+            code, res, _ = self.call("--ping", mode="badping", FAKE_REPLY=reply)
+            self.assertEqual((code, res["exit"], res["ping_ok"]), (1, 1, False), reply)
+            self.assertIn("ping", res["error"])
+
+    def test_json_and_run_log_hold_the_final_exit_code(self):
+        log = self.path("logs", "runs.jsonl")
+        self.assertEqual(self.review(mode="empty", CODEX_REVIEW_LOG=log)[1]["exit"], 1)
+        self.call("--ping", mode="badping", CODEX_REVIEW_LOG=log)
+        self.review(mode="fail", CODEX_REVIEW_LOG=log)
+        with open(log, encoding="utf-8") as fh:
+            self.assertEqual([json.loads(line)["exit"] for line in fh], [1, 1, 3])
 
 
 if __name__ == "__main__":

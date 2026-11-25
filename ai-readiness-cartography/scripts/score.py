@@ -584,7 +584,8 @@ def score_e(repo: Path, context_files: list[Path]) -> CategoryScore:
 
     # E3 Task validation commands actually exist
     have_pkg_json = (repo / "package.json").exists()
-    have_pyproject = (repo / "pyproject.toml").exists() or (repo / "apps/api/pyproject.toml").exists() or any(repo.glob("**/pyproject.toml"))
+    have_pyproject = (repo / "pyproject.toml").exists() or (repo / "apps/api/pyproject.toml").exists() or any(
+        not IGNORE_DIRS.intersection(p.relative_to(repo).parts) for p in repo.glob("**/pyproject.toml"))
     have_make = (repo / "Makefile").exists()
     have_husky = (repo / ".husky").exists() or (repo / ".husky").is_dir()
     have_workflows = (repo / ".github" / "workflows").exists()

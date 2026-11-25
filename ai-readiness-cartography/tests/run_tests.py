@@ -100,6 +100,14 @@ class Evidence(Base):
         e = self.cats()["E"].evidence
         self.assertEqual((e["ref_broken"], len(e["broken_refs"])), (51, 51))
 
+    def test_installed_dependencies_are_not_the_projects_own_checks(self):
+        self.write("src/app.py")
+        self.write(".venv/lib/demo/pyproject.toml")
+        self.write("node_modules/demo/pyproject.toml")
+        self.assertEqual(self.cats()["E"].sub_scores["E3_TaskValidation"], 0)
+        self.write("services/api/pyproject.toml")
+        self.assertEqual(self.cats()["E"].sub_scores["E3_TaskValidation"], 2)
+
     def test_checkout_location_does_not_change_the_score(self):
         totals = []
         for parent in ("plain", ".cache", "build"):

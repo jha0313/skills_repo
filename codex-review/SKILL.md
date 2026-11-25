@@ -1,6 +1,6 @@
 ---
 name: codex-review
-description: "다른 회사 모델(Codex CLI)에게 코드·계획·문서 리뷰를 맡기고, 돌아온 지적을 확인한 뒤 반영한다. '코덱스 리뷰', 'Codex한테 리뷰 맡겨', '다른 모델로 검토해 줘', '세컨드 오피니언', 'codex review', 'second opinion'에 쓴다. codex exec를 손으로 짜지 말고 이 스킬의 스크립트로 부른다."
+description: "다른 회사 모델(Codex CLI)에게 코드·계획·문서 리뷰를 맡기고, 돌아온 지적을 확인한 뒤 반영한다. 다른 제공사 모델의 검토를 요청할 때 쓴다: '코덱스 리뷰', 'Codex한테 리뷰 맡겨', '다른 모델로 검토해 줘', 'codex review', 'second opinion from another model'. 지금 에이전트가 Codex면 쓰지 않는다."
 license: MIT
 compatibility: "macOS·Linux, Python 3.11+, 로그인된 Codex CLI(0.167.2에서 확인, 2026-11-24)"
 metadata:
@@ -48,7 +48,7 @@ python3 -I <skill>/scripts/codex_review.py --prompt auth-r1.md --cd <리뷰할 �
 | `--effort` | Codex 설정값 | 깊은 리뷰는 그 모델이 지원하는 높은 단계 |
 | `--sandbox` | `read-only` | 사용자가 Codex에게 고치라고 **직접** 말했을 때만 `workspace-write` |
 | `--add-dir` | 없음 | `workspace-write`에서 쓰기 폴더를 더할 때. 쓰기용 옵션이라 읽기 전용 리뷰에는 뜻이 없다 |
-| `--web` | 안 넘김 | 최신 자료가 필요할 때. 안 넘겨도 Codex 기본값은 저장된 색인 검색(`cached`)이다 |
+| `--web` | 검색 끔(`web_search="disabled"`) | 최신 자료가 필요할 때. `live`가 된다. 사용자 설정의 검색 모드는 물려받지 않는다 |
 | `--timeout-min` | 30 | 큰 리뷰 |
 
 완료: 결과 JSON의 `exit`이 0이고 `error`가 없다. 아니면 `log`를 읽고 원인을 사용자에게 **그대로** 말한다. 결과 없이 리뷰했다고 하지 않는다.

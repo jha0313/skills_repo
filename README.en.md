@@ -6,10 +6,9 @@ When you hand work to an AI agent, three jobs stay with you: **understanding it,
 
 ```bash
 npx skills add jha0313/skills_repo            # pick what you need
-npx skills add jha0313/skills_repo --skill into
 ```
 
-Try it in two minutes: install `--skill time-convert` and ask "What time is Nov 25, 2 pm Seoul in London?" → Wed Nov 25, 05:00, computed by a script. Then install `--skill into` and say `into eli5 <PR, repo or article URL>`.
+Try it in two minutes: run `npx skills add jha0313/skills_repo --skill time-convert` and ask "What time is 2026-11-25, 2 pm Seoul in London?" → 2026-11-25 (Wed) 05:00, computed by a script. Then run `npx skills add jha0313/skills_repo --skill into` and say `into eli5 <PR, repo or article URL>`.
 
 Claude Code plugin: `/plugin marketplace add jha0313/skills_repo` → `/plugin install silbal@silbal`
 

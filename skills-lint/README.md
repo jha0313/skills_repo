@@ -46,10 +46,11 @@ CI 예시:
 
 ```yaml
 - uses: actions/checkout@v4
-- run: python3 -I skills-lint/scripts/skills_lint.py --root . --fail-on error
+# --allow-name은 바꿀 수 없는 옛 이름이 있을 때만. 이 저장소에는 하나 있습니다
+- run: python3 -I skills-lint/scripts/skills_lint.py --root . --fail-on error --allow-name presentation_slides
 ```
 
-이미 설치한 사람이 있어 바꿀 수 없는 옛 이름은 `--allow-name <이름>`으로 하나씩 예외로 둡니다. `name-format`만 건너뛰고 다른 검사는 그대로 합니다. 예: 이 저장소는 `--allow-name presentation_slides`가 필요합니다.
+`--allow-name <이름>`은 이미 설치한 사람이 있어 바꿀 수 없는 옛 이름을 하나씩 예외로 둡니다. `name-format`만 건너뛰고 다른 검사는 그대로 합니다.
 
 규격 검사(이름, 설명 1~1,024자, 필드 6개, compatibility 500자)는 [Agent Skills 규격](https://agentskills.io/specification)을 따릅니다(2026-11-24 확인). 에이전트마다 실제로는 더 느슨하게 읽기도 합니다.
 

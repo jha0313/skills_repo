@@ -10,7 +10,7 @@
 열어 둔 채 쉬는 세션은 파일을 잡지 않고 프로세스 인자에 id도 없을 수 있다. 그래서 세 가지를 함께 본다.
   1) claude가 들어간 프로세스의 작업 디렉터리와 인자 속 세션 id. 그 디렉터리의 세션은 모두 열린 것으로 본다.
   2) herdr가 깔려 있으면 패널의 디렉터리(선택).
-  3) 대화 기록(~/.claude/projects)과 폴더 안 파일의 마지막 수정 시각.
+  3) 대화 기록(~/.claude/projects)과 폴더, 그 안 파일의 마지막 수정 시각.
 ps·lsof·herdr가 실패해 확인하지 못하면 전부 KEEP으로 둔다.
 
 사용: session_dirs.py [--days N] [--all] [--no-herdr] [--root 폴더] [--projects 폴더]
@@ -28,7 +28,7 @@ import time
 
 UUID = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
 CACHE_DIRS = {"node_modules", ".venv", "venv", "__pycache__", ".cache"}   # 이 안의 파일도 세되 목록 뒤에 둔다
-JUNK_EXT = {".log", ".output", ".out", ".tmp", ".temp", ".pyc", ".o", ".pid", ".lock", ".sock"}
+JUNK_EXT = {".log", ".output", ".out", ".tmp", ".temp", ".pyc", ".o", ".pid", ".sock"}
 SMALL = 10e6
 
 
@@ -116,6 +116,10 @@ def look(top):
     size, newest, src, cached, bad = 0, 0, [], [], []
     for path, dirs, files in os.walk(top, onerror=bad.append):
         dirs.sort()
+        try:
+            newest = max(newest, os.lstat(path).st_mtime)   # 파일을 지우거나 빈 폴더를 만들면 폴더 시각만 바뀐다
+        except OSError as e:
+            bad.append(e)
         rel = os.path.relpath(path, top)
         parts = set(rel.split(os.sep))
         found = cached if CACHE_DIRS & parts else src

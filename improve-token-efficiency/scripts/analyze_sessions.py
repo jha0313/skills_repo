@@ -166,14 +166,16 @@ def read_sessions(files, owner_of=None):
     """응답과 세션별 도구 기록을 모은다. 같은 응답(메시지 id + requestId)은 한 번만 센다.
 
     owner_of를 주면 이 프로젝트의 기록만 모으고, 나머지는 notes에 건수와 토큰만 남긴다.
-    귀속은 가장 최근에 알아낸 cwd를 따른다. 하위 에이전트 기록은 부모 세션의 귀속에서 시작한다.
+    귀속은 가장 최근에 알아낸 cwd를 따른다. 하위 에이전트 기록은 부모 기록의 귀속이 하나일 때만 물려받는다.
     """
     responses, sessions, seen_tools = {}, {}, set()
     skipped = {"other": {}, None: {}}
-    first_owner = {}
+    parent_owners = {}
     notes = Counter()
     for session_id, path in files:
-        owner = first_owner.get(session_id) if owner_of else "ours"
+        is_parent = path.name == f"{session_id}.jsonl"  # session_files가 부모를 하위 에이전트보다 먼저 준다
+        known = parent_owners.setdefault(session_id, set())
+        owner = "ours" if not owner_of else next(iter(known)) if len(known) == 1 else None
         info = sessions.setdefault(session_id, {"tools": Counter(), "reads": Counter(), "first": None, "last": None})
         with open(path, encoding="utf-8", errors="replace") as f:
             for lineno, line in enumerate(f, 1):
@@ -190,8 +192,8 @@ def read_sessions(files, owner_of=None):
                 answer = rec.get("type") == "assistant" and isinstance(msg, dict)
                 if owner_of:
                     owner = owner_of(rec.get("cwd")) or owner
-                    if owner:
-                        first_owner.setdefault(session_id, owner)
+                    if owner and is_parent:
+                        known.add(owner)
                 if owner != "ours":
                     if answer:
                         add_response(rec, msg, session_id, (str(path), lineno), skipped[owner], Counter())

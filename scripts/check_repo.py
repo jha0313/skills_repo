@@ -7,6 +7,7 @@
 """
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -48,7 +49,7 @@ def frontmatter(path):
 
 def links(text):
     """코드 블록·인라인 코드 밖의 상대 링크."""
-    text = re.sub(r"^(```|~~~).*?^\1", "", text, flags=re.S | re.M)
+    text = re.sub(r"^[ \t]*(```+|~~~+).*?^[ \t]*\1", "", text, flags=re.S | re.M)
     text = re.sub(r"`[^`\n]*`", "", text)
     return [x for x in re.findall(r"\]\(([^)#\s]+)", text) if not re.match(r"[a-z]+:", x) and "{" not in x and "<" not in x]
 
@@ -82,10 +83,16 @@ def check_skill(d):
 def check_lists(all_skills):
     live = {d.name for d in all_skills if (frontmatter(d / "SKILL.md")[0] or {}).get("disable-model-invocation") != "true"}
     market = json.loads((ROOT / ".claude-plugin/marketplace.json").read_text(encoding="utf-8"))
-    paths = [s for p in market["plugins"] for s in p["skills"]]
-    for s in paths:
-        if not (ROOT / s / "SKILL.md").exists():
-            bad("marketplace.json", f"{s}에 SKILL.md가 없다")
+    paths = []
+    for p in market["plugins"]:
+        base = ROOT / p["source"] if isinstance(p.get("source"), str) and p["source"].startswith(".") else None
+        if base is None or not base.is_dir():
+            bad("marketplace.json", f"{p.get('name')}의 source({p.get('source')})가 없다")
+            base = ROOT
+        for s in p["skills"]:
+            paths.append(s)
+            if not (base / s / "SKILL.md").exists():
+                bad("marketplace.json", f"{s}에 SKILL.md가 없다")
     listed = {Path(s).name for s in paths}
     groups = {s for g in json.loads((ROOT / "skills.sh.json").read_text(encoding="utf-8"))["groupings"] for s in g["skills"]}
     for name, have, want in (("marketplace.json", listed, live), ("skills.sh.json", groups, {d.name for d in all_skills})):
@@ -112,7 +119,15 @@ def check_leaks(deny):
         return bad("git", "파일 목록을 못 읽었다. 유출 검사를 하지 못했다")
     for rel in r.stdout.split("\0"):
         p = ROOT / rel
-        if not rel or not p.is_file():
+        if not rel:
+            continue
+        name = rel + (" -> " + os.readlink(p) if p.is_symlink() else "")  # 폴더 이름과 링크 대상도 공개된다
+        for w in deny:
+            if w.lower() in name.lower():
+                bad(rel, "금칙어(경로·링크)")
+        if p.is_symlink() and any(rx.search(name) for _, rx in LEAKS):
+            bad(rel, "링크 대상에 개인 값")
+        if not p.is_file():
             continue
         if SECRET_NAME.search(rel):
             bad(rel, "비밀값 파일 이름")

@@ -193,6 +193,9 @@ def convert(a):
         base = instants(parse(a.now, now.astimezone(tz))[0], tz)
         if not base:
             raise Bad(f"--now가 {src}에 없는 시각이다")
+        if len(base) == 2:
+            raise Bad(f"--now가 {src}에서 두 번 온다(UTC {base[0]:%Y-%m-%d %H:%M}, {base[1]:%Y-%m-%d %H:%M}). "
+                      "어느 쪽인지 사용자에게 묻고, 두 시각을 모두 UTC로 바꿔 --from UTC로 다시 돌린다.")
         now = base[0]
     targets, seen = [], set()
     names = a.to.split(",") if a.to else ["여기", *places]

@@ -244,6 +244,19 @@ class SameFolderName(Case):
         _, data = self.analyze()
         self.assertEqual((data["totals"]["input"], data["notes"]["other_project_responses"]), (1, 2))
 
+    def test_하위_에이전트의_귀속은_형제에게_넘어가지_않는다(self):
+        self.write("aaaa/subagents/agent-1.jsonl", at(self.ours, line("a", "a", inp=10)), folder=self.folder)
+        self.write("aaaa/subagents/agent-2.jsonl", line("b", "b", inp=90), folder=self.folder)
+        _, data = self.analyze()
+        self.assertEqual((data["totals"]["input"], data["notes"]["unclear_project_tokens"]), (10, 90))
+
+    def test_부모의_귀속이_둘이면_하위_에이전트가_물려받지_않는다(self):
+        self.write("aaaa.jsonl", at(self.ours, line("a", "a", inp=1)), at(self.other, line("b", "b", inp=2)), folder=self.folder)
+        self.write("aaaa/subagents/agent-1.jsonl", line("c", "c", inp=4), folder=self.folder)
+        _, data = self.analyze()
+        n = data["notes"]
+        self.assertEqual((data["totals"]["input"], n["other_project_tokens"], n["unclear_project_tokens"]), (1, 2, 4))
+
     def test_심볼릭_링크로_적힌_cwd도_같은_프로젝트다(self):
         link = self.tmp / "link"
         link.symlink_to(self.ours)

@@ -114,6 +114,15 @@ class When(unittest.TestCase):
         out = self.ok("2025-11-02 12:00", "--from", LA, "--now", "2025-11-01 12:00")
         self.assertEqual(out["results"][0]["from_now"], "1일 1시간 0분 뒤")
 
+    def test_base_time_that_comes_twice_is_not_guessed(self):
+        # 예전에는 첫 번째를 조용히 골라 남은 시간이 한 시간 달랐다
+        say = self.bad("2025-11-02 03:30", "--from", "America/New_York", "--now", "2025-11-02 01:30", say="두 번 온다")
+        for text in ("2025-11-02 05:30", "2025-11-02 06:30", "--from UTC"):
+            self.assertIn(text, say)
+        for now, text in (("05:30", "3시간 0분 뒤"), ("06:30", "2시간 0분 뒤")):   # 안내한 대로 다시 돌릴 수 있다
+            out = self.ok("2025-11-02 08:30", "--from", "UTC", "--now", "2025-11-02 " + now)
+            self.assertEqual(out["results"][0]["from_now"], text)
+
     def test_remaining_time_past_and_now(self):
         for when, text, minutes in (("2025-11-20 09:30", "2시간 30분 전", -150), ("2025-11-20 12:00", "지금", 0),
                                     ("2025-11-23 13:05", "3일 1시간 5분 뒤", 4385)):

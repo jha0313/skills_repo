@@ -284,11 +284,13 @@ class Focus(Base):
         self.assertIn("마감 · acme-web · D-2 · 결제 화면 공개 (맡긴 작업 없음)", self.section("지금 볼 것"))
         self.assertNotIn("먼 일", self.board())
 
-    def test_project_deadline_merges_into_task_with_same_due(self):
-        self.focus("- 2026-01-20 acme-web: 결제 화면 공개\n")
+    def test_project_deadline_is_kept_next_to_task_with_same_due(self):
+        """날짜만 같다고 작업이 그 마감을 맡은 것은 아니다. 마감 이름은 사라지지 않는다."""
+        self.focus("- 2026-01-20 acme-web: 고객 검토\n- 2026-01-20 acme-web: 운영 전환\n")
         self.task("pay", DONE, due="2026-01-20")
-        self.assertEqual(self.order(), ["pay"])
-        self.assertEqual(self.section("마감"), "")
+        self.assertIn("pay", self.order())
+        for name in ("고객 검토", "운영 전환"):
+            self.assertIn(f"{name} (열린 작업 1개)", self.section("마감"))
 
     def test_overdue_project_deadline(self):
         self.focus("- 2026-01-10 acme-web: 공개\n")
@@ -345,6 +347,8 @@ class Package(Base):
         worker = (SKILL / "references/worker.md").read_text("utf-8")
         projects = (SKILL / "assets/projects.md").read_text("utf-8")
         self.assertIn("비서실장만", skill)
+        step6 = skill.split("### 6.")[1].split("### 7.")[0]
+        self.assertRegex(step6, "push와 PR.*작업자")
         self.assertNotIn("그 행동 한 번만 한다", worker)
         self.assertNotIn("승인 없이 그 명령을", projects)
         for text in (worker, projects):

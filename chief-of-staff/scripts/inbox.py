@@ -164,7 +164,7 @@ def board(home, today):
     dated = []
     for days, project, what in sorted(deadlines):
         mine = [t for t in open_tasks if t["project"] == project]
-        if days <= WINDOW and not any(t["due"] == days for t in mine):
+        if days <= WINDOW:  # 같은 날 작업이 있어도 그 마감을 맡았다는 뜻은 아니다. 이름을 숨기지 않는다
             note = f"{short(what)} ({f'열린 작업 {len(mine)}개' if mine else '맡긴 작업 없음'})"
             dated.append({"id": "마감", "project": project, "kind": "마감", "due": days, "human": False,
                           "stuck": False, "group": "마감", "note": note})

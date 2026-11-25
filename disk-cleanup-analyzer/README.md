@@ -43,7 +43,7 @@ Python 3.9 이상(macOS 개발 도구에 든 `python3`로 된다). herdr(에이�
 # 이 스킬 폴더에서 실행한다
 python3 -I scripts/scan.py            # 홈과 /Library의 큰 폴더·파일
 python3 -I scripts/session_dirs.py    # 세션 폴더 판정
-python3 -I scripts/scan.py --record <경로> > 기록.json   # 승인받을 때의 경로·바이트·수정 시각
+python3 -I scripts/scan.py --record <경로> > 기록.json   # 승인받을 때의 경로·크기·하위 목록
 python3 -I scripts/scan.py --check 기록.json             # 지우기 직전 대조 (0 같음, 1 달라짐, 2 확인 못 함)
 python3 tests/run_tests.py            # 임시 폴더와 가짜 ps·lsof·herdr로 검사
 ```
@@ -55,7 +55,7 @@ python3 tests/run_tests.py            # 임시 폴더와 가짜 ps·lsof·herdr�
 - 다른 폴더에서 도는 백그라운드 세션은 최근 활동(기본 7일)으로만 걸린다.
 - 대화 기록이 이미 지워진 오래된 폴더는 KEEP으로 남는다. 세션이 열린 프로젝트의 옛 세션 폴더도 KEEP이다. 놓치는 것보다 남기는 쪽을 골랐다.
 - `node_modules`나 `.cache` 안의 파일도 원본일 수 있다고 본다. 이런 폴더가 남은 세션은 REVIEW다.
-- `--check`는 크기와 가장 최근 수정 시각을 대조한다. 둘 다 그대로 두고 내용만 바꾼 것, 대조한 뒤 지우기 전에 바뀐 것은 못 잡는다.
+- `--check`는 하위 항목의 경로·종류·크기·수정 시각을 대조한다. 이것을 다 그대로 두고 내용만 바꾼 것, 대조한 뒤 지우기 전에 바뀐 것은 못 잡는다.
 - 표의 크기와 실제 회수량은 다를 수 있다(APFS 복제·스냅샷, 하드 링크).
 - 예약 실행 스크립트는 없다. 비대화형으로 돌리면 에이전트의 권한 설정에 따라 스캔 명령이 막힐 수 있다. 돌리더라도 보고서까지만 쓴다.
 - 세션 제목을 찾으려고 대화 기록을 읽는다. 본문은 출력하지 않지만 제목이 보고서에 남는다.

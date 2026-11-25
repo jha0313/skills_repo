@@ -10,6 +10,7 @@
 고정하는 것: --skip-git-repo-check, 샌드박스 명시(기본 read-only), 프롬프트는 표준 입력('-'),
 결과는 -o <결과>, 나머지 출력은 <결과>.log, 제한 시간이 지나면 하위 프로세스까지 멈춤.
 지정하지 않은 모델·effort는 넘기지 않는다(Codex 설정의 기본값을 쓴다).
+웹 검색은 늘 값을 넘긴다(--web이면 live, 아니면 disabled). 사용자 설정의 검색 모드를 물려받지 않는다.
 
 환경 변수:
   CODEX_BIN           codex 실행 파일(기본 codex)
@@ -33,7 +34,8 @@ import time
 
 # Codex 버전에 묶인 값. codex-cli 0.167.2에서 확인(2026-11-24).
 # 옛 버전은 tools.web_search=true나 features.web_search_request를 썼다. 값이 바뀌면 여기만 고친다.
-WEB_LIVE = 'web_search="live"'
+# disabled는 검색 도구를 없앤다. 안 넘기면 Codex 설정(기본 cached)이나 전체 접근 샌드박스의 live를 물려받는다.
+WEB_KEY, WEB_ON, WEB_OFF = "web_search", "live", "disabled"
 PING = "Reply with exactly: ok"
 
 
@@ -108,7 +110,7 @@ def main(argv):
     ap.add_argument("--model", default=os.environ.get("CODEX_REVIEW_MODEL") or None)
     ap.add_argument("--effort", help="모델이 지원하는 단계 이름(low, medium, high 등)")
     ap.add_argument("--sandbox", default="read-only", choices=["read-only", "workspace-write"])
-    ap.add_argument("--web", action="store_true", help=f"실시간 웹 검색({WEB_LIVE})")
+    ap.add_argument("--web", action="store_true", help=f"실시간 웹 검색({WEB_KEY}={WEB_ON}). 없으면 {WEB_OFF}")
     ap.add_argument("--timeout-min", type=float, default=30)
     ap.add_argument("--ping", action="store_true", help="모델이 응답하는지만 본다")
     ap.add_argument("--dry-run", action="store_true", help="부르지 않고 무엇을 어디에 줄지만 보여 준다")
@@ -161,13 +163,14 @@ def main(argv):
         cmd += ["-m", a.model]
     if effort:
         cmd += ["-c", f'model_reasoning_effort="{effort}"']
-    if a.web:
-        cmd += ["-c", WEB_LIVE]
+    web = WEB_ON if a.web else WEB_OFF
+    cmd += ["-c", f'{WEB_KEY}="{web}"']
     for d in add_dirs:
         cmd += ["--add-dir", d]
     cmd.append("-")
     if a.dry_run:
         emit(exit=0, dry_run=True, cmd=cmd, prompt_bytes=len(prompt.encode("utf-8")), out=out,
+             web_search=web, web_search_inherited=False,
              note="프롬프트와 Codex가 읽은 파일 내용이 모델 제공사로 나가요. 읽는 범위는 작업 폴더로 제한되지 않아요")
         return 0
 
@@ -183,12 +186,16 @@ def main(argv):
         reply = ""
         if size:
             with open(out, encoding="utf-8", errors="replace") as fh:
-                reply = fh.read().strip().lower()
-        rec["ping_ok"] = code == 0 and reply.startswith("ok")
+                reply = fh.read().strip()
+        rec["ping_ok"] = code == 0 and reply == "ok"
     if code == 124:
         rec["error"] = f"{a.timeout_min:g}분 안에 끝나지 않아 멈췄어요"
     elif code == 0 and size == 0:
         rec["error"] = "결과 파일이 비어 있어요. 로그를 보세요"
+    elif code == 0 and a.ping and not rec["ping_ok"]:
+        rec["error"] = "ping 응답이 ok가 아니에요. 결과 파일을 보세요"
+    if code == 0 and rec.get("error"):
+        rec["exit"] = 1   # codex가 0으로 끝났어도 쓸 결과가 없다. 기록에도 이 값을 남긴다
     if run_log:
         os.makedirs(os.path.dirname(run_log), exist_ok=True)
         keep = {k: rec[k] for k in ("exit", "seconds", "out_bytes", "model", "effort", "sandbox")}
@@ -196,7 +203,7 @@ def main(argv):
             fh.write(json.dumps(dict(ts=dt.datetime.now().astimezone().isoformat(timespec="seconds"), cwd=cwd,
                                      ping=a.ping, **keep), ensure_ascii=False) + "\n")
     emit(**rec)
-    return code if code else (1 if rec.get("error") or (a.ping and not rec["ping_ok"]) else 0)
+    return rec["exit"]
 
 
 if __name__ == "__main__":

@@ -71,7 +71,10 @@ class Sessions(Temp):
     def session(self, proj, sid, files=(("tasks/a.output", "log"),), log_days=30, file_days=30, name=""):
         for f, text in files:
             self.write(f"root/{proj}/{sid}/{f}", text, file_days)
-        os.makedirs(os.path.join(self.tmp, "root", proj, sid), exist_ok=True)
+        top = os.path.join(self.tmp, "root", proj, sid)
+        os.makedirs(top, exist_ok=True)
+        for d, _, _ in os.walk(top, topdown=False):
+            os.utime(d, (time.time() - file_days * 86400,) * 2)
         if log_days is not None:
             line = '{"type":"user","text":"숨길 내용"}\n' + (f'{{"customTitle":"{name}"}}\n' if name else "")
             self.write(f"projects/{proj}/{sid}.jsonl", line, log_days)
@@ -110,7 +113,8 @@ class Sessions(Temp):
         self.assertIn("scratchpad/site/index.html", r["files"])
 
     def test_unknown_or_missing_extension_is_review(self):
-        for i, f in enumerate(["Makefile", "main.swift", "notes.docx", "clip.mp4", "fix.patch"]):
+        for i, f in enumerate(["Makefile", "main.swift", "notes.docx", "clip.mp4", "fix.patch",
+                               "Cargo.lock", "uv.lock", "poetry.lock", "flake.lock"]):
             with self.subTest(f):
                 proj = f"-w-p{i}"
                 self.session(proj, A, [(f, "data")])
@@ -148,6 +152,16 @@ class Sessions(Temp):
     def test_recent_file_keeps_even_if_transcript_is_old(self):
         self.session("-w-app", A, file_days=1)
         self.assertEqual(self.rows()[("-w-app", A)]["why"], "최근 활동")
+
+    def test_recent_folder_change_keeps_even_if_files_are_old(self):
+        self.session("-w-app", A)
+        os.unlink(self.write(f"root/-w-app/{A}/gone.txt"))       # 파일을 지우면 폴더 시각만 바뀐다
+        self.session("-w-app", B)
+        top = os.path.join(self.tmp, "root/-w-app", B)
+        os.makedirs(os.path.join(top, "empty"))                  # 빈 하위 폴더만 최근
+        os.utime(top, (time.time() - 30 * 86400,) * 2)
+        rows = self.rows()
+        self.assertEqual([rows[("-w-app", s)]["why"] for s in (A, B)], ["최근 활동"] * 2)
 
     def test_missing_transcript_keeps(self):
         self.session("-w-app", A, log_days=None)
@@ -357,6 +371,15 @@ class ScanTest(Temp):
         self.assertEqual(len(self.paths(out, "큰 파일")), 2)   # 하드 링크 하나와 d.bin
         self.assertEqual(len(self.paths(out, "큰 폴더")), 2)   # 뿌리와 하드 링크 중 먼저 본 쪽
 
+    def test_every_item_over_the_threshold_is_listed(self):
+        for i in range(51):
+            self.write(f"f{i:02d}.bin", "x" * 100_000)
+        out = self.small()
+        self.assertEqual(len(self.paths(out, "큰 파일")), 51)
+        out = self.small("--top", "50")
+        self.assertEqual(len(self.paths(out, "큰 파일")), 50)
+        self.assertIn("1개는 줄였다", out)
+
     def test_newest_date_of_a_folder(self):
         self.write("a/old", "x" * 200_000, 100)
         self.write("a/new", "x", 3)
@@ -449,15 +472,56 @@ class ScanTest(Temp):
         self.run_it("--check", rec)
         os.chmod(locked, 0)
         self.addCleanup(os.chmod, locked, 0o700)
-        if not os.access(locked, os.R_OK):
-            self.run_it("--check", rec, code=1)
+        if os.access(locked, os.R_OK):
+            self.skipTest("root로 실행 중")
+        self.assertIn("확인 못 함: ", self.run_it("--check", rec, code=2))   # 1(달라짐)이 아니다
+        self.assertEqual(self.run_it("--record", os.path.join(self.tmp, "e2"), code=2), "")
+
+    def test_check_stops_when_a_file_is_swapped_for_another(self):
+        # 합계와 가장 최근 시각이 그대로여도 안의 목록이 다르면 멈춘다
+        self.write("d/new.log", "x" * 5000, 1)
+        old = self.write("d/tool.tmp", "x" * 5000, 5)
+        d = os.path.dirname(old)
+
+        def swap(name, days, text):
+            os.unlink(os.path.join(d, "tool.tmp"))
+            self.write("d/" + name, text, days)
+
+        for name, days, text in (("user-notes.md", 5, "x" * 5000), ("tool.tmp", 4, "x" * 5000), ("tool.tmp", 5, "x" * 5001)):
+            with self.subTest(name=name, days=days, size=len(text)):
+                self.write("d/tool.tmp", "x" * 5000, 5)
+                stamp = os.lstat(d).st_mtime_ns
+                rec = self.record(d)
+                with open(rec, encoding="utf-8") as f:
+                    before = json.load(f)[0]
+                swap(name, days, text)
+                os.utime(d, ns=(stamp, stamp))
+                with open(self.record(d), encoding="utf-8") as f:
+                    after = json.load(f)[0]
+                self.assertEqual((after["bytes"], after["mtime_ns"]), (before["bytes"], before["mtime_ns"]))
+                old_record = self.write("old.json", json.dumps([before]))
+                self.assertIn("하위 목록", self.run_it("--check", old_record, code=1))
+                if name != "tool.tmp":
+                    os.unlink(os.path.join(d, name))
+
+    def test_check_stops_when_a_folder_becomes_a_link_inside(self):
+        self.write("d/blob", "x" * 5000, 1)
+        sub = os.path.join(self.tmp, "d", "sub")
+        os.makedirs(sub)
+        d, st = os.path.dirname(sub), os.lstat(sub)
+        stamp, rec = os.lstat(d).st_mtime_ns, self.record(d)
+        os.rmdir(sub)
+        os.symlink(self.tmp, sub)
+        os.utime(sub, ns=(st.st_mtime_ns,) * 2, follow_symlinks=False)
+        os.utime(d, ns=(stamp, stamp))
+        self.assertIn("하위 목록", self.run_it("--check", rec, code=1))
 
     def test_check_refuses_missing_path_and_broken_record(self):
         f = self.write("gone/blob", "x")
         rec = self.record(f)
         os.unlink(f)
         self.run_it("--check", rec, code=2)
-        for text in ("", "[]", "{}", "[1]", '[{"path":"/x"}]', '[{"path":"/","bytes":0,"mtime_ns":0}]'):
+        for text in ("", "[]", "{}", "[1]", '[{"path":"/x"}]', '[{"path":"/","bytes":0,"mtime_ns":0,"list":""}]'):
             self.run_it("--check", self.write("bad.json", text), code=2)
         self.run_it("--check", os.path.join(self.tmp, "없음.json"), code=2)
         self.run_it("--record", code=2)
@@ -502,6 +566,21 @@ class Documents(Temp):
         self.assertIn("캐시 밖", row)
         self.assertIn("따로 승인", row)
         self.assertIn("캐시 밖", read("SKILL.md"))
+
+    def test_only_known_read_only_commands_before_approval(self):
+        # npm cache clean은 --force가 있으면 --dry-run이어도 캐시를 지운다. uv·pip·pnpm에는 정리 dry-run이 없다
+        known = {"npm config get cache", "uv cache dir", "uv cache size", "pip3 cache dir", "pip3 cache info",
+                 "pnpm store path", "brew --cache", "brew cleanup -n --prune=all"}
+        text = read("references", "classify.md").split("## ①")[1].split("## ②")[0]
+        self.assertIn("| 흔한 경로 | 승인 전 조회(캐시를 지우지 않음) |", text)
+        rows = [x.split(" | ")[1] for x in text.splitlines() if x.startswith("| ") and "---" not in x][1:]
+        self.assertEqual(len(rows), 5)
+        for row in rows:
+            self.assertLessEqual(set(re.findall(r"`([^`]+)`", row)), known)
+        self.assertIn("npm에는 안전한 dry-run이 없다", text)
+        skill = read("SKILL.md")
+        self.assertIn("승인 전 조회", skill)
+        self.assertNotIn("먼저 dry-run을 돌려", skill)
 
     def test_skill_uses_the_record_not_the_table(self):
         for text in ("scan.py --record", "scan.py --check"):
