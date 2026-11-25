@@ -142,7 +142,8 @@ def load_task(folder, today, warn):
         label = "확인됨" if fresh else f"{'확인 뒤 결과가 바뀜' if checked else '확인 전(작업자의 말)'}, 지문 {mark}"
         return put("읽을 것", f"{label}: {short(result.get('SUMMARY')) or '요약 없음'}")
     if head.get("started"):
-        return put("작업 중", f"시작 {short(head['started'], 30)}, 결과 없음")
+        where = f", 작업자 {short(head['worker'], 60)}" if head.get("worker") else ""
+        return put("작업 중", f"시작 {short(head['started'], 30)}, 결과 없음{where}")
     return put("작업 중", "시작 전")
 
 

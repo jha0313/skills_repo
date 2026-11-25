@@ -140,6 +140,13 @@ class Sorting(Base):
         self.task("old", DONE, due="2026-01-01", closed="2026-01-02 받아들임")
         self.assertEqual(self.order(), [])
 
+    def test_working_task_shows_where_the_worker_is(self):
+        self.task("seen", worker="herdr pay_fix, wT:t2")
+        self.task("unknown")
+        out = self.section("작업 중")
+        self.assertIn("seen · acme-web/run · 시작 2026-01-15 09:00, 결과 없음, 작업자 herdr pay_fix, wT:t2\n", out)
+        self.assertIn("unknown · acme-web/run · 시작 2026-01-15 09:00, 결과 없음\n", out)
+
     def test_quiet_working_task_is_not_in_top(self):
         self.task("working")
         self.assertEqual(self.section("지금 볼 것"), "  없음\n")
@@ -341,18 +348,46 @@ class Package(Base):
         self.assertIn("여러 프로젝트를 두고", desc)
         self.assertIn("쓰지 않는다", desc)
 
+    def test_trigger_has_manager_only_words(self):
+        """'너는 관리만 해'와 워커 세션 요청에 켜지지 않던 일(2026-11-25)."""
+        desc = (SKILL / "SKILL.md").read_text("utf-8").split("---")[1]
+        for phrase in ('"너는 관리만 해"', '"워커 세션에서 해"', '"워커 세션 만들어서 맡겨"', '"비서실장"', '"chief of staff"'):
+            self.assertIn(phrase, desc)
+
     def test_one_approval_has_one_executor(self):
-        """비서실장만 승인을 실행한다. 작업자 쪽 문서가 다르게 말하면 같은 행동이 두 번 나간다."""
-        skill = (SKILL / "SKILL.md").read_text("utf-8")
-        worker = (SKILL / "references/worker.md").read_text("utf-8")
-        projects = (SKILL / "assets/projects.md").read_text("utf-8")
-        self.assertIn("비서실장만", skill)
-        step6 = skill.split("### 6.")[1].split("### 7.")[0]
+        """작업자 한 명만 승인을 실행한다. 문서마다 다르게 말하면 같은 행동이 두 번 나가거나 아무도 하지 않는다."""
+        step6 = (SKILL / "SKILL.md").read_text("utf-8").split("### 6.")[1].split("### 7.")[0]
+        self.assertIn("**그 작업의 작업자 한 명만, 한 번만** 실행한다. 비서실장은 하지 않는다", step6)
         self.assertRegex(step6, "push와 PR.*작업자")
-        self.assertNotIn("그 행동 한 번만 한다", worker)
-        self.assertNotIn("승인 없이 그 명령을", projects)
-        for text in (worker, projects):
-            self.assertIn("비서실장이 실행한다", text)
+        for doc in ("SKILL.md", "references/worker.md", "references/dispatch.md", "assets/brief.md", "assets/projects.md"):
+            self.assertIn("승인받은 행동", (SKILL / doc).read_text("utf-8"), doc)
+        self.assertIn("실패했으면 이어 시키지 않고 다시 묻는다", (SKILL / "references/dispatch.md").read_text("utf-8"))
+
+    def test_no_doc_says_the_chief_executes(self):
+        for path in SKILL.rglob("*.md"):
+            text = path.read_text("utf-8")
+            for old in ("비서실장이 실행", "비서실장만, 한 번만", "작업자에게 넘기지 않는다", "방금 승인한 명령", "그 명령을 쓰지 않는다"):
+                self.assertNotIn(old, text, f"{path.name}: {old}")
+
+    def test_worker_runs_only_the_written_approval(self):
+        worker = (SKILL / "references/worker.md").read_text("utf-8")
+        rule = worker.split("## 승인받은 행동")[1].split("## ")[0]
+        for need in ("적힌 대상에만, 한 번만", "밖의 결과부터", "다시 본다", "다시 하지 않고 `failed`", "넓히지 않는다"):
+            self.assertIn(need, rule)
+
+    def test_chief_only_manages(self):
+        """승인받은 삭제와 디스크 훑기를 본 세션이 직접 하던 일(2026-11-25)."""
+        text = (SKILL / "SKILL.md").read_text("utf-8")
+        self.assertRegex(text, r"\*\*관리만 한다\*\*.*승인한 것도 작업자가 한다")
+        self.assertIn("턴을 끝내기 전에 셋을 본다", text)
+        self.assertIn("모두 작업자가 했나?", text)
+        self.assertEqual(len(re.findall(r"^- .*\?$", text.split("턴을 끝내기 전에")[1], re.M)), 3)
+
+    def test_visible_worker_comes_first_with_permissions_on(self):
+        launch = (SKILL / "references/dispatch.md").read_text("utf-8").split("## 띄우는 방법")[1].split("## ")[0]
+        self.assertLess(launch.index("HERDR_ENV=1"), launch.index("subagent"))
+        self.assertIn("--permission-mode auto", launch)
+        self.assertNotRegex(launch, "bypassPermissions|dangerously-skip")
 
     def test_late_push_approval_goes_to_the_same_ship_worker(self):
         """커밋에서 멈춘 뒤 push를 승인받아도 실행자는 SKILL.md 6단계와 같다."""
@@ -362,7 +397,8 @@ class Package(Base):
     def test_interrupted_approval_looks_outside_first(self):
         for doc in ("SKILL.md", "assets/decisions.md"):
             self.assertIn("실행 시작", (SKILL / doc).read_text("utf-8"), doc)
-        self.assertIn("밖의 결과부터", (SKILL / "SKILL.md").read_text("utf-8"))
+        skill = (SKILL / "SKILL.md").read_text("utf-8")
+        self.assertRegex(skill, "그 작업자가 아직 도는지 보고, 돌면 기다린다.*밖의 결과부터")
 
     def test_masking_wins_over_verbatim(self):
         """'원문 그대로'라고 적은 문서에는 가림 규칙이 함께 있다."""
