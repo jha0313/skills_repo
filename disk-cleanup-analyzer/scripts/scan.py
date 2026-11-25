@@ -2,15 +2,19 @@
 """디스크를 차지하는 큰 폴더와 큰 파일을 한 번 걸어서 표로 낸다. macOS용. 읽기만 한다(삭제 코드 없음).
 
   scan.py                    홈과 /Library
-  scan.py <경로> [<경로>…]   그 경로만 (삭제 전 확인, /Applications 추가 등)
+  scan.py <경로> [<경로>…]   그 경로만 (/Applications 추가 등)
   scan.py --free             남은 용량만
+  scan.py --record <경로>…   승인 기록을 JSON으로 낸다(원래 경로·바이트·mtime_ns)
+  scan.py --check <기록>     기록의 경로를 다시 재서 대조한다. 종료 코드: 0 같음 / 1 달라짐 / 2 확인 못 함
 
 - 실제로 차지한 블록을 센다. 내려받지 않은 iCloud 파일은 0에 가깝고, 하드 링크는 한 번만 센다.
 - 심볼릭 링크와 다른 볼륨은 따라가지 않는다. /, /System, /Volumes는 받지 않는다.
-- 경로는 셸에 붙여 넣을 수 있게 따옴표를 붙여 낸다(공백·작은따옴표 포함).
+- 경로는 셸에 붙여 넣을 수 있게 따옴표를 붙여 낸다(공백·작은따옴표·개행 포함).
 """
 import argparse
+import json
 import os
+import re
 import shlex
 import shutil
 import sys
@@ -29,11 +33,11 @@ class Scan:
             self.seen.add((st.st_dev, st.st_ino))
         size = st.st_blocks * 512
         if size >= self.min_file:
-            self.files.append((size, st.st_mtime, path))
-        return size, st.st_mtime
+            self.files.append((size, st.st_mtime_ns, path))
+        return size, st.st_mtime_ns
 
     def walk(self, path, dev, level=0):
-        """(크기, 가장 최근 수정 시각). level 0이 시작 폴더다."""
+        """(크기, 가장 최근 수정 시각 ns). level 0이 시작 폴더다."""
         total, newest = 0, 0
         try:
             with os.scandir(path) as it:
@@ -56,47 +60,95 @@ class Scan:
             self.dirs.append((total, newest, path))
         return total, newest
 
+    def measure(self, path):
+        st = os.lstat(path)
+        if os.path.isdir(path) and not os.path.islink(path):
+            return self.walk(path, st.st_dev)
+        self.dirs.append((st.st_blocks * 512, st.st_mtime_ns, path))
+        return st.st_blocks * 512, st.st_mtime_ns
+
 
 def human(n):
     return f"{n / 1e9:.2f} GB" if n >= 1e8 else f"{n / 1e6:.2f} MB"
 
 
+def shown(size, when):
+    return f"{human(size)}, {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(when / 1e9)) if when else '?'}"
+
+
+def shell(path):
+    """셸(zsh·bash)에 그대로 넣으면 원래 경로가 되는 글. 표와 줄을 깨는 글자는 $'\\x0a'처럼 적는다."""
+    if not re.search(r"[\x00-\x1f\x7f|]", path):
+        return shlex.quote(path)
+    return "$'" + re.sub(r"[\x00-\x1f\x7f|'\\]", lambda m: f"\\x{ord(m[0]):02x}", path) + "'"
+
+
 def table(rows, top):
     print("| 크기 | 마지막 수정 | 경로 |\n|---|---|---|")
     for size, when, path in sorted(rows, key=lambda r: -r[0])[:top]:
-        day = time.strftime("%Y-%m-%d", time.localtime(when)) if when else "?"
-        text = shlex.quote(path).replace("|", "\\|").replace("\n", "\\n")
-        print(f"| {human(size)} | {day} | {text} |")
+        day = time.strftime("%Y-%m-%d", time.localtime(when / 1e9)) if when else "?"
+        print(f"| {human(size)} | {day} | {shell(path)} |")
+
+
+def check(records):
+    """기록과 지금이 모두 같으면 0, 하나라도 다르면 1."""
+    changed = 0
+    for path, old in records:
+        s = Scan(0, float("inf"), float("inf"))
+        now = s.measure(path)
+        same = now == old and not s.denied
+        changed |= not same
+        print(f"{'같음' if same else '달라짐'}: {shell(path)}")
+        print(f"  기록 {shown(*old)} / 지금 {shown(*now)}" + (f", 읽지 못한 곳 {len(s.denied)}개" if s.denied else ""))
+    return int(changed)
 
 
 def main(argv):
     ap = argparse.ArgumentParser(description="큰 폴더와 큰 파일을 표로 낸다(읽기만).")
     ap.add_argument("paths", nargs="*", help="기본: 홈, /Library")
     ap.add_argument("--free", action="store_true", help="남은 용량만 낸다")
+    ap.add_argument("--record", action="store_true", help="그 경로의 승인 기록(JSON)을 낸다")
+    ap.add_argument("--check", metavar="기록", help="승인 기록과 지금을 대조한다")
     ap.add_argument("--depth", type=int, default=4, help="폴더를 몇 단계까지 보일지 (기본 4)")
     ap.add_argument("--min-dir-mb", type=float, default=1000, help="이보다 작은 폴더는 줄인다 (기본 1000)")
     ap.add_argument("--min-file-mb", type=float, default=500, help="이보다 작은 파일은 줄인다 (기본 500)")
     ap.add_argument("--top", type=int, default=50)
     a = ap.parse_args(argv)
     home = os.path.expanduser("~")
-    paths = [os.path.abspath(os.path.expanduser(p)) for p in a.paths] or [home, "/Library"]
+    checking = a.check is not None
+    if a.record and not a.paths or checking and (a.paths or a.record or a.free):
+        ap.error("--record에는 경로를, --check에는 기록 파일 하나만 준다")
+    use = shutil.disk_usage(home)
+    free = f"디스크: 전체 {human(use.total)} / 사용 {human(use.used)} / 여유 {human(use.free)} ({time.strftime('%Y-%m-%d %H:%M')})"
+    if a.free:
+        print(free)
+        return 0
+    records = []
+    if checking:
+        try:
+            with open(a.check, encoding="utf-8") as f:
+                records = [(r["path"], (r["bytes"], r["mtime_ns"])) for r in json.load(f)]
+        except (OSError, ValueError, KeyError, TypeError) as e:
+            ap.error(f"{a.check}: 기록을 읽지 못했다({e})")
+        if not records:
+            ap.error(f"{a.check}: 기록이 비었다")
+    paths = [os.path.abspath(os.path.expanduser(p)) for p in a.paths] or [r[0] for r in records] or [home, "/Library"]
     for p in paths:
         real = os.path.realpath(p)
         if real == "/" or real.lower().split("/")[1] in ("system", "volumes"):
             ap.error(f"{p}: /, /System, /Volumes는 스캔하지 않는다")
         if not os.path.lexists(p):
             ap.error(f"{p}: 없는 경로다")
-    use = shutil.disk_usage(home)
-    print(f"디스크: 전체 {human(use.total)} / 사용 {human(use.used)} / 여유 {human(use.free)} ({time.strftime('%Y-%m-%d %H:%M')})")
-    if a.free:
+    if checking:
+        return check(records)
+    if a.record:
+        got = [(p, *Scan(0, float("inf"), float("inf")).measure(p)) for p in paths]
+        print(json.dumps([dict(path=p, bytes=b, mtime_ns=t, shown=shown(b, t)) for p, b, t in got], ensure_ascii=False, indent=1))
         return 0
+    print(free)
     s = Scan(a.depth, a.min_dir_mb * 1e6, a.min_file_mb * 1e6)
     for p in paths:
-        st = os.lstat(p)
-        if os.path.isdir(p) and not os.path.islink(p):
-            s.walk(p, st.st_dev)
-        else:
-            s.dirs.append((st.st_blocks * 512, st.st_mtime, p))
+        s.measure(p)
     print(f"\n## 큰 폴더 ({a.min_dir_mb:g} MB 이상, {a.depth}단계까지. 위 폴더 크기에 아래 폴더가 들어 있다)")
     table(s.dirs, a.top)
     print(f"\n## 큰 파일 ({a.min_file_mb:g} MB 이상)")

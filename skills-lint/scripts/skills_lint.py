@@ -4,7 +4,7 @@
 사용:
   skills_lint.py                        # 이 컴퓨터에 설치된 스킬 폴더
   skills_lint.py --root <폴더> [--root …]  # 저장소 하나(아래 폴더까지 찾음). CI용
-  옵션: --json, --fail-on error|warning|never (기본 error)
+  옵션: --json, --fail-on error|warning|never (기본 error), --allow-name <이름> (이름 글자 규칙만 예외)
 
 설치된 폴더: ~/.claude/skills, ~/.agents/skills, ~/.codex/skills, ./.claude/skills, ./.agents/skills.
 규격 검사(이름·설명 길이·필드)는 https://agentskills.io/specification 기준(2026-11-24 확인).
@@ -126,7 +126,7 @@ def line_of(text, pos):
     return text.count("\n", 0, pos) + 1
 
 
-def broken_links(path, skill_dir):
+def broken_links(path):
     text = read(path)
     for pattern in (r"^[ \t]*(```+|~~~+).*?^[ \t]*\1[ \t]*$", r"<!--.*?-->", r"(`+)(?!`)[^\n]+?(?<!`)\1(?!`)"):
         text = blank(pattern, text)
@@ -137,7 +137,7 @@ def broken_links(path, skill_dir):
         if re.match(r"[A-Za-z][A-Za-z0-9+.-]*:|[#/~]", target) or re.search(r"[{}<>$*…]|\.\.\.", target):
             continue   # 웹 주소·페이지 안 위치·절대 경로·자리 표시. 점도 빗금도 없는 대상(예시 낱말)도 아래에서 거른다
         rel = unquote(re.split(r"[#?]", target)[0])
-        if re.search(r"[./]", rel) and not any(os.path.exists(os.path.join(base, rel)) for base in (os.path.dirname(path), skill_dir)):
+        if re.search(r"[./]", rel) and not os.path.exists(os.path.join(os.path.dirname(path), rel)):
             yield target, line_of(text, m.start())
 
 
@@ -203,7 +203,7 @@ def issue(code, level, path, line, message):
     return dict(code=code, level=level, file=shown(path), line=line, message=message)
 
 
-def check(skill_dir, locations, by_folder, repo_mode):
+def check(skill_dir, locations, by_folder, repo_mode, allow_names):
     path, issues = os.path.join(skill_dir, "SKILL.md"), []
     folder = os.path.basename(os.path.abspath(locations[0]))
 
@@ -239,7 +239,7 @@ def check(skill_dir, locations, by_folder, repo_mode):
             add("name-missing", "error", at("name"), "name이 없음")
         else:
             rec["name"] = name
-            if len(name) > NAME_LIMIT or not NAME_RE.fullmatch(name):
+            if name not in allow_names and (len(name) > NAME_LIMIT or not NAME_RE.fullmatch(name)):
                 add("name-format", "error", at("name"), f"name은 소문자·숫자·하이픈 1~{NAME_LIMIT}자: {name}")
             for loc in locations:
                 if os.path.basename(os.path.abspath(loc)) != name:
@@ -259,12 +259,12 @@ def check(skill_dir, locations, by_folder, repo_mode):
         dirs[:] = sorted(d for d in dirs if d not in SKIP_DIRS and not d.startswith("."))
         for f in sorted(files):
             if f.lower().endswith(".md"):
-                for target, line in broken_links(os.path.join(base, f), skill_dir):
+                for target, line in broken_links(os.path.join(base, f)):
                     add("broken-link", "error", line, f"없는 파일로 가는 링크: {target}", os.path.join(base, f))
     return rec, issues
 
 
-def lint(roots, repo_mode):
+def lint(roots, repo_mode, allow_names):
     issues, places, per_root = [], {}, []
     for root in roots:
         found, dangling = (find_in_repo(root), []) if repo_mode else find_installed(root)
@@ -278,7 +278,7 @@ def lint(roots, repo_mode):
         by_folder.setdefault(os.path.basename(p), []).append(p)
     skills = {}
     for real, locs in places.items():
-        rec, found = check(locs[0], locs, by_folder, repo_mode)
+        rec, found = check(locs[0], locs, by_folder, repo_mode, allow_names)
         skills[real] = rec
         issues += found
 
@@ -333,6 +333,8 @@ def main(argv):
     ap.add_argument("--root", action="append", help="검사할 저장소 폴더(아래 폴더까지 찾음). 여러 번 줄 수 있다")
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--fail-on", choices=["error", "warning", "never"], default="error")
+    ap.add_argument("--allow-name", action="append", default=[], metavar="이름",
+                    help="name-format만 봐 줄 이름(이미 설치된 옛 이름 등). 여러 번 줄 수 있다")
     a = ap.parse_args(argv)
     roots, seen = [], set()
     for r in a.root or INSTALLED:
@@ -344,7 +346,7 @@ def main(argv):
         elif a.root:
             print(f"폴더가 없어요: {r}", file=sys.stderr)
             return 2
-    result = lint(roots, bool(a.root))
+    result = lint(roots, bool(a.root), set(a.allow_name))
     if not result["skills"] and not result["issues"]:
         print("SKILL.md가 있는 폴더를 찾지 못했어요", file=sys.stderr)
         return 2

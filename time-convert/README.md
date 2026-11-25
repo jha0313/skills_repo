@@ -38,7 +38,7 @@ export WHEN_PLACES="서울=Asia/Seoul,런던=Europe/London"
 에이전트: 런던은 17:00입니다. 3월 20일에는 미국만 서머타임이어서 한 시간 달랐습니다.
 ```
 
-직접 돌리기와 시험:
+직접 돌리기와 시험(`time-convert` 폴더에서):
 
 ```bash
 python3 -I scripts/when.py "금 오후 1시" --from Asia/Seoul --to 여기,UTC

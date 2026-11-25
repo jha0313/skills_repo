@@ -8,13 +8,14 @@
 """
 import argparse
 import datetime
+import functools
 import json
 import os
 import re
 import sys
 import unicodedata
 from collections import Counter
-from pathlib import Path
+from pathlib import Path, PurePath
 
 PRICING_FILE = Path(__file__).resolve().parent.parent / "references" / "pricing.json"
 STALE_DAYS = 90
@@ -101,6 +102,33 @@ def find_sessions_dir(repo, projects_root):
     return None
 
 
+def owner_finder(repo):
+    """cwd → 'ours'(이 프로젝트와 그 아래) · 'other'(기록 폴더 이름만 같은 다른 프로젝트) · None(모름)."""
+    raw = os.path.abspath(os.path.expanduser(repo))
+    roots = {unicodedata.normalize("NFC", p) for p in (raw, os.path.realpath(raw))}
+    names = set(candidate_dir_names(repo))
+
+    def is_repo(path):
+        if path in roots:
+            return True
+        try:
+            return os.path.samefile(path, raw)  # 심볼릭 링크, 대소문자만 다른 경로
+        except OSError:
+            return False
+
+    @functools.lru_cache(maxsize=None)
+    def owner(cwd):
+        for path in (cwd, *map(str, PurePath(cwd).parents)):
+            path = unicodedata.normalize("NFC", path)
+            if is_repo(path):
+                return "ours"
+            if encode_path(path) in names:
+                return "other"
+        return None
+
+    return lambda cwd: owner(cwd) if isinstance(cwd, str) and os.path.isabs(cwd) else None
+
+
 def session_files(sessions_dir):
     """(세션 id, 파일). 하위 에이전트 기록은 부모 세션에 넣는다."""
     files = [(p.stem, p) for p in sessions_dir.glob("*.jsonl")]
@@ -134,11 +162,18 @@ def read_usage(usage):
     }, unknown
 
 
-def read_sessions(files):
-    """응답과 세션별 도구 기록을 모은다. 같은 응답(메시지 id + requestId)은 한 번만 센다."""
+def read_sessions(files, owner_of=None):
+    """응답과 세션별 도구 기록을 모은다. 같은 응답(메시지 id + requestId)은 한 번만 센다.
+
+    owner_of를 주면 이 프로젝트의 기록만 모으고, 나머지는 notes에 건수와 토큰만 남긴다.
+    귀속은 가장 최근에 알아낸 cwd를 따른다. 하위 에이전트 기록은 부모 세션의 귀속에서 시작한다.
+    """
     responses, sessions, seen_tools = {}, {}, set()
+    skipped = {"other": {}, None: {}}
+    first_owner = {}
     notes = Counter()
     for session_id, path in files:
+        owner = first_owner.get(session_id) if owner_of else "ours"
         info = sessions.setdefault(session_id, {"tools": Counter(), "reads": Counter(), "first": None, "last": None})
         with open(path, encoding="utf-8", errors="replace") as f:
             for lineno, line in enumerate(f, 1):
@@ -151,17 +186,30 @@ def read_sessions(files):
                     continue
                 if not isinstance(rec, dict):
                     continue
+                msg = rec.get("message")
+                answer = rec.get("type") == "assistant" and isinstance(msg, dict)
+                if owner_of:
+                    owner = owner_of(rec.get("cwd")) or owner
+                    if owner:
+                        first_owner.setdefault(session_id, owner)
+                if owner != "ours":
+                    if answer:
+                        add_response(rec, msg, session_id, (str(path), lineno), skipped[owner], Counter())
+                    continue
                 ts = rec.get("timestamp")
                 if isinstance(ts, str) and re.match(r"\d{4}-\d\d-\d\d", ts):
                     info["first"] = min(filter(None, (info["first"], ts)))
                     info["last"] = max(filter(None, (info["last"], ts)))
-                msg = rec.get("message")
-                if rec.get("type") != "assistant" or not isinstance(msg, dict):
+                if not answer:
                     continue
                 for block in msg.get("content") if isinstance(msg.get("content"), list) else []:
                     if isinstance(block, dict) and block.get("type") == "tool_use":
                         add_tool(block, info, seen_tools)
                 add_response(rec, msg, session_id, (str(path), lineno), responses, notes)
+    for name, owner in (("other_project", "other"), ("unclear_project", None)):
+        left = [r for key, r in skipped[owner].items() if key not in responses]
+        notes[f"{name}_responses"] = len(left)
+        notes[f"{name}_tokens"] = sum(sum(r["tokens"].values()) for r in left)
     return list(responses.values()), sessions, notes
 
 
@@ -261,8 +309,8 @@ def grade_of(score):
     return "F"
 
 
-def analyze(files, pricing, label, today):
-    responses, sessions, notes = read_sessions(files)
+def analyze(files, pricing, label, today, owner_of=None):
+    responses, sessions, notes = read_sessions(files, owner_of)
     by_session, by_model = {}, {}
     for r in responses:
         by_session.setdefault(r["session"], []).append(r)
@@ -295,6 +343,10 @@ def analyze(files, pricing, label, today):
             "duplicate_lines": notes["duplicate_lines"],
             "lines_without_id": notes["lines_without_id"],
             "broken_lines": notes["broken_lines"],
+            "other_project_responses": notes["other_project_responses"],
+            "other_project_tokens": notes["other_project_tokens"],
+            "unclear_project_responses": notes["unclear_project_responses"],
+            "unclear_project_tokens": notes["unclear_project_tokens"],
             "cache_write_ttl_unknown_tokens": sum(r["unknown_ttl"] for r in responses),
         },
         "totals": {**summarize(responses, pricing), "sessions": len(rows),
@@ -344,7 +396,12 @@ def main():
 
     label = args.label or ("Claude Code 세션" if args.sessions_dir else Path(os.path.abspath(args.repo)).name)
     today = datetime.date.today()
-    result = analyze(session_files(sessions_dir), pricing, label, today)
+    owner_of = None if args.sessions_dir else owner_finder(args.repo)
+    result = analyze(session_files(sessions_dir), pricing, label, today, owner_of)
+    n = result["notes"]
+    for key, why in (("other_project", "기록 폴더 이름이 같은 다른 프로젝트의"), ("unclear_project", "cwd로 어느 프로젝트인지 알 수 없는")):
+        if n[f"{key}_responses"]:
+            print(f"[warn] {why} 응답 {n[f'{key}_responses']}건 / {n[f'{key}_tokens']:,}토큰은 합계에 넣지 않았다.", file=sys.stderr)
     if not result["sessions"]:
         print("[error] 사용량이 적힌 세션이 없다.", file=sys.stderr)
         sys.exit(2)
@@ -354,7 +411,7 @@ def main():
     out = out_dir / "token-analysis.json"
     write_private(out, json.dumps(result, ensure_ascii=False, indent=2))
 
-    t, n = result["totals"], result["notes"]
+    t = result["totals"]
     cost = "가격 모름" if t["cost_usd"] is None else f"${t['cost_usd']:.2f} (API 정가 환산)"
     print(f"[ok] {out}")
     print(f"     세션 {t['sessions']}개, 응답 {t['responses']}건, {cost}, 캐시 적중 {t['cache_hit_ratio'] * 100:.1f}%")

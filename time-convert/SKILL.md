@@ -9,7 +9,7 @@ metadata:
 
 # 시간대 변환
 
-시각 계산은 머리로 하지 않고 `scripts/when.py`로 한다. 결과는 이 컴퓨터의 시간대 자료만큼 맞다. 자료가 오래됐거나 앞으로 규칙이 바뀌면 틀릴 수 있다. 입력은 한국어와 숫자 표기를 읽고 출력은 한국어다.
+시각 계산은 머리로 하지 않고 `S/when.py`로 한다. `S`는 이 스킬 폴더의 `scripts`다. 결과는 이 컴퓨터의 시간대 자료만큼 맞다. 자료가 오래됐거나 앞으로 규칙이 바뀌면 틀릴 수 있다. 입력은 한국어와 숫자 표기를 읽고 출력은 한국어다.
 
 ## 언제 쓰나
 
@@ -22,9 +22,9 @@ metadata:
    완료: `--from`과 `--to`가 모두 IANA 이름, `여기`, `UTC`, 또는 사용자가 설정한 별칭이다. **정하지 못했으면 2로 가지 않는다.**
 2. **돌린다.**
    ```bash
-   python3 -I scripts/when.py "2025-11-24 14:00" --from Asia/Seoul --to 여기,Europe/London
-   python3 -I scripts/when.py "금 오후 1시" --from Asia/Seoul      # 오늘 이후 첫 금요일
-   python3 -I scripts/when.py now --to Asia/Seoul,UTC --json
+   python3 -I S/when.py "2025-11-24 14:00" --from Asia/Seoul --to 여기,Europe/London
+   python3 -I S/when.py "금 오후 1시" --from Asia/Seoul      # 오늘 이후 첫 금요일
+   python3 -I S/when.py now --to Asia/Seoul,UTC --json
    ```
    읽는 입력: `2025-11-24 14:00`, `11/24(월) 오후 2시`, `11월 24일 14시 반`, `금 13:00`, `내일 9시`, `now`. 그 밖의 말("다음 주 금요일", "어제")은 날짜로 풀어 쓴다. 오늘 날짜와 요일은 `now`로 확인한다.
    완료: 종료 코드를 확인했다.
@@ -42,7 +42,7 @@ metadata:
 ## 근거
 
 - 답의 시각·요일·남은 시간은 출력에서 옮긴다. 다시 계산하거나 합치지 않는다. "1일"은 24시간이다.
-- 스킬을 고쳤으면 `python3 tests/run_tests.py` 통과 결과를 보인다.
+- 스킬을 고쳤으면 이 스킬 폴더에서 `python3 tests/run_tests.py` 통과 결과를 보인다.
 
 ## 하지 말 것
 

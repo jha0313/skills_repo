@@ -79,7 +79,7 @@ def resolve(name, places):
 
 # ── 입력 읽기 ───────────────────────────────────────────
 def parse(text, now):
-    """(시간대 없는 시각, 적힌 요일 또는 None, 가정 목록). 남는 글자가 있으면 오류."""
+    """(시간대 없는 시각, 적힌 요일 목록, 가정 목록). 남는 글자가 있으면 오류."""
     rest = re.sub(r"(?<=\d)[Tt](?=\d)", " ", text.strip())
 
     def take(pattern):
@@ -107,13 +107,13 @@ def parse(text, now):
             raise Bad(f"날짜가 두 개다: {text!r}")
         day = today + dt.timedelta(days=NEAR["모레" if "모레" in near.group(0) else near.group(0)])
         notes.append(f"'{near.group(0)}'를 {day}({WEEK[day.weekday()]})로 봤다")
-    said = None
+    said = []
     m = take(r"\(\s*([월화수목금토일])(?:요일)?\s*\)|(?<!\w)([월화수목금토일])(?:요일)?(?=에?(?:\s|$|\d))")
     if m:
-        said = WEEK.index(m.group(1) or m.group(2))
+        said.append(WEEK.index(m.group(1) or m.group(2)))
     m = take(r"(?<!\w)\(?(mon|tue|wed|thu|fri|sat|sun)(?:day|sday|nesday|rsday|urday|s|rs|r)?\)?(?!\w)")
-    if m:
-        said = EN_WEEK.index(m.group(1).lower())
+    if m and EN_WEEK.index(m.group(1).lower()) not in said:
+        said.append(EN_WEEK.index(m.group(1).lower()))
     half = take(r"오전|오후|(?<![a-z])[ap]m(?![a-z])")
     m = take(r"(?<!\d)(\d{1,2})\s*(?::\s*(\d{2})|시\s*(?:(\d{1,2})\s*분|(반))?)(?![\d:])")
     if not m:
@@ -129,8 +129,8 @@ def parse(text, now):
     if hour > 23 or minute > 59:
         raise Bad(f"없는 시각: {hour}:{minute:02d} (자정은 다음 날 00:00으로 적는다)")
     if day is None:
-        day = today + dt.timedelta(days=0 if said is None else (said - today.weekday()) % 7)
-        why = "날짜가 없어 오늘" if said is None else "요일만 있어"
+        day = today + dt.timedelta(days=(said[0] - today.weekday()) % 7 if said else 0)
+        why = "요일만 있어" if said else "날짜가 없어 오늘"
         notes.append(f"{why} {day}({WEEK[day.weekday()]})로 봤다")
     return dt.datetime(day.year, day.month, day.day, hour, minute), said, notes
 
@@ -207,8 +207,8 @@ def convert(a):
     else:
         naive, said, notes = parse(a.when, now.astimezone(tz))
         moments = instants(naive, tz)
-        if said is not None and said != naive.weekday():
-            warnings.append(f"{naive:%Y-%m-%d}는 {WEEK[said]}요일이 아니라 {WEEK[naive.weekday()]}요일이다({src_label} 기준)")
+        warnings += [f"{naive:%Y-%m-%d}는 {WEEK[d]}요일이 아니라 {WEEK[naive.weekday()]}요일이다({src_label} 기준)"
+                     for d in said if d != naive.weekday()]
         if len(moments) == 2:
             warnings.append(f"{naive:%Y-%m-%d %H:%M}은 {src_label}에서 두 번 온다(시계가 뒤로 감). 어느 쪽인지 정해야 한다")
         if not moments:

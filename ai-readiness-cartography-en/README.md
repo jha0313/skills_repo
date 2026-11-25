@@ -8,7 +8,7 @@ npx skills add jha0313/skills_repo --skill ai-readiness-cartography   # 대신 �
 npx skills remove ai-readiness-cartography-en                         # 옛 것 지우기 · remove the old one
 ```
 
-- 영어 출력 · English output: `python3 -I scripts/score.py REPO --lang en`
+- 영어 출력 · English output: `python3 -I <ai-readiness-cartography>/scripts/score.py REPO --lang en` (`<ai-readiness-cartography>`는 새 스킬을 설치한 폴더 · the folder where the new skill is installed)
 - 영어 안내 · English guide: `ai-readiness-cartography/references/SKILL.en.md`
 - v2 점수와 v2.1 점수는 비교할 수 없다. · v2 and v2.1 scores are not comparable.
 

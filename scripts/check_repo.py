@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parent.parent
 SPEC = {"name", "description", "license", "compatibility", "metadata", "allowed-tools"}
 HOST = {"disable-model-invocation", "argument-hint"}  # 호스트 전용. 쓰면 README에 이유를 적는다
 LEGACY = {"presentation_slides"}  # 밑줄 이름. 설치한 사람의 경로를 깨지 않으려고 이름만 남긴다
-TEXT = {".md", ".py", ".json", ".html", ".sh", ".yaml", ".yml", ".toml", ".js", ".cjs", ".mjs", ".css", ".txt"}
+SECRET_NAME = re.compile(r"(?:^|/)(?:\.env(?:\.(?!example$)[^/]+)?|id_(?:rsa|ed25519)|[^/]+\.(?:pem|key|p12|pfx|keystore))$")
 LEAKS = [
     ("개인 절대 경로", re.compile(r"(?<![A-Za-z0-9])/(?:Users|home)/(?!(?:me|you|user|name|<[^>]+>|\$|runner|\.\.\.|…)\b)[A-Za-z0-9._-]+")),
     ("이메일", re.compile(r"[A-Za-z0-9._%+-]+@(?!example\.|anthropic\.com|users\.noreply)[A-Za-z0-9-]+\.(?:com|net|org|io|kr|ai)\b")),
@@ -34,12 +34,23 @@ def frontmatter(path):
     m = re.match(r"---\n(.*?)\n---\n", s, re.S)
     if not m:
         return None, s
-    out = {}
+    out, key = {}, None
     for line in m.group(1).splitlines():
         k = re.match(r"([A-Za-z-]+):\s*(.*)$", line)
         if k:
-            out[k.group(1)] = k.group(2).strip().strip("'\"")
+            key = k.group(1)
+            v = k.group(2).strip()
+            out[key] = "" if re.fullmatch(r"[>|][+-]?", v) else v.strip("'\"")
+        elif key and line.startswith((" ", "\t")):  # 여러 줄 값
+            out[key] = (out[key] + " " + line.strip()).strip()
     return out, s
+
+
+def links(text):
+    """코드 블록·인라인 코드 밖의 상대 링크."""
+    text = re.sub(r"^(```|~~~).*?^\1", "", text, flags=re.S | re.M)
+    text = re.sub(r"`[^`\n]*`", "", text)
+    return [x for x in re.findall(r"\]\(([^)#\s]+)", text) if not re.match(r"[a-z]+:", x) and "{" not in x and "<" not in x]
 
 
 def skills():
@@ -62,8 +73,8 @@ def check_skill(d):
     for f in d.rglob("*.md"):
         if "tests" in f.relative_to(d).parts:
             continue
-        for link in re.findall(r"\]\(([^)#\s]+)", f.read_text(encoding="utf-8")):
-            if not re.match(r"[a-z]+:", link) and "{" not in link and "<" not in link and not (f.parent / link).exists():
+        for link in links(f.read_text(encoding="utf-8")):
+            if not (f.parent / link).exists():
                 bad(str(f.relative_to(ROOT)), f"깨진 링크 {link}")
     return fm
 
@@ -71,7 +82,11 @@ def check_skill(d):
 def check_lists(all_skills):
     live = {d.name for d in all_skills if (frontmatter(d / "SKILL.md")[0] or {}).get("disable-model-invocation") != "true"}
     market = json.loads((ROOT / ".claude-plugin/marketplace.json").read_text(encoding="utf-8"))
-    listed = {Path(s).name for p in market["plugins"] for s in p["skills"]}
+    paths = [s for p in market["plugins"] for s in p["skills"]]
+    for s in paths:
+        if not (ROOT / s / "SKILL.md").exists():
+            bad("marketplace.json", f"{s}에 SKILL.md가 없다")
+    listed = {Path(s).name for s in paths}
     groups = {s for g in json.loads((ROOT / "skills.sh.json").read_text(encoding="utf-8"))["groupings"] for s in g["skills"]}
     for name, have, want in (("marketplace.json", listed, live), ("skills.sh.json", groups, {d.name for d in all_skills})):
         for x in sorted(want - have):
@@ -83,15 +98,28 @@ def check_lists(all_skills):
         for x in sorted(live):
             if f"({x}/" not in text:
                 bad(readme, f"{x} 링크가 없다")
+    for f in ROOT.glob("*.md"):
+        for link in links(f.read_text(encoding="utf-8")):
+            if not (ROOT / link).exists():
+                bad(f.name, f"깨진 링크 {link}")
+        if "{{" in f.read_text(encoding="utf-8"):
+            bad(f.name, "채우지 않은 자리표시 {{ }}")
 
 
 def check_leaks(deny):
-    files = subprocess.run(["git", "ls-files", "-co", "--exclude-standard"], cwd=ROOT, capture_output=True, text=True).stdout.splitlines()
-    for rel in files:
+    r = subprocess.run(["git", "ls-files", "-coz", "--exclude-standard"], cwd=ROOT, capture_output=True, text=True)
+    if r.returncode or not r.stdout:
+        return bad("git", "파일 목록을 못 읽었다. 유출 검사를 하지 못했다")
+    for rel in r.stdout.split("\0"):
         p = ROOT / rel
-        if p.suffix not in TEXT or not p.exists():
+        if not rel or not p.is_file():
             continue
-        for n, line in enumerate(p.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
+        if SECRET_NAME.search(rel):
+            bad(rel, "비밀값 파일 이름")
+        raw = p.read_bytes()
+        if b"\0" in raw[:8000]:  # 이진 파일
+            continue
+        for n, line in enumerate(raw.decode("utf-8", errors="replace").splitlines(), 1):
             if "check_repo: ok" in line:
                 continue
             for what, rx in LEAKS:

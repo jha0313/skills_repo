@@ -1,6 +1,6 @@
 # skill-evaluator
 
-동료의 작업을 검토하듯 Claude Code 스킬을 평가한다. 실제 과제를 주고, 실제로 무엇을 하는지 지켜보고, 독립 채점자가 기록된 근거를 채점하게 한다. 모든 것이 Claude Code의 native `claude plugin eval` sandbox 위에서 로컬로 실행된다.
+동료의 작업을 검토하듯 Claude Code 스킬을 평가한다. 실제 과제를 주고, 실제로 무엇을 하는지 지켜보고, 독립 채점자가 기록된 근거를 채점하게 한다. 세션은 이 컴퓨터의 native `claude plugin eval` sandbox에서 실행되고 산출물도 여기에 남지만, 스킬 파일·fixture·실행 근거는 모델 제공사로 전달된다.
 
 ## 설치
 
@@ -15,6 +15,9 @@ uv run skill-evaluator/scripts/evaluate.py doctor
 ## 사용
 
 ```bash
+# 사례만 만들고 멈춘다 — 처음에는 이것부터 검토
+uv run skill-evaluator/scripts/evaluate.py my-skill
+
 # 사례 4개, 채점 1회, 약 5분 — 스킬을 고쳐 가며 반복할 때
 uv run skill-evaluator/scripts/evaluate.py my-skill --yes --quick
 
@@ -36,7 +39,7 @@ FAIL: 9/10 cases passed, grade B, ~$28.85 (CLI estimate), 43 min
 Report: ~/skill-eval/my-skill/<run-id>/REPORT.md  (HTML: .../REPORT.html)
 ```
 
-`--yes`는 생성된 사례를 승인하고 대상 스킬의 코드가 sandbox에서 실행돼도 된다고 확인하는 것이다. 빼면 표를 출력한 뒤 멈추므로 `<skill>/evals/eval_criteria.yaml`을 편집하고 `--criteria <that file> --yes`로 다시 실행한다. 스킬의 실제 작업에 Read, Glob, Grep, Skill 외의 도구가 필요하면 도구마다 `--allow-tool`을 추가한다. `--open`은 HTML 보고서를 연다. 종료 코드 0은 전체 통과, 1은 사례 실패, 2는 환경 오류로 채점되지 않은 사례가 있음, 130은 중단(`--resume RUN_DIR`로 이어 간다)이다.
+`--yes`는 생성된 사례를 승인하고 대상 스킬의 코드가 sandbox에서 실행돼도 된다고 확인하는 것이다. 빼면 표를 출력한 뒤 멈추므로(`--quick`은 멈추지 않는다) `<skill>/evals/eval_criteria.yaml`을 편집하고 `--criteria <that file> --yes`로 다시 실행한다. 스킬의 실제 작업에 Read, Glob, Grep, Skill 외의 도구가 필요하면 도구마다 `--allow-tool`을 추가한다. `--open`은 HTML 보고서를 연다. 종료 코드 0은 전체 통과, 1은 사례 실패, 2는 환경 오류로 채점되지 않은 사례가 있음, 130은 중단(`--resume RUN_DIR`로 이어 간다)이다.
 
 ## 실행이 하는 일
 

@@ -27,17 +27,18 @@ import sys
 import time
 
 UUID = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
-JUNK_DIRS = {"node_modules", ".git", ".venv", "venv", "__pycache__", ".cache"}
+CACHE_DIRS = {"node_modules", ".venv", "venv", "__pycache__", ".cache"}   # 이 안의 파일도 세되 목록 뒤에 둔다
 JUNK_EXT = {".log", ".output", ".out", ".tmp", ".temp", ".pyc", ".o", ".pid", ".lock", ".sock"}
 SMALL = 10e6
 
 
-def run(*cmd):
-    """명령 출력. 실행하지 못하면 None."""
+def run(*cmd, ok=(0,)):
+    """명령 출력. 실행하지 못했거나 종료 코드가 ok에 없으면 None(출력이 일부만 나왔을 수 있다)."""
     try:
-        return subprocess.run(cmd, capture_output=True, timeout=30).stdout.decode("utf-8", "replace")
+        r = subprocess.run(cmd, capture_output=True, timeout=30)
     except (OSError, subprocess.SubprocessError):
         return None
+    return r.stdout.decode("utf-8", "replace") if r.returncode in ok else None
 
 
 def unescape(name):
@@ -67,7 +68,7 @@ def alive(pid):
 def from_processes():
     out = run("ps", "-xwwo", "pid=,command=")
     if not out or not out.strip():
-        return set(), set(), ["ps를 실행하지 못함"]
+        return set(), set(), ["ps가 실패함"]
     ids, pids = set(), []
     for line in out.splitlines():
         pid, _, cmd = line.strip().partition(" ")
@@ -76,7 +77,9 @@ def from_processes():
             pids.append(int(pid))
     cwd_of, pid = {}, None
     if pids:
-        for line in (run("lsof", "-a", "-d", "cwd", "-Fpn", "-p", ",".join(map(str, pids))) or "").splitlines():
+        # lsof는 그사이 끝난 pid가 있으면 1로 끝난다. 빠진 것은 아래 lost에서 pid마다 본다.
+        out = run("lsof", "-a", "-d", "cwd", "-Fpn", "-p", ",".join(map(str, pids)), ok=(0, 1))
+        for line in (out or "").splitlines():
             if line[:1] == "p":
                 pid = int(line[1:])
             elif line[:1] == "n":
@@ -110,13 +113,14 @@ def title(path):
 
 def look(top):
     """(크기, 가장 최근 수정 시각, 원본일 수 있는 파일, 읽지 못한 곳)"""
-    size, newest, src, bad = 0, 0, [], []
+    size, newest, src, cached, bad = 0, 0, [], [], []
     for path, dirs, files in os.walk(top, onerror=bad.append):
         dirs.sort()
         rel = os.path.relpath(path, top)
-        junk = JUNK_DIRS & set(rel.split(os.sep))
-        if ".git" in dirs and not junk:
-            src.append(os.path.normpath(os.path.join(rel, ".git")))
+        parts = set(rel.split(os.sep))
+        found = cached if CACHE_DIRS & parts else src
+        if ".git" in dirs:
+            found.append(os.path.normpath(os.path.join(rel, ".git")))
         for name in sorted(files):
             try:
                 st = os.lstat(os.path.join(path, name))
@@ -126,9 +130,9 @@ def look(top):
             size += st.st_blocks * 512
             newest = max(newest, st.st_mtime)
             ext = os.path.splitext(name)[1].lower()
-            if stat.S_ISREG(st.st_mode) and st.st_size and not junk and ext not in JUNK_EXT and name != ".DS_Store":
-                src.append(os.path.normpath(os.path.join(rel, name)))
-    return size, newest, src, bad
+            if stat.S_ISREG(st.st_mode) and st.st_size and ".git" not in parts and ext not in JUNK_EXT and name != ".DS_Store":
+                found.append(os.path.normpath(os.path.join(rel, name)))
+    return size, newest, src + cached, bad
 
 
 def cell(text):
@@ -137,14 +141,14 @@ def cell(text):
 
 def main(argv):
     ap = argparse.ArgumentParser(description="세션 작업 폴더를 KEEP/REVIEW/ASK로 판정한다(읽기만).")
-    ap.add_argument("--days", type=float, default=7, help="이 일수 안에 바뀌었으면 KEEP (기본 7, 최소 1)")
+    ap.add_argument("--days", type=float, default=7, help="이 일수 안에 바뀌었으면 KEEP (기본이자 최소 7)")
     ap.add_argument("--all", action="store_true", help="10 MB 미만 KEEP도 모두 보인다")
     ap.add_argument("--no-herdr", action="store_true", help="herdr가 깔려 있어도 보지 않는다")
     ap.add_argument("--root", help="작업 폴더 뿌리 (기본 /private/tmp/claude-<uid>)")
     ap.add_argument("--projects", default=os.path.expanduser("~/.claude/projects"), help="대화 기록 폴더")
     a = ap.parse_args(argv)
-    if not a.days >= 1:
-        ap.error("--days는 1 이상이어야 한다")
+    if not a.days >= 7:
+        ap.error("--days는 7 이상이어야 한다(늘릴 수만 있다)")
     if sys.platform != "darwin" and not a.root:
         ap.error("macOS 전용이다")
     root = a.root or f"/private/tmp/claude-{os.getuid()}"

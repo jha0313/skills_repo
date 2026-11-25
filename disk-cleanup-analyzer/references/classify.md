@@ -12,7 +12,9 @@
 | `~/.cache/uv` | `uv cache dir`, `uv cache size` | `uv cache prune`(덜 지움) / `uv cache clean` | 다시 내려받고 빌드 |
 | `~/Library/Caches/pip` | `pip3 cache dir`, `pip3 cache info` | `pip3 cache purge` | 다시 내려받음 |
 | pnpm store | `pnpm store path` | `pnpm store prune` | 안 쓰는 패키지만 지움. 다음 설치가 느려질 수 있음 |
-| `~/Library/Caches/Homebrew` | `brew cleanup -n --prune=all`(지울 목록만) | `brew cleanup --prune=all` | 다시 내려받음. 옛 버전 프로그램도 지움 |
+| `~/Library/Caches/Homebrew` | `brew cleanup -n --prune=all`(지울 목록만) | `brew cleanup --prune=all` | 내려받은 것만. **옛 버전 프로그램 등 캐시 밖도 지운다.** 그 목록은 따로 승인받는다 |
+
+경로 하나의 승인은 그 경로까지다. 정리 명령의 dry-run에 캐시 밖 대상이 있으면 그 목록도 보여 주고 따로 승인받는다. 거절하면 그 명령을 쓰지 않는다.
 
 오프라인이거나 사내 저장소 접근이 끊겼으면 다시 받을 수 없다. 그때는 ②다.
 

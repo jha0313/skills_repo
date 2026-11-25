@@ -27,7 +27,7 @@ python3 -I <skill>/scripts/skills_lint.py                 # 이 컴퓨터에 설
 python3 -I <skill>/scripts/skills_lint.py --root <저장소>   # 저장소 하나(아래 폴더까지)
 ```
 
-옵션: `--json`(기계용), `--fail-on error|warning|never`(기본 `error`). 종료 코드 1은 **문제가 있다**는 뜻이지 실행 실패가 아니다. 2가 실행 실패다.
+옵션: `--json`(기계용), `--fail-on error|warning|never`(기본 `error`), `--allow-name <이름>`(바꿀 수 없는 옛 이름의 `name-format`만 봐 준다. 사용자가 정한 이름만 준다). 종료 코드 1은 **문제가 있다**는 뜻이지 실행 실패가 아니다. 2가 실행 실패다.
 완료: 첫 줄에 `스킬 N개 · 오류 · 경고`가 나왔고 N이 예상과 맞다. N이 다르면 왜 다른지 알기 전에는 다음 단계로 가지 않는다.
 
 **2. 오류부터 원문을 연다.** 보고의 `파일:줄`을 열어 맞는지 본다.
@@ -37,7 +37,7 @@ python3 -I <skill>/scripts/skills_lint.py --root <저장소>   # 저장소 하�
 | `frontmatter-missing` `frontmatter-unclosed` `frontmatter-yaml` | 오류 | 머리말이 깨져 스킬이 안 읽힐 수 있다 |
 | `name-missing` `name-format` `name-folder` | 오류 | 이름이 없거나 규격(소문자·숫자·하이픈 1~64자, 폴더와 같음)에 어긋난다 |
 | `description-missing` `description-length` `compatibility-length` | 오류 | 1~1,024자, compatibility는 500자까지 |
-| `broken-link` `dangling-symlink` | 오류 | 없는 파일로 가는 링크, 가리키는 곳이 없는 설치 링크 |
+| `broken-link` `dangling-symlink` | 오류 | 없는 파일로 가는 링크(상대 링크는 그 문서 위치에서 찾는다), 가리키는 곳이 없는 설치 링크 |
 | `name-duplicate` | 저장소는 오류, 설치는 경고 | 같은 이름이 다른 파일로 여러 곳에 있다. 내용이 다르면 한쪽이 낡았다 |
 | `field-unknown` | 경고 | 규격 6개 밖의 필드. 일부 에이전트에서만 통한다 |
 | `trigger-overlap` | 경고 | 설명에 **따옴표로 적은** 같은 말을 여러 스킬이 쓴다 |

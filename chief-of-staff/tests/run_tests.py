@@ -325,12 +325,40 @@ class Package(Base):
 
     def test_frontmatter_and_length(self):
         text = (SKILL / "SKILL.md").read_text("utf-8")
-        self.assertLessEqual(len(text.splitlines()), 120)
+        self.assertLessEqual(len(text.splitlines()), 100)
         self.assertEqual(re.search(r"^name: (.+)$", text, re.M)[1], SKILL.name)
         desc = re.search(r"^description: >-\n((?:  .*\n)+)", text, re.M)[1]
         self.assertLessEqual(len(" ".join(desc.split())), 350)
         for field in re.findall(r"^([a-z-]+):", text.split("---")[1], re.M):
             self.assertIn(field, ("name", "description", "license", "compatibility", "metadata"))
+
+    def test_trigger_needs_several_projects(self):
+        desc = (SKILL / "SKILL.md").read_text("utf-8").split("---")[1]
+        for single in ('"상태 어때?"', '"이거 맡아 줘"', '"이번 주는 이게 먼저야"'):
+            self.assertNotIn(single, desc)
+        self.assertIn("여러 프로젝트를 두고", desc)
+        self.assertIn("쓰지 않는다", desc)
+
+    def test_one_approval_has_one_executor(self):
+        """비서실장만 승인을 실행한다. 작업자 쪽 문서가 다르게 말하면 같은 행동이 두 번 나간다."""
+        skill = (SKILL / "SKILL.md").read_text("utf-8")
+        worker = (SKILL / "references/worker.md").read_text("utf-8")
+        projects = (SKILL / "assets/projects.md").read_text("utf-8")
+        self.assertIn("비서실장만", skill)
+        self.assertNotIn("그 행동 한 번만 한다", worker)
+        self.assertNotIn("승인 없이 그 명령을", projects)
+        for text in (worker, projects):
+            self.assertIn("비서실장이 실행한다", text)
+
+    def test_interrupted_approval_looks_outside_first(self):
+        for doc in ("SKILL.md", "assets/decisions.md"):
+            self.assertIn("실행 시작", (SKILL / doc).read_text("utf-8"), doc)
+        self.assertIn("밖의 결과부터", (SKILL / "SKILL.md").read_text("utf-8"))
+
+    def test_masking_wins_over_verbatim(self):
+        """'원문 그대로'라고 적은 문서에는 가림 규칙이 함께 있다."""
+        for doc in ("SKILL.md", "references/dispatch.md", "assets/brief.md", "assets/decisions.md"):
+            self.assertIn("[가림]", (SKILL / doc).read_text("utf-8"), doc)
 
     def test_links_exist(self):
         for doc in [SKILL / "SKILL.md", *SKILL.glob("references/*.md")]:

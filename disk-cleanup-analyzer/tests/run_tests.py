@@ -3,6 +3,7 @@
 
 사용: python3 tests/run_tests.py
 """
+import json
 import os
 import re
 import shlex
@@ -119,9 +120,24 @@ class Sessions(Temp):
         self.session("-w-app", A, [("repo/.git/HEAD", "ref")])
         self.assertEqual(self.verdicts(), {A: "REVIEW"})
 
-    def test_junk_dirs_and_empty_files_do_not_make_review(self):
-        self.session("-w-app", A, [("node_modules/x/index.js", "1"), ("empty.py", ""), (".DS_Store", "x")])
+    def test_logs_bytecode_and_empty_files_do_not_make_review(self):
+        self.session("-w-app", A, [(".cache/run.log", "1"), ("__pycache__/x.pyc", "1"), ("empty.py", ""), (".DS_Store", "x")])
         self.assertEqual(self.verdicts(), {A: "ASK"})
+
+    def test_original_inside_a_cache_folder_is_review(self):
+        # 예전에는 상위 폴더 이름이 캐시면 그 안의 하나뿐인 원본을 세지 않았다
+        for i, f in enumerate([".cache/only-copy.md", "node_modules/x/fix.patch", ".venv/src/a.py", "__pycache__/memo.txt",
+                               "node_modules/x/.git/HEAD"]):
+            with self.subTest(f):
+                proj = f"-w-p{i}"
+                self.session(proj, A, [(f, "data")])
+                r = self.rows()[(proj, A)]
+                self.assertEqual(r["verdict"], "REVIEW")
+                self.assertIn("1개 (예: " + f.replace("/HEAD", ""), r["files"])
+
+    def test_files_outside_cache_folders_are_shown_first(self):
+        self.session("-w-app", A, [(f".cache/{i}.js", "1") for i in range(5)] + [("site/z.html", "<p>")])
+        self.assertIn("6개 (예: site/z.html", self.rows()[("-w-app", A)]["files"])
 
     def test_recent_transcript_keeps(self):
         self.session("-w-app", A, log_days=2)
@@ -202,6 +218,24 @@ class Sessions(Temp):
         self.stub("ps", "", code=1)
         self.assertEqual(self.verdicts(), {A: "KEEP"})
 
+    def test_partial_output_with_failed_exit_keeps_everything(self):
+        self.session("-w-app", A)
+        self.stub("ps", "    1 /sbin/launchd\n", code=1)
+        self.assertEqual(self.rows()[("-w-app", A)]["why"], "확인 실패")
+        self.stub("ps", "    1 /sbin/launchd\n")
+        self.stub("herdr", '{"result":{"agents":[]}}', code=1)
+        self.assertEqual(self.rows()[("-w-app", A)]["why"], "확인 실패")
+
+    def test_lsof_exit_1_is_judged_per_process(self):
+        # lsof는 이미 끝난 pid가 하나만 섞여도 1로 끝난다
+        p = subprocess.Popen(["true"])
+        p.wait()
+        self.session("-w-app", A)
+        self.session("-w-other", B)
+        self.stub("ps", f"  {os.getpid()} claude\n  {p.pid} claude\n")
+        self.stub("lsof", f"p{os.getpid()}\nfcwd\nn/w/app\n", code=1)
+        self.assertEqual(self.verdicts(), {A: "KEEP", B: "ASK"})
+
     def test_process_without_known_cwd_keeps_everything(self):
         self.session("-w-app", A)
         self.stub("ps", f"  {os.getpid()} claude\n")   # 살아 있는 프로세스인데 lsof가 답하지 않음
@@ -274,9 +308,10 @@ class Sessions(Temp):
                            env={"PATH": self.bin.name + ":/usr/bin:/bin", "PYTHONUTF8": "1"})
         self.assertIn("KEEP 1개는 줄였다", r.stdout)
 
-    def test_days_below_one_is_refused(self):
-        for bad in ("0", "-3", "nan"):
+    def test_days_below_seven_is_refused(self):
+        for bad in ("0", "-3", "nan", "1", "6", "6.9"):
             self.run_it("--days", bad, code=2)
+        self.run_it("--days", "7")
 
     def test_nothing_changes_on_disk(self):
         self.session("-w-app", A, [("a.md", "x")])
@@ -356,6 +391,88 @@ class ScanTest(Temp):
         self.assertIn("여유", out)
         self.assertNotIn("##", out)
 
+    def test_free_works_without_library_folder(self):
+        # 리눅스에는 /Library가 없다
+        code = ("import os, runpy, sys\nreal = os.path.lexists\n"
+                "os.path.lexists = lambda p: p != '/Library' and real(p)\n"
+                f"sys.argv = ['scan.py', '--free']\nrunpy.run_path({SCAN!r}, run_name='__main__')")
+        r = subprocess.run([sys.executable, "-I", "-c", code], capture_output=True, text=True, encoding="utf-8",
+                           env={"PATH": "/usr/bin:/bin", "HOME": self.tmp, "PYTHONUTF8": "1"})
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("여유", r.stdout)
+
+    # 승인 기록과 실행 직전 대조
+    def record(self, *paths):
+        rec = os.path.join(self.tmp, "record.json")
+        with open(rec, "w", encoding="utf-8") as f:
+            f.write(self.run_it("--record", *paths))
+        return rec
+
+    def test_record_has_raw_path_bytes_and_mtime_ns(self):
+        f = self.write("it's\na|b/blob", "x" * 5000, 3)
+        st = os.lstat(f)
+        with open(self.record(f, os.path.dirname(f)), encoding="utf-8") as r:
+            got = json.load(r)
+        self.assertEqual([x["path"] for x in got], [f, os.path.dirname(f)])
+        for x in got:
+            self.assertEqual((x["bytes"], x["mtime_ns"]), (st.st_blocks * 512, st.st_mtime_ns))
+            self.assertIn(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(st.st_mtime)), x["shown"])
+
+    def test_check_passes_when_nothing_changed(self):
+        f = self.write("d/blob", "x" * 5000, 3)
+        self.assertIn("같음: ", self.run_it("--check", self.record(os.path.dirname(f), f)))
+
+    def test_check_stops_on_one_hour_difference(self):
+        # 표에서는 날짜도 크기도 같아 보인다
+        f = self.write("d/blob", "x" * 5000)
+        noon = time.mktime((2025, 10, 1, 12, 0, 0, 0, 0, -1))
+        os.utime(f, (noon, noon))
+        rec, before = self.record(os.path.dirname(f)), self.run_it(os.path.dirname(f)).split("## 큰 폴더")[1]
+        os.utime(f, (noon + 3600, noon + 3600))
+        self.assertEqual(self.run_it(os.path.dirname(f)).split("## 큰 폴더")[1], before)
+        self.assertIn("달라짐: ", self.run_it("--check", rec, code=1))
+
+    def test_check_stops_on_size_link_or_unreadable(self):
+        f = self.write("d/blob", "x" * 5000, 3)
+        d, rec = os.path.dirname(f), self.record(os.path.dirname(f))
+        self.write("d/more", "x" * 5000, 5)
+        self.run_it("--check", rec, code=1)
+        self.write("e/blob", "x" * 5000, 3)
+        link = os.path.join(self.tmp, "link")
+        os.symlink(d, link)
+        rec = self.record(os.path.join(self.tmp, "e"))
+        os.rename(os.path.join(self.tmp, "e"), os.path.join(self.tmp, "e2"))
+        os.rename(link, os.path.join(self.tmp, "e"))
+        self.run_it("--check", rec, code=1)
+        os.makedirs(os.path.join(self.tmp, "e2", "locked"))
+        rec, locked = self.record(os.path.join(self.tmp, "e2")), os.path.join(self.tmp, "e2", "locked")
+        self.run_it("--check", rec)
+        os.chmod(locked, 0)
+        self.addCleanup(os.chmod, locked, 0o700)
+        if not os.access(locked, os.R_OK):
+            self.run_it("--check", rec, code=1)
+
+    def test_check_refuses_missing_path_and_broken_record(self):
+        f = self.write("gone/blob", "x")
+        rec = self.record(f)
+        os.unlink(f)
+        self.run_it("--check", rec, code=2)
+        for text in ("", "[]", "{}", "[1]", '[{"path":"/x"}]', '[{"path":"/","bytes":0,"mtime_ns":0}]'):
+            self.run_it("--check", self.write("bad.json", text), code=2)
+        self.run_it("--check", os.path.join(self.tmp, "없음.json"), code=2)
+        self.run_it("--record", code=2)
+        self.run_it("--check", "", code=2)               # 빈 변수가 들어와도 0으로 끝나지 않는다
+        self.run_it("--check", rec, "--free", code=2)
+
+    def test_printed_paths_give_the_real_path_back_in_a_shell(self):
+        # 예전에는 표의 개행과 막대가 다른 글자로 바뀌어 그대로 쓰면 다른 경로가 됐다
+        f = self.write("it's\na|b\\c\td/blob 파일", "x" * 200_000)
+        table = next(row for row in self.small().split("## 큰 파일")[1].splitlines() if "blob" in row)
+        line = next(x for x in self.run_it("--check", self.record(f)).splitlines() if x.startswith("같음: "))
+        for text in (table.split(" | ")[2][:-2], line[len("같음: "):]):
+            r = subprocess.run(["bash", "-c", "printf %s " + text], capture_output=True, text=True, encoding="utf-8")
+            self.assertEqual(r.stdout, f)
+
     def test_nothing_changes_on_disk(self):
         self.write("a/b", "x")
         before = self.tree()
@@ -378,6 +495,17 @@ class Documents(Temp):
         self.assertNotIn("xargs -I", text)
         self.assertNotRegex(text, r"find / ")
         self.assertNotIn("CANDIDATE", text)
+
+    def test_homebrew_command_asks_for_what_is_outside_the_cache(self):
+        # brew cleanup은 승인받은 캐시 경로 밖의 옛 설치 버전도 지운다
+        row = next(x for x in read("references", "classify.md").splitlines() if "brew cleanup -n" in x)
+        self.assertIn("캐시 밖", row)
+        self.assertIn("따로 승인", row)
+        self.assertIn("캐시 밖", read("SKILL.md"))
+
+    def test_skill_uses_the_record_not_the_table(self):
+        for text in ("scan.py --record", "scan.py --check"):
+            self.assertIn(text, read("SKILL.md"))
 
     def test_node_modules_command_handles_spaces_and_quotes(self):
         cmd = next(line for line in read("references", "classify.md").splitlines() if line.startswith("find ~/"))

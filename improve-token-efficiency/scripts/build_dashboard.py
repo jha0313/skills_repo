@@ -134,6 +134,9 @@ def warnings_html(data):
         out.append(f"캐시 쓰기 {compact(n['cache_write_ttl_unknown_tokens'])} 토큰은 5분·1시간 구분이 기록에 없어 5분 가격으로 셌다.")
     if n["broken_lines"]:
         out.append(f"읽지 못한 기록 줄이 {n['broken_lines']:,}개 있다. 실제보다 적게 세었을 수 있다.")
+    for key, why in (("other_project", "기록 폴더 이름이 같은 다른 프로젝트의"), ("unclear_project", "어느 프로젝트인지 알 수 없는")):
+        if n.get(f"{key}_responses"):
+            out.append(f"{why} 응답 {n[f'{key}_responses']:,}건({compact(n[f'{key}_tokens'])} 토큰)은 합계에 넣지 않았다.")
     return "".join(f'<div class="warn"><b>주의</b> · {w}</div>' for w in out)
 
 

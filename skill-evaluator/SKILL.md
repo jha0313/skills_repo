@@ -11,13 +11,18 @@ metadata:
 
 # 스킬 평가
 
-지정한 설치 스킬을 평가한다. 모든 것이 로컬에서 실행된다. native `claude plugin eval` sandbox에서 실제 Claude 세션을 실행한 뒤, 별도 채점 세션이 기록된 근거를 줄 단위로 인용해야 한다. 비용은 실제 모델 사용량이다(quick 실행은 약 $3, 에이전트를 띄우는 스킬의 전체 실행은 $10~30).
+지정한 설치 스킬을 평가한다. 이 컴퓨터의 native `claude plugin eval` sandbox에서 실제 Claude 세션을 실행한 뒤, 별도 채점 세션이 기록된 근거를 줄 단위로 인용해야 한다.
 
-## 세 단계
+- **남는 곳:** 사례, 실행 기록, 보고서는 이 컴퓨터에 남는다.
+- **나가는 것:** 스킬 파일 전체, fixture, 대상 세션이 읽은 내용, 채점할 근거가 **모델 제공사로 전달된다.** 비밀값이 든 스킬이나 fixture로 돌리지 않는다.
+- **비용:** 기준 작성·실행·채점 모두 실제 모델 사용량이다. 실측 예: 2026-09-21, 에이전트를 띄우는 스킬 하나, 사례 10개·채점 3회에 약 $29(CLI 추정이며 청구서가 아니다, [기록](https://github.com/jha0313/skills_repo/blob/main/workflow-orchestrator/evals/EVALUATION-2026-09-21.md)). 스킬과 모델에 따라 크게 다르다.
+
+## 네 단계
 
 1. **환경을 한 번 확인한다:** `uv run <this-skill>/scripts/evaluate.py doctor`. CLI 버전과 native eval 사용 가능 여부를 보고한다. 빠진 것이 있으면 출력된 안내를 따른다.
-2. **실행한다:** `uv run <this-skill>/scripts/evaluate.py TARGET --yes`. TARGET은 스킬 이름 또는 `SKILL.md`가 있는 디렉터리다. `--yes`가 없으면 명령은 테스트 사례를 생성한 뒤 멈추므로 사용자가 출력된 표를 검토하고 `<skill>/evals/eval_criteria.yaml`을 편집할 수 있다. `--yes`는 생성된 사례를 그대로 승인하고 대상 스킬의 코드가 sandbox에서 실행되는 것을 신뢰한다는 뜻이다. 스킬의 실제 작업에 그 도구가 필요할 때만 `--allow-tool Write`(그리고 `Edit`, `Bash`, `Agent`)를 추가한다.
-3. **결과를 읽는다:** 터미널에 사례별 PASS/FAIL과 한 줄 이유, 이어서 보고서 경로가 출력된다. `--open`은 `REPORT.html`을 연다. 채점자가 인용한 모든 것은 `~/skill-eval/<skill>/<run-id>/` 아래에 있다.
+2. **기준을 만들고 검토한다:** `uv run <this-skill>/scripts/evaluate.py TARGET`. TARGET은 스킬 이름 또는 `SKILL.md`가 있는 디렉터리다. 테스트 사례를 만들고 멈춘다. 출력된 표를 사용자에게 보이고, 필요하면 `<skill>/evals/eval_criteria.yaml`을 편집한다. `--quick`만 붙이면 멈추지 않고 실행하므로 `prepare TARGET --quick`을 쓴다.
+3. **실행한다:** 사용자가 사례를 승인하고 대상 코드를 믿는다고 하면 `uv run <this-skill>/scripts/evaluate.py TARGET --criteria <skill>/evals/eval_criteria.yaml --yes`(2단계에서 준 크기 옵션도 함께). `--yes`는 그 사례를 승인하고 대상 스킬의 코드가 sandbox에서 실행되는 것을 신뢰한다는 뜻이다. 스킬의 실제 작업에 그 도구가 필요할 때만 `--allow-tool Write`(그리고 `Edit`, `Bash`, `Agent`)를 추가한다.
+4. **결과를 읽는다:** 터미널에 사례별 PASS/FAIL과 한 줄 이유, 이어서 보고서 경로가 출력된다. `--open`은 `REPORT.html`을 연다. 채점자가 인용한 모든 것은 `~/skill-eval/<skill>/<run-id>/` 아래에 있다.
 
 ## 크기 선택
 

@@ -57,6 +57,12 @@ def blocked(path):
     return None
 
 
+def same(a, b):
+    """두 경로가 같은 파일인가. 심볼릭 링크, 하드 링크, 대소문자만 다른 이름도 같은 파일로 본다."""
+    return os.path.realpath(a) == os.path.realpath(b) or (
+        os.path.exists(a) and os.path.exists(b) and os.path.samefile(a, b))
+
+
 def emit(**rec):
     print(json.dumps(rec, ensure_ascii=False))
 
@@ -135,8 +141,17 @@ def main(argv):
         return fail(f"작업 폴더가 없어요: {cwd}")
     if not os.path.isdir(os.path.dirname(out)):   # 호출이 끝난 뒤에 결과를 잃지 않게 먼저 본다
         return fail(f"결과를 둘 폴더가 없어요: {os.path.dirname(out)}")
-    if a.prompt and os.path.realpath(a.prompt) == os.path.realpath(out):
-        return fail("결과 파일이 프롬프트 파일과 같아요")
+    log, prev = out + ".log", out + ".prev"
+    run_log = os.environ.get("CODEX_REVIEW_LOG")
+    run_log = os.path.abspath(os.path.expanduser(run_log)) if run_log else None
+    files = [("프롬프트", a.prompt), ("결과", out), ("로그", log), ("지난 결과", prev), ("실행 기록", run_log)]
+    files = [(name, path) for name, path in files if path]
+    for i, (name, path) in enumerate(files):   # 프롬프트나 다른 결과를 덮지 않게 열기 전에 본다
+        if os.path.isdir(path):
+            return fail(f"{name} 파일 자리가 폴더예요: {path}")
+        for other, path2 in files[:i]:
+            if same(path, path2):
+                return fail(f"{other}와 {name}이(가) 같은 파일이에요: {path}")
     codex = os.environ.get("CODEX_BIN", "codex")
     if not shutil.which(codex):
         return fail(f"codex 실행 파일을 찾지 못했어요: {codex}", 127)
@@ -156,9 +171,8 @@ def main(argv):
              note="프롬프트와 Codex가 읽은 파일 내용이 모델 제공사로 나가요. 읽는 범위는 작업 폴더로 제한되지 않아요")
         return 0
 
-    log = out + ".log"
     if os.path.exists(out):   # 지난 결과를 새 결과로 착각하지 않게 옮겨 둔다
-        os.replace(out, out + ".prev")
+        os.replace(out, prev)
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(143))   # 종료 신호에도 run()의 정리를 거친다
     t0 = time.time()
     code = run(cmd, prompt, log, a.timeout_min * 60)
@@ -175,11 +189,10 @@ def main(argv):
         rec["error"] = f"{a.timeout_min:g}분 안에 끝나지 않아 멈췄어요"
     elif code == 0 and size == 0:
         rec["error"] = "결과 파일이 비어 있어요. 로그를 보세요"
-    if os.environ.get("CODEX_REVIEW_LOG"):
-        path = os.path.abspath(os.path.expanduser(os.environ["CODEX_REVIEW_LOG"]))
-        os.makedirs(os.path.dirname(path), exist_ok=True)
+    if run_log:
+        os.makedirs(os.path.dirname(run_log), exist_ok=True)
         keep = {k: rec[k] for k in ("exit", "seconds", "out_bytes", "model", "effort", "sandbox")}
-        with open(path, "a", encoding="utf-8") as fh:
+        with open(run_log, "a", encoding="utf-8") as fh:
             fh.write(json.dumps(dict(ts=dt.datetime.now().astimezone().isoformat(timespec="seconds"), cwd=cwd,
                                      ping=a.ping, **keep), ensure_ascii=False) + "\n")
     emit(**rec)

@@ -93,6 +93,26 @@ class PathRegex(Base):
         self.assertEqual(self.cats()["E"].evidence["ref_broken"], 0)
 
 
+class Evidence(Base):
+    def test_every_broken_ref_is_kept(self):
+        """후보마다 판정하려면 근거 JSON에 하나도 빠지지 않아야 한다."""
+        self.write("CLAUDE.md", "".join(f"`src/gone/f{i}.py`\n" for i in range(51)))
+        e = self.cats()["E"].evidence
+        self.assertEqual((e["ref_broken"], len(e["broken_refs"])), (51, 51))
+
+    def test_checkout_location_does_not_change_the_score(self):
+        totals = []
+        for parent in ("plain", ".cache", "build"):
+            self.repo = Path(self._tmp.name).resolve() / parent / "demo"
+            self.write("agent-results.json", "{}")
+            self.write("node_modules/x/agent-results.json", "{}")
+            self.write("src/app.py")
+            report = score.build_report(self.repo, "ko")
+            self.assertEqual(report.categories["G"].evidence["metric_files"], ["agent-results.json"], parent)
+            totals.append(report.total)
+        self.assertEqual(len(set(totals)), 1, totals)
+
+
 class RootContext(Base):
     def score_with(self, name: str) -> tuple[int, int, object]:
         self.write("app/main.py")

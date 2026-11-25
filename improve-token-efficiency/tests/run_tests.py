@@ -48,6 +48,10 @@ def line(mid="m1", req="r1", model="claude-opus-5-5", inp=0, out=0, w5=0, w1=0, 
     return rec
 
 
+def at(cwd, rec):
+    return {**rec, "cwd": str(cwd)}
+
+
 def user(text):
     return {"type": "user", "timestamp": "2026-11-01T00:00:00Z", "message": {"role": "user", "content": text}}
 
@@ -166,7 +170,7 @@ class FindDir(Case):
             repo = self.tmp / name
             repo.mkdir()
             folder = self.tmp / ".claude/projects" / re.sub(r"[^a-zA-Z0-9]", "-", unicodedata.normalize("NFC", str(repo)))
-            self.write("s1.jsonl", line(inp=10), folder=folder)
+            self.write("s1.jsonl", at(repo, line(inp=10)), folder=folder)
             r = self.cli("analyze_sessions.py", "--repo", repo, "--out-dir", self.tmp / f"out-{len(name)}-{name.isascii()}")
             self.assertEqual(r.returncode, 0, f"{name}: {r.stderr}")
 
@@ -188,6 +192,75 @@ class FindDir(Case):
     def test_기록이_없으면_2로_끝난다(self):
         self.assertEqual(self.cli("analyze_sessions.py", "--repo", self.tmp).returncode, 2)
         self.assertFalse((self.tmp / "token-report").exists())
+
+
+class SameFolderName(Case):
+    """my_app과 my-app은 기록 폴더 이름이 같다. 기록에 적힌 cwd로 가른다."""
+
+    def setUp(self):
+        super().setUp()
+        self.ours, self.other = self.tmp / "my_app", self.tmp / "my-app"
+        for d in (self.ours, self.other):
+            d.mkdir()
+        self.folder = self.tmp / ".claude/projects" / A.encode_path(str(self.ours))
+
+    def analyze(self, repo=None):
+        r = self.cli("analyze_sessions.py", "--repo", repo or self.ours, "--out-dir", self.tmp / "out")
+        out = self.tmp / "out/token-analysis.json"
+        return r, json.loads(out.read_text()) if r.returncode == 0 else None
+
+    def test_재현_다른_프로젝트의_토큰과_세션이_섞이지_않는다(self):
+        self.write("aaaa.jsonl", at(self.ours, line("a", "a", inp=10)), folder=self.folder)
+        self.write("bbbb.jsonl", at(self.other, line("b", "b", inp=90, content=[tool("t1")])), folder=self.folder)
+        r, data = self.analyze()
+        self.assertEqual((data["totals"]["input"], data["totals"]["tool_calls"]), (10, 0))
+        self.assertEqual([s["session_id"] for s in data["sessions"]], ["aaaa"])
+        self.assertEqual((data["notes"]["other_project_responses"], data["notes"]["other_project_tokens"]), (1, 90))
+        self.assertIn("다른 프로젝트", r.stderr)
+        self.assertIn("다른 프로젝트", B.build_html(data))
+        self.assertNotIn("bbbb", json.dumps(data))
+        _, data = self.analyze(self.other)
+        self.assertEqual((data["totals"]["input"], data["notes"]["other_project_responses"]), (90, 1))
+
+    def test_귀속을_모르는_기록은_합계에서_빼고_건수를_적는다(self):
+        self.write("aaaa.jsonl", at(self.ours, line("a", "a", inp=10)), folder=self.folder)
+        self.write("cccc.jsonl", line("c", "c", inp=5), line("c", "c", inp=5), at("/elsewhere", line("d", "d", inp=2)), folder=self.folder)
+        r, data = self.analyze()
+        n = data["notes"]
+        self.assertEqual((data["totals"]["input"], n["unclear_project_responses"], n["unclear_project_tokens"]), (10, 2, 7))
+        self.assertIn("2건", r.stderr)
+        self.assertIn("어느 프로젝트", B.build_html(data))
+
+    def test_하위_폴더와_옮겨_간_cwd는_앞의_귀속을_따른다(self):
+        self.write("aaaa.jsonl", at(self.ours, user("x")), at(self.ours / "sub", line("a", "a", inp=1)),
+                   at("/elsewhere", line("b", "b", inp=2)), line("c", "c", inp=4), folder=self.folder)
+        self.write("aaaa/subagents/agent-x.jsonl", at("/elsewhere", line("d", "d", inp=8)), folder=self.folder)
+        _, data = self.analyze()
+        self.assertEqual((data["totals"]["input"], data["notes"]["unclear_project_responses"]), (15, 0))
+
+    def test_한_파일에서_다른_프로젝트로_이어_쓴_부분만_뺀다(self):
+        self.write("aaaa.jsonl", at(self.ours, line("a", "a", inp=1)), at(self.other / "sub", line("b", "b", inp=90)),
+                   line("c", "c", inp=90), folder=self.folder)
+        _, data = self.analyze()
+        self.assertEqual((data["totals"]["input"], data["notes"]["other_project_responses"]), (1, 2))
+
+    def test_심볼릭_링크로_적힌_cwd도_같은_프로젝트다(self):
+        link = self.tmp / "link"
+        link.symlink_to(self.ours)
+        self.write("aaaa.jsonl", at(link, line("a", "a", inp=1)), folder=self.folder)
+        for repo in (self.ours, link):
+            self.assertEqual(self.analyze(repo)[1]["totals"]["input"], 1)
+
+    def test_남의_기록만_있으면_2로_끝나고_건수를_말한다(self):
+        self.write("bbbb.jsonl", at(self.other, line("b", "b", inp=90)), folder=self.folder)
+        r, _ = self.analyze()
+        self.assertEqual(r.returncode, 2)
+        self.assertIn("다른 프로젝트", r.stderr)
+
+    def test_폴더를_직접_고르면_가르지_않는다(self):
+        self.write("bbbb.jsonl", at(self.other, line("b", "b", inp=90)), folder=self.folder)
+        r = self.cli("analyze_sessions.py", "--sessions-dir", self.folder, "--out-dir", self.tmp / "out")
+        self.assertEqual(r.returncode, 0, r.stderr)
 
 
 class Dedup(Case):

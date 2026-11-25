@@ -221,6 +221,42 @@ class CodexReviewTest(unittest.TestCase):
         self.assertEqual(self.review("--out", self.prompt)[0], 2)
         self.assertFalse(self.called())
 
+    # 경로 충돌: 파일을 열기 전에 거절하고 아무것도 바꾸지 않는다
+    def refused(self, *args, keep=None, **env):
+        code, res, _ = self.call("--cd", self.work, *args, **env)
+        self.assertEqual((code, self.called()), (2, False), args)
+        self.assertIn("같은 파일", res["error"])
+        if keep:
+            with open(keep, encoding="utf-8") as fh:
+                self.assertEqual(fh.read(), "원본")
+
+    def test_prompt_must_not_be_the_log_or_prev_of_the_result(self):
+        for name in ("review.log", "review.prev"):
+            prompt = self.write(name, "원본")
+            self.refused("--prompt", prompt, "--out", self.path("review"), keep=prompt)
+
+    def test_collision_is_found_through_links(self):
+        prompt = self.write("p.md", "원본")
+        os.symlink(prompt, self.path("a.log"))
+        os.link(prompt, self.path("b.log"))
+        for out in ("a", "b"):
+            self.refused("--prompt", prompt, "--out", self.path(out), keep=prompt)
+        os.symlink(self.path("c"), self.path("c.log"))   # 로그가 결과를 덮는다
+        self.refused("--prompt", prompt, "--out", self.path("c"), keep=prompt)
+
+    def test_collision_is_found_in_dry_run_and_run_log(self):
+        prompt = self.write("review.log", "원본")
+        self.refused("--prompt", prompt, "--out", self.path("review"), "--dry-run", keep=prompt)
+        self.refused("--prompt", prompt, CODEX_REVIEW_LOG=prompt, keep=prompt)
+
+    def test_result_path_must_not_be_a_folder(self):
+        for out in (self.work, self.path("x")):
+            os.makedirs(self.path("x.log"), exist_ok=True)
+            code, res, _ = self.review("--out", out)
+            self.assertEqual((code, self.called()), (2, False), out)
+            self.assertIn("폴더", res["error"])
+        self.assertTrue(os.path.isdir(self.work))
+
     def test_missing_codex(self):
         code, res, _ = self.review(CODEX_BIN=self.path("no-codex"))
         self.assertEqual(code, 127)

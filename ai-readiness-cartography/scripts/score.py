@@ -620,7 +620,7 @@ def score_e(repo: Path, context_files: list[Path]) -> CategoryScore:
         evidence={
             "ref_total": total_refs,
             "ref_broken": len(bad_refs),
-            "broken_refs": [f"{p.relative_to(repo).as_posix()}: {ref}" for p, ref in bad_refs[:50]],
+            "broken_refs": [f"{p.relative_to(repo).as_posix()}: {ref}" for p, ref in bad_refs],
             "codeowners": has_codeowners,
             "pr_template": has_pr_template,
             "ci_workflows": have_workflows,
@@ -754,7 +754,7 @@ def score_f(modules: list[Module], repo: Path) -> CategoryScore:
 def score_g(repo: Path) -> CategoryScore:
     eval_dirs = [p for p in ("evals", "benchmarks", "agent-evals", "agent-metrics") if (repo / p).exists()]
     metric_files = list(repo.glob("**/agent-results.json")) + list(repo.glob("**/.skill-eval.json"))
-    metric_files = [m for m in metric_files if not any(seg in m.parts for seg in IGNORE_DIRS)]
+    metric_files = [m for m in metric_files if not any(seg in m.relative_to(repo).parts for seg in IGNORE_DIRS)]
     has_telemetry_hint = any(
         re.search(r"telemetry|opentelemetry|claude.*session|agent.*log",
                   read_text(p), re.IGNORECASE)

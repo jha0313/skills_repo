@@ -5,6 +5,7 @@
 """
 import json
 import os
+import shlex
 import subprocess
 import sys
 import unittest
@@ -160,6 +161,17 @@ class When(unittest.TestCase):
         self.ok("2025-11-21(금) 13:00", "--from", SEOUL)
         self.ok("내일(토) 13:00", "--from", SEOUL, "--now", "2025-11-19 12:00", code=3)
 
+    def test_two_weekdays_that_disagree_warn(self):
+        # 예전에는 영어 요일이 한국어 요일을 덮었다
+        for text in ("2025-11-24(일) Mon 14:00", "2025-11-24(월) Sun 14:00"):
+            with self.subTest(text):
+                out = self.ok(text, "--from", SEOUL, code=3)
+                self.assertEqual(len(out["warnings"]), 1)
+                self.assertIn("일요일이 아니라 월요일", out["warnings"][0])
+        self.ok("(금) Sat 14:00", "--from", SEOUL, "--now", "2025-11-19 22:00", code=3)
+        self.ok("2025-11-24(월) Mon 14:00", "--from", SEOUL)
+        self.assertEqual(len(self.ok("2025-11-24(일) Sun 14:00", "--from", SEOUL, code=3)["warnings"]), 1)
+
     def test_leftover_text_is_an_error(self):
         # 예전에는 조용히 버려서 다른 시각으로 계산했다
         for text in ("2025-11-24 14:00 PST", "2025-11-24T14:00+09:00", "다음 주 금요일 10:00", "14:00:30",
@@ -214,6 +226,21 @@ class When(unittest.TestCase):
     def test_unknown_local_zone_is_an_error_not_utc(self):
         self.bad("2025-11-24 10:00", tz="KST-9", say="알 수 없다")
         self.ok("2025-11-24 10:00", "--from", SEOUL, "--to", "UTC", tz="KST-9")
+
+    # 문서
+    def test_skill_commands_run_from_any_folder(self):
+        scripts = os.path.dirname(SCRIPT)
+        with open(os.path.join(os.path.dirname(scripts), "SKILL.md"), encoding="utf-8") as f:
+            text = f.read()
+        self.assertIn("`S`는 이 스킬 폴더의 `scripts`", text)
+        commands = [x.strip() for x in text.splitlines() if x.strip().startswith("python3 -I ")]
+        self.assertGreaterEqual(len(commands), 3)
+        for c in commands:
+            with self.subTest(c):
+                args = [a.replace("S/", scripts + "/", 1) if a.startswith("S/") else a for a in shlex.split(c, comments=True)]
+                r = subprocess.run([sys.executable, *args[1:]], capture_output=True, text=True, encoding="utf-8",
+                                   cwd="/", env={"PATH": "/usr/bin:/bin", "TZ": PHX})
+                self.assertEqual(r.returncode, 0, r.stderr)
 
     # 화면
     def test_text_output(self):

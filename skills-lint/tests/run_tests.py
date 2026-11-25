@@ -90,6 +90,16 @@ class LintTest(unittest.TestCase):
             os.rename(self.repo, self.p("done-" + str(len(os.listdir(self.tmp)))))
         self.assertEqual(self.one(front("a" * 64), folder="a" * 64), [])
 
+    def test_name_exception_is_explicit_and_only_for_the_format(self):
+        self.skill("old_name", front("old_name"))
+        self.skill("bad_name", front("bad_name"))
+        allow = ("--root", self.repo, "--allow-name", "old_name")
+        self.assertEqual([(i["code"], i["message"][-8:]) for i in self.lint(*allow)["issues"]], [("name-format", "bad_name")])
+        self.assertEqual(self.call(*allow, "--allow-name", "bad_name").returncode, 0)
+        self.assertEqual(self.codes(), ["name-format", "name-format"])
+        self.skill("other", front("old_name"))
+        self.assertIn("name-folder", self.codes(*allow))
+
     def test_name_must_match_folder(self):
         self.assertEqual(self.one(front("beta")), ["name-folder"])
 
@@ -140,13 +150,20 @@ class LintTest(unittest.TestCase):
 
     # 링크와 경로
     def test_broken_links(self):
-        self.write(os.path.join(self.repo, "alpha", "references", "a b.md"), "[위](../SKILL.md) [뿌리](references/a%20b.md) [없음](x.md)\n")
+        self.write(os.path.join(self.repo, "alpha", "references", "a b.md"), "[위](../SKILL.md) [옆](a%20b.md) [없음](x.md)\n")
         self.skill("alpha", front("alpha") + "\n".join([
             "[됨](references/a%20b.md#절) [웹](https://example.com/x.md) [위치](#절) [예시](url) [자리](<이름>.md) ![](img/none.png)",
             "```", "[코드](none.md)", "```", "`[코드](none.md)` <!-- [주석](none.md) -->", "[정의]: references/none.md"]))
         got = sorted((i["code"], i["level"], i["message"].split(": ")[1], i["line"]) for i in self.lint()["issues"])
         self.assertEqual(got, [("broken-link", "error", "img/none.png", 5), ("broken-link", "error", "references/none.md", 10),
                                ("broken-link", "error", "x.md", 1)])
+
+    def test_links_resolve_from_the_document_not_the_skill_root(self):
+        self.write(os.path.join(self.repo, "alpha", "file.md"), "")
+        self.write(os.path.join(self.repo, "alpha", "references", "test.md"), "[루트에만 있음](file.md) [됨](../file.md)\n")
+        self.skill("alpha", front("alpha") + "[됨](file.md)\n")
+        self.assertEqual([(i["code"], i["message"].split(": ")[1], i["line"]) for i in self.lint()["issues"]],
+                         [("broken-link", "file.md", 1)])
 
     def test_stale_paths_inside_the_skill(self):
         self.write(os.path.join(self.repo, "alpha", "scripts", "ok.py"), "")
