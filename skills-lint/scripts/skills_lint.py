@@ -127,14 +127,19 @@ def line_of(text, pos):
 
 
 def blank_code(text):
-    """펜스와 들여쓰기 코드 줄을 빈칸으로 바꾼다. 앞 줄이 문단이면 네 칸 들여써도 문단이다(CommonMark)."""
-    out, lists, fence, para = [], [], None, False   # lists: 열린 목록 항목들의 본문이 시작하는 칸
+    """펜스·들여쓰기 코드·HTML 주석 줄을 빈칸으로 바꾼다. 앞 줄이 문단이면 네 칸 들여써도 문단이다(CommonMark)."""
+    out, lists, fence, para = [], [], None, False   # lists: 열린 목록 항목·각주의 본문이 시작하는 칸
+    comment = False
     for line in text.split("\n"):
         s = line.expandtabs(4)
         ind, body = len(s) - len(s.lstrip(" ")), s.strip()
         inner = lists[-1] if lists else 0
-        if fence and body and ind < inner:
-            fence = None   # 목록 항목이 끝나면 그 안의 펜스도 끝난다
+        if body and ind < inner:
+            fence, comment = None, False   # 목록 항목이 끝나면 그 안의 펜스와 주석도 끝난다
+        if comment:
+            comment = "-->" not in body
+            out.append(" " * len(line))
+            continue
         if fence:
             if re.fullmatch(re.escape(fence) + re.escape(fence[0]) + "*", body) and ind < inner + 4:
                 fence = None
@@ -145,7 +150,8 @@ def blank_code(text):
             out.append(line)
             continue
         item = re.match(r" *(?:[-*+]|\d{1,9}[.)])(?: {1,4}(?! )|(?= {5})|$)", s)
-        block = item or re.match(r"#{1,6}(?: |$)|```[^`]*$|~~~", body)
+        note = re.match(r" *\[\^[^\]\s]+\]:", s)   # 각주 본문은 네 칸 들여쓴다
+        block = item or note or re.match(r"#{1,6}(?: |$)|```[^`]*$|~~~|<!--", body)
         while lists and ind < lists[-1] and (block or not para):
             lists.pop()
         inner = lists[-1] if lists else 0
@@ -159,6 +165,13 @@ def blank_code(text):
                 out.append(" " * len(line))
                 para = False
                 continue
+        elif note:
+            lists.append(inner + 4)
+            body = s[note.end():].strip()
+        if body.startswith("<!--"):   # 주석 줄은 문단이 아니다
+            comment, para = "-->" not in body, False
+            out.append(" " * len(line))
+            continue
         f = re.match(r"(`{3,})[^`]*$|(~{3,})", body)
         fence = f and (f.group(1) or f.group(2))
         para = bool(body) and not fence and not re.match(r"#{1,6}(?: |$)|(?:=+|-+|\*{3,}|_{3,})$", body)

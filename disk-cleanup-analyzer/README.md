@@ -30,8 +30,8 @@ Python 3.9 이상(macOS 개발 도구에 든 `python3`로 된다). herdr(에이�
   ① 다시 만들어지는 캐시: ~/.cache/uv 6.1 GB, 마지막 수정 어제, 다음 설치 때 다시 받음
   ② 검토: 시뮬레이터 14.0 GB (안의 앱 데이터가 사라짐)
   세션 폴더: KEEP 5 · REVIEW 2(scratchpad/site/index.html, tasks/b1.output) · ASK 0
-  항목마다 물을게요. uv 캐시를 지울까요?
-나: 응, 그것만.
+  항목마다 물을게요. uv 캐시를 지울까요? (symlink 방식으로 설치했다면 이미 설치된 패키지가 깨집니다)
+나: symlink는 안 써. 응, 그것만.
 에이전트: 다시 쟀고 값이 같습니다. uv cache clean → 여유 11.8 → 17.6 GB
 ```
 

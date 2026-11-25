@@ -47,7 +47,7 @@ npx skills add jha0313/skills_repo --skill codex-review
 
 - **읽기를 막지 못합니다.** codex-cli 0.167.2(macOS)에서 `codex sandbox -c 'sandbox_mode="read-only"'`로 확인: 작업 폴더 밖 파일 읽기는 되고, 쓰기는 작업 폴더 안도 거절됩니다(2026-11-24). `CODEX_REVIEW_BLOCK`은 `--cd`, `--add-dir` 인자만 검사하므로 실수 방지용입니다. 정말 보이면 안 되는 자료는 다른 계정이나 컨테이너로 나누세요.
 - **사용자의 Codex 설정을 그대로 씁니다.** MCP 서버, 훅, `AGENTS.md`도 함께 읽힙니다. Codex는 세션 기록을 `$CODEX_HOME`에 남깁니다.
-- **로그에 내용이 남습니다.** `<결과>.log`에는 프롬프트와 Codex의 출력이 들어 있습니다. 결과·로그·`.prev`는 0600(나만 읽기)으로 만들지만, 직접 쓴 프롬프트 파일의 권한은 바꾸지 않습니다. git에 올리지 마세요.
+- **로그에 내용이 남습니다.** `<결과>.log`에는 프롬프트와 Codex의 출력이 들어 있습니다. 결과·로그·`.prev`는 0600(나만 읽기)으로 만들고, 그 자리가 심볼릭 링크면 대상을 건드리지 않고 멈춥니다. 직접 쓴 프롬프트 파일의 권한은 바꾸지 않습니다. git에 올리지 마세요.
 - **웹 검색 값은 Codex 버전에 묶입니다.** 기본은 `web_search="disabled"`(검색 도구 없음), `--web`이면 `web_search="live"`를 늘 명시해서 사용자 설정의 검색 모드를 물려받지 않습니다([설정 문서](https://learn.chatgpt.com/docs/config-file/config-reference), 2026-11-24). 0.167.2에서 `live`를 주면 외부 웹 접근이 켜지는 것은 실행으로, `disabled`의 뜻은 문서로 확인했습니다. 다른 버전에서 값이 바뀌었으면 `scripts/codex_review.py`의 `WEB_KEY` 줄을 고치세요. MCP 도구나 셸 명령의 네트워크는 이 값이 막지 않습니다.
 - 지적이 맞는지는 보장하지 않습니다. 그래서 확인 단계가 있습니다.
 

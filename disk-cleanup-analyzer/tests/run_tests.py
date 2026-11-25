@@ -605,13 +605,20 @@ class Documents(Temp):
         # brew cleanup은 미리보기에 없는 잠금 파일과 옛 설치 버전도, pnpm store prune은 저장소 밖 dlx 캐시와 전역 설치 잔여도 지운다
         rows = [x.split(" | ") for x in read("references", "classify.md").splitlines() if x.startswith("| ")]
         # npm cache clean은 형제 폴더 _logs의 오래된 로그도 지운다
-        for name in ("brew cleanup --prune=all", "pnpm store prune", "npm cache clean --force"):
+        for name in ("brew cleanup --prune=all", "pnpm store prune", "npm cache clean --force --cache <_cacache의 부모>"):
             cells = [r[2] for r in rows if len(r) == 4 and f"`{name}`" in " ".join(r)]
             self.assertEqual(len(cells), 1, name)
             self.assertTrue(cells[0].startswith("안내만"), cells)
         self.assertNotIn("npm cache clean", read("README.md"))     # 예시 대화에서도 에이전트가 치지 않는다
         for text in ("안내만", "캐시 밖"):
             self.assertIn(text, read("SKILL.md"))
+
+    def test_uv_symlink_installs_are_told_before_approval(self):
+        # link-mode가 symlink면 캐시를 지울 때 이미 설치된 패키지가 깨진다
+        row = next(x for x in read("references", "classify.md").splitlines() if "uv cache clean" in x)
+        example = next(x for x in read("README.md").splitlines() if "uv 캐시를 지울까요" in x)
+        for text in (row, example):
+            self.assertIn("symlink", text)
 
     def test_only_known_read_only_commands_before_approval(self):
         # npm cache clean은 --force가 있으면 --dry-run이어도 캐시를 지운다. uv·pip·pnpm에는 정리 dry-run이 없다

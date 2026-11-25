@@ -193,6 +193,27 @@ class LintTest(unittest.TestCase):
 
         self.assertEqual(self.links_in("- ```\n  [예](no.md)\n\n[진짜](no.md)\n"), [4], "항목이 끝나면 펜스도 끝난다")
 
+    def test_footnote_body_is_not_indented_code(self):
+        note = "글[^env]\n\n[^env]: 첫 문단\n\n"
+        for why, body, lines in (
+            ("둘째 문단", note + "    [진짜](no.md)\n", [5]), ("빈 줄 없이", "[^a]: 글\n    [진짜](no.md)\n", [2]),
+            ("첫 줄이 비어도", "[^a]:\n\n    [진짜](no.md)\n", [3]), ("각주 안 목록", note + "    - 하나\n\n      [진짜](no.md)\n", [7]),
+            ("각주 안 코드", note + "        [예](no.md)\n", []), ("각주 안 펜스", note + "    ```\n    [예](no.md)\n    ```\n", []),
+            ("각주가 끝난 뒤", note + "글\n\n    [예](no.md)\n", []), ("각주가 아님", "[^a] 글\n\n    [예](no.md)\n", []),
+        ):
+            self.assertEqual(self.links_in(body), lines, why)
+
+    def test_html_comment_line_is_not_a_paragraph(self):
+        code = "    [예](no.md)\n"
+        for why, body, lines in (
+            ("한 줄", "<!-- Markdown example -->\n" + code, []), ("여러 줄", "<!--\n설명\n-->\n" + code, []),
+            ("문단 뒤", "글\n<!-- x -->\n" + code, []), ("목록 안", "- <!-- x -->\n\n  <!-- y -->\n  " + code, []),
+            ("주석 안 펜스", "<!--\n```\n-->\n[진짜](no.md)\n", [4]), ("주석 안 링크", "<!--\n[예](no.md)\n\n" + code + "-->\n", []),
+            ("주석 뒤 빈 줄과 글", "<!-- x -->\n\n[진짜](no.md)\n", [3]), ("문장 속 주석", "글 <!-- x -->\n    [진짜](no.md)\n", [2]),
+            ("항목이 끝나면 주석도", "- <!-- x\n\n[진짜](no.md)\n", [3]),
+        ):
+            self.assertEqual(self.links_in(body), lines, why)
+
     def test_code_example_does_not_fail_ci(self):
         self.skill("alpha", front("alpha") + "\n설명\n\n    [example](missing.md)\n")
         self.assertEqual(self.call("--root", self.repo, "--fail-on", "error").returncode, 0)

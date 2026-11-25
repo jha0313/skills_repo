@@ -238,6 +238,24 @@ class CodexReviewTest(unittest.TestCase):
         with open(self.path("r1.out.md.prev"), encoding="utf-8") as fh:
             self.assertEqual(fh.read(), "옛 리뷰")
 
+    def test_symlinked_output_is_refused_and_its_target_is_untouched(self):
+        target = self.write("team-archive.md", "팀 보관본")
+        os.chmod(target, 0o644)
+        for name in ("r1.out.md", "r1.out.md.log", "r1.out.md.prev"):
+            os.symlink(target, self.path(name))
+            for extra in ((), ("--dry-run",)):
+                code, res, _ = self.review(*extra)
+                self.assertEqual((code, self.called()), (2, False), name)
+                self.assertIn("링크", res["error"])
+            self.assertEqual(self.mode_of("team-archive.md"), "0o644", name)
+            with open(target, encoding="utf-8") as fh:
+                self.assertEqual(fh.read(), "팀 보관본")
+            os.unlink(self.path(name))
+
+    def test_output_that_is_not_a_regular_file_is_refused(self):
+        os.mkfifo(self.path("r1.out.md.log"))
+        self.assertEqual((self.review()[0], self.called()), (2, False))
+
     def test_interrupted_or_empty_run_keeps_the_previous_result(self):
         self.review()
         self.review(mode="empty")

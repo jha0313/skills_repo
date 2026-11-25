@@ -27,6 +27,7 @@ import os
 import re
 import shutil
 import signal
+import stat
 import subprocess
 import sys
 import tempfile
@@ -87,12 +88,16 @@ def stop(proc):
             pass
 
 
-def make_private(path):
-    """빈 0600 파일로 만든다. 이미 있던 파일도 쓰기 전에 권한을 좁힌다."""
-    fd = os.open(path, os.O_WRONLY | os.O_CREAT, 0o600)
+def make_private(path, keep=False):
+    """0600 일반 파일로 만든다. keep이 아니면 비운다. 심볼릭 링크는 따라가지 않는다."""
+    flags = os.O_RDONLY if keep else os.O_WRONLY | os.O_CREAT
+    fd = os.open(path, flags | os.O_NOFOLLOW | os.O_NONBLOCK, 0o600)
     try:
+        if not stat.S_ISREG(os.fstat(fd).st_mode):
+            raise OSError(f"일반 파일이 아니에요: {path}")
         os.fchmod(fd, 0o600)
-        os.ftruncate(fd, 0)
+        if not keep:
+            os.ftruncate(fd, 0)
     finally:
         os.close(fd)
 
@@ -164,6 +169,9 @@ def main(argv):
         for other, path2 in files[:i]:
             if same(path, path2):
                 return fail(f"{other}와 {name}이(가) 같은 파일이에요: {path}")
+    for name, path in (("결과", out), ("로그", log), ("지난 결과", prev)):   # 링크 대상의 내용과 권한을 바꾸지 않는다
+        if os.path.lexists(path) and not stat.S_ISREG(os.lstat(path).st_mode):
+            return fail(f"{name} 파일 자리가 심볼릭 링크이거나 일반 파일이 아니에요: {path}")
     codex = os.environ.get("CODEX_BIN", "codex")
     if not shutil.which(codex):
         return fail(f"codex 실행 파일을 찾지 못했어요: {codex}", 127)
@@ -187,8 +195,8 @@ def main(argv):
     try:
         if os.path.exists(out) and os.path.getsize(out):   # 지난 결과를 새 결과로 착각하지 않게 옮겨 둔다
             os.replace(out, prev)
-        if os.path.exists(prev):   # 옛 실행이 남긴 백업도 좁힌다
-            os.chmod(prev, 0o600)
+        if os.path.lexists(prev):   # 옛 실행이 남긴 백업도 좁힌다
+            make_private(prev, keep=True)
         for path in (out, log):   # 프롬프트와 리뷰 내용이 들어간다. codex가 쓰기 전에 나만 읽게 만든다
             make_private(path)
     except OSError as e:
@@ -201,10 +209,10 @@ def main(argv):
     finally:
         if os.path.exists(out):
             size = os.path.getsize(out)
-            if size:
-                os.chmod(out, 0o600)   # codex가 새 파일로 바꿔치기했을 때
-            else:
+            if not size:
                 os.unlink(out)   # 미리 만든 빈 파일을 결과로 남기지 않는다
+            elif not os.path.islink(out):
+                make_private(out, keep=True)   # codex가 새 파일로 바꿔치기했을 때
     rec = dict(exit=code, seconds=round(time.time() - t0, 1), out=out, log=log, out_bytes=size,
                model=a.model, effort=effort, sandbox=a.sandbox)
     if a.ping:
