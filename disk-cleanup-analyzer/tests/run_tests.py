@@ -68,7 +68,7 @@ class Sessions(Temp):
             f.write(f"#!/bin/sh\ncat '{text}'\nexit {code}\n")
         os.chmod(path, 0o755)
 
-    def session(self, proj, sid, files=(("tasks/b8pbadumr.output", "log"),), log_days=30, file_days=30, name=""):
+    def session(self, proj, sid, files=(("__pycache__/a.cpython-312.pyc", "x"),), log_days=30, file_days=30, name=""):
         for f, text in files:
             self.write(f"root/{proj}/{sid}/{f}", text, file_days)
         top = os.path.join(self.tmp, "root", proj, sid)
@@ -116,19 +116,21 @@ class Sessions(Temp):
         for i, f in enumerate(["Makefile", "main.swift", "notes.docx", "clip.mp4", "fix.patch",
                                "Cargo.lock", "uv.lock", "poetry.lock", "flake.lock",
                                "measurements.out", "bench.log", "result.output", "draft.tmp", "old.temp", "main.o",
-                               "lib.pyc", "server.pid", "sub/tasks/b8pbadumr.output", "tasks/notes.md",
-                               "tasks/measurements.output", "tasks/benchmark.output"]):
+                               "lib.pyc", "server.pid", "tasks/notes.md", "tasks/baseline1.output",
+                               "tasks/b8pbadumr.output", "tasks/a0997b76d23ad8e67.output"]):
             with self.subTest(f):
                 proj = f"-w-p{i}"
                 self.session(proj, A, [(f, "data")])
-                self.assertEqual(self.rows()[(proj, A)]["verdict"], "REVIEW")
+                r = self.rows()[(proj, A)]
+                self.assertEqual(r["verdict"], "REVIEW")
+                self.assertIn(f, r["files"])
 
     def test_git_dir_is_review(self):
         self.session("-w-app", A, [("repo/.git/HEAD", "ref")])
         self.assertEqual(self.verdicts(), {A: "REVIEW"})
 
     def test_only_files_known_to_be_made_by_tools_do_not_make_review(self):
-        self.session("-w-app", A, [("tasks/b8pbadumr.output", "1"), ("tasks/a0997b76d23ad8e67.output", "1"), ("src/__pycache__/x.cpython-312.pyc", "1"),
+        self.session("-w-app", A, [("tasks/b8pbadumr.output", ""), ("src/__pycache__/x.cpython-312.pyc", "1"),
                                    ("empty.py", ""), (".DS_Store", "x")])
         self.assertEqual(self.verdicts(), {A: "ASK"})
 
@@ -602,17 +604,18 @@ class Documents(Temp):
     def test_commands_that_delete_outside_the_path_are_only_told_to_the_user(self):
         # brew cleanup은 미리보기에 없는 잠금 파일과 옛 설치 버전도, pnpm store prune은 저장소 밖 dlx 캐시와 전역 설치 잔여도 지운다
         rows = [x.split(" | ") for x in read("references", "classify.md").splitlines() if x.startswith("| ")]
-        for name in ("brew cleanup --prune=all", "pnpm store prune"):
+        # npm cache clean은 형제 폴더 _logs의 오래된 로그도 지운다
+        for name in ("brew cleanup --prune=all", "pnpm store prune", "npm cache clean --force"):
             cells = [r[2] for r in rows if len(r) == 4 and f"`{name}`" in " ".join(r)]
             self.assertEqual(len(cells), 1, name)
             self.assertTrue(cells[0].startswith("안내만"), cells)
+        self.assertNotIn("npm cache clean", read("README.md"))     # 예시 대화에서도 에이전트가 치지 않는다
         for text in ("안내만", "캐시 밖"):
             self.assertIn(text, read("SKILL.md"))
 
     def test_only_known_read_only_commands_before_approval(self):
         # npm cache clean은 --force가 있으면 --dry-run이어도 캐시를 지운다. uv·pip·pnpm에는 정리 dry-run이 없다
-        known = {"npm config get cache --logs-max=1000000 --no-update-notifier", "uv cache dir", "uv cache size", "pip3 cache dir", "pip3 cache info",
-                 "pnpm store path", "brew --cache", "brew cleanup -n --prune=all", "<출력>/_cacache"}
+        known = {"uv cache dir", "uv cache size", "pip3 cache dir", "pip3 cache info"}
         text = read("references", "classify.md").split("## ①")[1].split("## ②")[0]
         self.assertIn("| 흔한 경로 | 승인 전 조회(캐시를 지우지 않음) |", text)
         rows = [x.split(" | ")[1] for x in text.splitlines() if x.startswith("| ") and "---" not in x][1:]
@@ -620,8 +623,7 @@ class Documents(Temp):
         for row in rows:
             self.assertLessEqual(set(re.findall(r"`([^`]+)`", row)), known)
         self.assertIn("npm에는 안전한 dry-run이 없다", text)
-        self.assertNotIn("`npm config get cache`", text)      # 기본값이면 오래된 로그를 지운다
-        self.assertIn("`<출력>/_cacache`", text)
+        self.assertNotIn("npm config get", text)               # npm은 조회만 해도 오래된 로그를 지운다
         skill = read("SKILL.md")
         self.assertIn("승인 전 조회", skill)
         self.assertNotIn("먼저 dry-run을 돌려", skill)

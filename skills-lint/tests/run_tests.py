@@ -158,6 +158,45 @@ class LintTest(unittest.TestCase):
         self.assertEqual(got, [("broken-link", "error", "img/none.png", 5), ("broken-link", "error", "references/none.md", 10),
                                ("broken-link", "error", "x.md", 1)])
 
+    def links_in(self, body):
+        """본문만 있는 하위 문서에서 깨진 링크로 본 줄 번호."""
+        self.skill("alpha", front("alpha"))
+        self.write(os.path.join(self.repo, "alpha", "references", "doc.md"), body)
+        return [i["line"] for i in self.lint()["issues"] if i["code"] == "broken-link"]
+
+    def test_indented_code_is_not_a_link(self):
+        code = "    [예](no.md)"
+        for why, body in {
+            "문서 시작": code, "빈 줄 뒤": "글\n\n" + code, "이어지는 줄": f"글\n\n{code}\n{code}\n\n{code}",
+            "탭": "글\n\n\t[예](no.md)", "제목 바로 뒤": "# 제목\n" + code, "펜스 바로 뒤": "```\nx\n```\n" + code,
+            "목록이 끝난 뒤": "- 하나\n\n글\n\n" + code, "목록 안 코드": "- 하나\n\n      [예](no.md)",
+        }.items():
+            self.assertEqual(self.links_in(body + "\n"), [], why)
+        self.assertEqual(self.links_in(f"글\n\n{code}\n\n[진짜](no.md)\n"), [5])
+
+    def test_indented_paragraph_is_still_a_paragraph(self):
+        for why, body, line in (
+            ("문단 이어 쓰기", "글\n    [진짜](no.md)", 2), ("세 칸", "글\n\n   [진짜](no.md)", 3),
+            ("목록 항목 이어 쓰기", "- 글\n      [진짜](no.md)", 2), ("목록 항목의 둘째 문단", "1. 글\n\n    [진짜](no.md)", 3),
+            ("바깥 항목으로 돌아온 문단", "- a\n  - b\n    - c\n\n    [진짜](no.md)", 5),
+            ("깊은 항목", "- a\n  - b\n    - [진짜](no.md)", 3),
+        ):
+            self.assertEqual(self.links_in(body + "\n"), [line], why)
+
+    def test_fences_inside_lists_are_not_links(self):
+        for why, body in {
+            "항목 안": "1. 하나\n   ```\n   [예](no.md)\n   ```\n", "둘째 단계": "- a\n  - b\n\n    ~~~md\n    [예](no.md)\n    ~~~\n",
+            "항목 첫 줄": "- ```\n  [예](no.md)\n  ```\n", "더 긴 펜스": "````\n```\n[예](no.md)\n```\n````\n",
+        }.items():
+            self.assertEqual(self.links_in(body), [], why)
+            self.assertEqual(self.links_in(body + "\n[진짜](no.md)\n"), [body.count("\n") + 2], why)
+
+        self.assertEqual(self.links_in("- ```\n  [예](no.md)\n\n[진짜](no.md)\n"), [4], "항목이 끝나면 펜스도 끝난다")
+
+    def test_code_example_does_not_fail_ci(self):
+        self.skill("alpha", front("alpha") + "\n설명\n\n    [example](missing.md)\n")
+        self.assertEqual(self.call("--root", self.repo, "--fail-on", "error").returncode, 0)
+
     def test_links_resolve_from_the_document_not_the_skill_root(self):
         self.write(os.path.join(self.repo, "alpha", "file.md"), "")
         self.write(os.path.join(self.repo, "alpha", "references", "test.md"), "[루트에만 있음](file.md) [됨](../file.md)\n")

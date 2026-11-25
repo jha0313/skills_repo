@@ -126,9 +126,49 @@ def line_of(text, pos):
     return text.count("\n", 0, pos) + 1
 
 
+def blank_code(text):
+    """펜스와 들여쓰기 코드 줄을 빈칸으로 바꾼다. 앞 줄이 문단이면 네 칸 들여써도 문단이다(CommonMark)."""
+    out, lists, fence, para = [], [], None, False   # lists: 열린 목록 항목들의 본문이 시작하는 칸
+    for line in text.split("\n"):
+        s = line.expandtabs(4)
+        ind, body = len(s) - len(s.lstrip(" ")), s.strip()
+        inner = lists[-1] if lists else 0
+        if fence and body and ind < inner:
+            fence = None   # 목록 항목이 끝나면 그 안의 펜스도 끝난다
+        if fence:
+            if re.fullmatch(re.escape(fence) + re.escape(fence[0]) + "*", body) and ind < inner + 4:
+                fence = None
+            out.append(" " * len(line))
+            continue
+        if not body:
+            para = False
+            out.append(line)
+            continue
+        item = re.match(r" *(?:[-*+]|\d{1,9}[.)])(?: {1,4}(?! )|(?= {5})|$)", s)
+        block = item or re.match(r"#{1,6}(?: |$)|```[^`]*$|~~~", body)
+        while lists and ind < lists[-1] and (block or not para):
+            lists.pop()
+        inner = lists[-1] if lists else 0
+        if ind >= inner + 4:
+            out.append(line if para else " " * len(line))
+            continue
+        if item:
+            lists.append(len(item.group(0)) + item.group(0).endswith(tuple("-*+.)")))
+            body = s[item.end():].strip()
+            if s[item.end():].startswith(" " * 5):   # 표시 뒤 다섯 칸부터는 항목 안의 들여쓰기 코드
+                out.append(" " * len(line))
+                para = False
+                continue
+        f = re.match(r"(`{3,})[^`]*$|(~{3,})", body)
+        fence = f and (f.group(1) or f.group(2))
+        para = bool(body) and not fence and not re.match(r"#{1,6}(?: |$)|(?:=+|-+|\*{3,}|_{3,})$", body)
+        out.append(" " * len(line) if fence else line)
+    return "\n".join(out)
+
+
 def broken_links(path):
-    text = read(path)
-    for pattern in (r"^[ \t]*(```+|~~~+).*?^[ \t]*\1[ \t]*$", r"<!--.*?-->", r"(`+)(?!`)[^\n]+?(?<!`)\1(?!`)"):
+    text = blank_code(read(path))
+    for pattern in (r"<!--.*?-->", r"(`+)(?!`)[^\n]+?(?<!`)\1(?!`)"):
         text = blank(pattern, text)
     hits = list(re.finditer(r"\]\([ \t]*(?:<([^>\n]+)>|([^)\s]+))(?:[ \t]+[\"'][^\n]*?[\"'])?[ \t]*\)", text))
     hits += re.finditer(r"^ {0,3}\[[^\]^\n][^\]\n]*\]:[ \t]*(?:<([^>\n]+)>|(\S+))", text, re.M)

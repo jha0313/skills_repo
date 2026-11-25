@@ -231,6 +231,13 @@ class CodexReviewTest(unittest.TestCase):
         with open(self.path("r1.out.md.log"), encoding="utf-8") as fh:
             self.assertNotIn("옛 내용", fh.read())
 
+    def test_loose_backup_becomes_private_even_without_a_current_result(self):
+        os.chmod(self.write("r1.out.md.prev", "옛 리뷰"), 0o644)
+        self.assertEqual(self.review()[0], 0)
+        self.assertEqual(self.mode_of("r1.out.md.prev"), "0o600")
+        with open(self.path("r1.out.md.prev"), encoding="utf-8") as fh:
+            self.assertEqual(fh.read(), "옛 리뷰")
+
     def test_interrupted_or_empty_run_keeps_the_previous_result(self):
         self.review()
         self.review(mode="empty")

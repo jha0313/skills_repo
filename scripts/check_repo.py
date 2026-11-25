@@ -14,6 +14,9 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "skills-lint/scripts"))
+sys.dont_write_bytecode = True
+from skills_lint import blank_code  # noqa: E402
 SPEC = {"name", "description", "license", "compatibility", "metadata", "allowed-tools"}
 HOST = {"disable-model-invocation", "argument-hint"}  # 호스트 전용. 쓰면 README에 이유를 적는다
 LEGACY = {"presentation_slides"}  # 밑줄 이름. 설치한 사람의 경로를 깨지 않으려고 이름만 남긴다
@@ -49,25 +52,9 @@ def frontmatter(path):
 
 
 def links(text):
-    """코드 블록·인라인 코드 밖의 상대 링크. 목록 안 펜스는 펜스로, 네 칸 들여쓴 줄(목록 밖)은 들여쓰기 코드로 본다."""
-    out, fence, inner = [], "", 0  # inner: 지금 목록 항목의 본문이 시작하는 칸
-    for line in text.splitlines():
-        ind = len(line) - len(line.lstrip(" "))
-        f = re.match(r" *(```+|~~~+)", line)
-        if fence:
-            if f and f.group(1).startswith(fence) and not line.strip().strip("`~"):
-                fence = ""
-            continue
-        item = re.match(r" *(?:[-*+]|\d+[.)]) +", line)
-        if item and ind < inner + 4:
-            inner = len(item.group(0))
-        elif line.strip() and ind < inner:
-            inner = 0
-        if f and ind < inner + 4:
-            fence = f.group(1)
-        elif ind < inner + 4:
-            out.append(re.sub(r"`[^`\n]*`", "", line))
-    return [x for x in re.findall(r"\]\(([^)#\s]+)", "\n".join(out)) if not re.match(r"[a-z]+:", x) and "{" not in x and "<" not in x]
+    """코드 블록·인라인 코드 밖의 상대 링크. 코드 판별은 skills-lint와 같은 함수를 쓴다."""
+    text = re.sub(r"`[^`\n]*`", "", blank_code(text))
+    return [x for x in re.findall(r"\]\(([^)#\s]+)", text) if not re.match(r"[a-z]+:", x) and "{" not in x and "<" not in x]
 
 
 def skills():

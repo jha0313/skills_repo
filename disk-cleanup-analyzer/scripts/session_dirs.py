@@ -28,9 +28,9 @@ import time
 
 UUID = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
 CACHE_DIRS = {"node_modules", ".venv", "venv", "__pycache__", ".cache"}   # 이 안의 파일도 세되 목록 뒤에 둔다
-# 도구가 만든 것으로 확인한 경로만 원본 후보에서 뺀다: Claude Code 백그라운드 작업의 출력, 파이썬 바이트코드, Finder 파일.
-# 확장자만 보고 빼지 않는다(.log·.out·.tmp도 하나뿐인 측정 결과일 수 있다).
-TOOL_MADE = re.compile(r"tasks/(?:a[0-9a-f]{16}|[bw](?=[a-z]*[0-9])[0-9a-z]{8})\.output|(?:.*/)?__pycache__/[^/]+\.pyc|(?:.*/)?\.DS_Store")
+# 이것과 빈 파일만 원본 후보에서 뺀다: 파이썬 바이트코드, Finder 파일.
+# 이름만 보고 빼지 않는다(.log·.out·tasks/*.output도 하나뿐인 측정 결과일 수 있다).
+TOOL_MADE = re.compile(r"(?:.*/)?__pycache__/[^/]+\.pyc|(?:.*/)?\.DS_Store")
 SMALL = 10e6
 
 

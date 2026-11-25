@@ -187,6 +187,7 @@ def main(argv):
     try:
         if os.path.exists(out) and os.path.getsize(out):   # 지난 결과를 새 결과로 착각하지 않게 옮겨 둔다
             os.replace(out, prev)
+        if os.path.exists(prev):   # 옛 실행이 남긴 백업도 좁힌다
             os.chmod(prev, 0o600)
         for path in (out, log):   # 프롬프트와 리뷰 내용이 들어간다. codex가 쓰기 전에 나만 읽게 만든다
             make_private(path)
