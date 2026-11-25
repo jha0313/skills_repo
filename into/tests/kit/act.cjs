@@ -1,5 +1,5 @@
 // 시험용: 해 보기를 키보드로만 눌러 본다(브라우저 필요). 사용: node act.cjs <HTML 폴더>   — 스킬은 이 파일에 기대지 않는다.
-// 1 단추를 누른 뒤에도 초점이 그 그림(카드) 안에 남는다  2 레인: 어느 단계·요청에서도 말이 1280×800 안  3 차트: 기준 없는 행은 열기만, 나머지는 이름에 적힌 답이 맞음  4 예측 카드에 지어낸 보기가 없다(walk는 보기를 손으로 쓴 예)
+// 1 단추를 누른 뒤에도 초점이 그 그림(카드) 안에 남는다  2 레인: 어느 단계·요청에서도 말이 1280×800 안  3 차트: 기준 없는 행은 열기만, 나머지는 이름에 적힌 답이 맞음  4 예측 카드에 지어낸 보기가 없다(walk는 보기를 손으로 쓴 예)  5 폭을 바꿔도 말의 모양이 같다
 const fs = require('fs'), path = require('path');
 const puppeteer = require(process.env.PUPPETEER || 'puppeteer');
 const dir = process.argv[2];
@@ -25,6 +25,7 @@ const dir = process.argv[2];
       for (let i = 0; i < k; i++) { await p.evaluate(i => document.querySelector('.fig[data-part=lanes] .grp').querySelectorAll('.bt')[i].click(), i); m = Math.max(m, await low()); }
       if (m > 800) fail(f + ' 말이 화면 아래로 밀림 ' + m);
     }
+    await open(); { const t = () => p.evaluate(() => { const x = [...document.querySelectorAll('.bt')].find(e => /다음 단계/.test(e.textContent)); if (x) x.click(); return [...document.querySelectorAll('.say')].map(e => e.innerHTML).join('|'); }); const a = await t(); await p.setViewport({ width: 1072, height: 800 }); await new Promise(r => setTimeout(r, 500)); const b2 = await p.evaluate(() => [...document.querySelectorAll('.say')].map(e => e.innerHTML).join('|')); if (a !== b2) fail(f + ' 폭을 바꾸면 말의 모양이 바뀐다'); await p.setViewport({ width: 1280, height: 800 }); await open(); }
     if (f.startsWith('chart-base')) {
       const rows = await p.evaluate(() => [...document.querySelectorAll('.br')].map(r => [r.querySelector('.nm').textContent, [...r.querySelectorAll('.bt')].map(x => x.textContent).join()]));
       for (const [name, bs] of rows) {
