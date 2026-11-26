@@ -4,6 +4,7 @@ project:
 kind: <!-- ship | run | scout -->
 due: <!-- YYYY-MM-DD, 없으면 비움 -->
 started: <!-- 작업자를 띄운 시각 YYYY-MM-DD HH:MM -->
+model: <!-- route.py가 낸 값. 공급자 모델 effort (예: claude opus high, codex 설정의 기본 모델 high) -->
 worker: <!-- 작업자가 있는 곳. herdr는 세션 이름과 탭·pane id(예: herdr pay_fix, wT:t2 · wT:p9), subagent는 이름. 보고판에 나온다 -->
 workspace: <!-- 작업할 절대 경로 -->
 ask: <!-- 사용자 답을 기다리는 것. 답을 받으면 비운다 -->

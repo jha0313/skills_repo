@@ -1,5 +1,10 @@
 # 변경 기록
 
+## 미정 — chief-of-staff 0.3
+
+**더함**
+- `chief-of-staff` — 작업마다 어느 공급자·모델·effort로 보낼지 스크립트가 정한다. `usage.py`가 Claude 주간·Fable 주간·Codex 주간 사용량과 빈 메모리를 읽고, `route.py`가 작업 종류 × 난이도(`high`·`mid`·`low`)의 기본 표에 한도 속도(이대로면 초기화 전에 닿나, 남나)를 얹어 고른다. Codex 작업자를 herdr로 띄우는 명령(쓸 수 있는 곳은 작업의 결과 폴더 `out`뿐이고 brief는 쓰지 못한다. 옮기지 않은 결과는 보고판이 `내 차례`에 올린다), brief의 `model` 칸, 빈 메모리 30% 아래면 띄우지 않기, 리셋권은 사용자에게 묻기만 하기, 도는 작업자를 옮겨도 되는 조건(`references/routing.md`)
+
 ## 미정 — chief-of-staff 0.2
 
 **바꿈**
