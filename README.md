@@ -29,7 +29,7 @@ Claude Code 플러그인으로도 된다: `/plugin marketplace add jha0313/skill
 
 | 스킬 | 한 줄 | 확인한 것 |
 |---|---|---|
-| [chief-of-staff](chief-of-staff/README.md) | 여러 프로젝트를 비서실장 세션 하나에 맡기고, 오늘 볼 것 3개만 받는다 | 테스트 55개 |
+| [chief-of-staff](chief-of-staff/README.md) | 여러 프로젝트를 비서실장 세션 하나에 맡기고, 오늘 볼 것 3개만 받는다 | 테스트 155개 |
 | [workflow-orchestrator](workflow-orchestrator/README.md) | 한 작업을 조사·계획·구현·검증·리뷰로 나눠 끝까지 위임한다 | 행동 평가 사례 10개 |
 
 ### 검증한다 — "통과했다는데 정말?"

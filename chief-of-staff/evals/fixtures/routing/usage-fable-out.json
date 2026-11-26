@@ -1,0 +1,1 @@
+{"cli": {"claude": true, "codex": true}, "claude": {"used": 50, "reset_h": 80, "window_h": 168}, "fable": {"used": 99, "reset_h": 80, "window_h": 168}, "codex": {"used": 45, "reset_h": 70, "window_h": 168}, "mem_free_pct": 60}

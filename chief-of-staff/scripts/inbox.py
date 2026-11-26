@@ -141,8 +141,11 @@ def load_task(folder, today, warn):
     if state == "done":
         label = "확인됨" if fresh else f"{'확인 뒤 결과가 바뀜' if checked else '확인 전(작업자의 말)'}, 지문 {mark}"
         return put("읽을 것", f"{label}: {short(result.get('SUMMARY')) or '요약 없음'}")
+    if body is None and (folder / "out" / "result.md").is_file():
+        return put("내 차례", "out/result.md가 있음. 결과를 작업 폴더로 옮기고 다시 본다", stuck=True)
     if head.get("started"):
-        return put("작업 중", f"시작 {short(head['started'], 30)}, 결과 없음")
+        where = f", 작업자 {short(head['worker'], 60)}" if head.get("worker") else ""
+        return put("작업 중", f"시작 {short(head['started'], 30)}, 결과 없음{where}")
     return put("작업 중", "시작 전")
 
 
