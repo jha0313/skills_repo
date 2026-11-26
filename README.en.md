@@ -14,7 +14,7 @@ Claude Code plugin: `/plugin marketplace add jha0313/skills_repo` → `/plugin i
 
 | Group | Skill | What it does |
 |---|---|---|
-| Understand | [into](into/README.md) | Skeletons only: the order that reads best for a PR, repo, design doc, paper, thread, skill or curriculum, at three depths. Pair it with a tone (ELI5, STE100) and a drawing skill (visualize) |
+| Understand | [into](into/README.md) | Skeletons only: the order that reads best for a PR, repo, design doc, paper, thread, skill or curriculum, at three depths. On request it recasts that outline as a quiz, a short-video script or a long-video script. Pair it with a tone (ELI5, STE100) and a drawing skill (visualize) |
 | Delegate | [chief-of-staff](chief-of-staff/README.md) | One session runs many projects and shows you the three things to look at now |
 | Delegate | [workflow-orchestrator](workflow-orchestrator/README.md) | Runs one task end to end through delegated research, planning, building, verification and review |
 | Verify | [codex-review](codex-review/README.md) | Sends a review to another vendor's model and acts only on findings that were confirmed |
